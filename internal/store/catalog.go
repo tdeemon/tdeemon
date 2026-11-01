@@ -110,7 +110,9 @@ func restoreCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.E
 	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, "UPDATE foods SET catalog_id = ? WHERE user_id = ? AND id = ?", link, userID.String(), e.Entity); err != nil {
+	// The row before, unless it went since.
+	if _, err := tx.ExecContext(ctx, "UPDATE foods SET catalog_id = (SELECT id FROM catalog_foods WHERE id = ?) WHERE user_id = ? AND id = ?",
+		link, userID.String(), e.Entity); err != nil {
 		return err
 	}
 	var current int64
@@ -134,10 +136,11 @@ func restoreCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.E
 
 // restoreLegacyCatalog takes back what userID's save of food e, made
 // before the catalog, gave it through the migration: the row of the
-// name and brand the save left, untouched since (its first version) and
-// as the save left it, gets the food's values before; or, for a save
-// that made the food, goes, when no other food names it. Anything else
-// stays.
+// name and brand the save left, untouched since (its first version), as
+// the save left it, and of no food saved after it, gets the food's
+// values before; or, for a save that made the food, goes, when no other
+// food names it. Anything else stays, and a save of a food the catalog
+// does not take never changes it.
 func restoreLegacyCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Event, now time.Time) error {
 	if e.Action != event.FoodSave || e.After == nil {
 		return nil
@@ -145,6 +148,9 @@ func restoreLegacyCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e e
 	var after food.Food
 	if err := decode(e.After, &after); err != nil {
 		return err
+	}
+	if !catalogued(after) {
+		return nil
 	}
 	// By the name and brand the save left, as the food may be gone.
 	var id string
@@ -162,6 +168,14 @@ func restoreLegacyCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e e
 	}
 	if !sameCatalogValues(row.Food, after) {
 		return nil
+	}
+	// The migration made the row of the food saved last: another's saved
+	// after e is the row's, which stays.
+	var later bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM foods WHERE catalog_id = ? AND NOT (user_id = ? AND id = ?)
+		AND updated_at > ? AND archived = 0 AND source IN ('label', 'reference', 'off'))`,
+		id, userID.String(), e.Entity, formatTime(e.At)).Scan(&later); err != nil || later {
+		return err
 	}
 	if e.Before == nil {
 		_, err := tx.ExecContext(ctx, "UPDATE foods SET catalog_id = NULL WHERE user_id = ? AND id = ?", userID.String(), e.Entity)
