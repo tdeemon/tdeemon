@@ -166,10 +166,11 @@ its note or aliases, which are the user's own words; an estimate, a
 user's word, a dish, a recipe or an archived food never does. One
 product is one row, by its name and brand, else the row the food went
 into before (renamed with it), else one of its barcodes; the latest
-save of any user's food wins. An undo of a save puts the row back as
-the save found it, another user's values and barcodes in it, unless a
-save came since, which stays; a row the save made goes with it, unless
-a food names it still. A row keeps the newest ten barcodes, as a food
+save of any user's food wins, but a barcode stays the product's that
+had it first: a code is one product's. An undo of a save puts the row
+back as the save found it, another user's values in it, unless a save
+came since, which stays; a row the save made goes with it, unless a
+food names it still. A row keeps the newest ten barcodes, as a food
 does. The row has an id of
 its own and names no user, and a user's deletion leaves it: a label's
 values are no one's personal data. A user's search finds their foods

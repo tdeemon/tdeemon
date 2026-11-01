@@ -328,53 +328,33 @@ func TestUndoLeavesARowWhoseNameWasTaken(t *testing.T) {
 	}
 }
 
-// An undo leaves the row when a later save took a barcode of it.
-func TestUndoLeavesARowWhoseBarcodeWasTaken(t *testing.T) {
+// A barcode stays the product's that had it first: another product's
+// save with it leaves it where it is.
+func TestABarcodeStaysWithItsFirstProduct(t *testing.T) {
 	t.Parallel()
 
 	db, ana, ivo := withTwoUsers(t)
-	anas := saveFood(t, db, ana, tuna(116))
-	anas.Nutrients.Kcal = 118
-	saveFood(t, db, ana, anas)
+	saveFood(t, db, ana, tuna(116))
 	crackers := bar()
 	crackers.Aliases = nil
 	crackers = saveFood(t, db, ivo, crackers)
 	crackers.Barcodes = []string{"3850104000010"}
 	saveFood(t, db, ivo, crackers)
-	if _, err := db.UndoLast(t.Context(), ana, testActor, t0.Add(time.Minute)); err != nil {
-		t.Fatal(err)
-	}
 	got, err := db.CatalogFoodByBarcode(t.Context(), "3850104000010")
-	if err != nil || got.Name != crackers.Name {
-		t.Errorf("the barcode's food after Ana's undo = %+v, %v; want Ivo's bar, saved since", got, err)
+	if err != nil || got.Name != "Tuna u vlastitom soku" {
+		t.Errorf("the barcode's food after Ivo's bar = %+v, %v; want the tuna, which had it first", got, err)
 	}
-	if tunas := findCatalog(t, db, ivo, "tuna"); len(tunas) != 1 || tunas[0].Nutrients.Kcal != 118 {
-		t.Errorf("the tuna after Ana's undo = %+v; want her 118 kcal, left as it is", tunas)
+	if bars := findCatalog(t, db, addEva(t, db), "caramel"); len(bars) != 1 || len(bars[0].Barcodes) != 0 {
+		t.Errorf("Eva's search for the bar = %+v; want it without the tuna's barcode", bars)
 	}
 }
 
-// A barcode taken from another row goes back to it with an undo, and a
-// row keeps food.MaxBarcodes of its barcodes, the newest, so a food made
-// of it is valid.
+// A row keeps food.MaxBarcodes of its barcodes, the newest, so a food
+// made of it is valid.
 func TestCatalogBarcodes(t *testing.T) {
 	t.Parallel()
 
 	db, ana, ivo := withTwoUsers(t)
-	saveFood(t, db, ana, tuna(116))
-	other := bar()
-	other.Aliases, other.Barcodes = nil, []string{"3850104000010"}
-	saveFood(t, db, ivo, other)
-	moved, err := db.CatalogFoodByBarcode(t.Context(), "3850104000010")
-	if err != nil || moved.Name != other.Name {
-		t.Fatalf("the barcode's food after Ivo's save = %+v, %v; want his bar", moved, err)
-	}
-	if _, err := db.UndoLast(t.Context(), ivo, testActor, t0.Add(time.Minute)); err != nil {
-		t.Fatal(err)
-	}
-	if back, err := db.CatalogFoodByBarcode(t.Context(), "3850104000010"); err != nil || back.Name != "Tuna u vlastitom soku" {
-		t.Errorf("the barcode's food after Ivo's undo = %+v, %v; want the tuna again", back, err)
-	}
-
 	codes := func(first int) []string {
 		var out []string
 		for i := first; i < first+food.MaxBarcodes; i++ {
@@ -428,14 +408,13 @@ func TestUndoLeavesABarcodeAnotherRowTookSince(t *testing.T) {
 }
 
 // An undo puts a row's barcodes back in their order, so the next save
-// lets the oldest go; and a row given back a barcode keeps
-// food.MaxBarcodes of them.
-func TestUndoKeepsTheBarcodesOrderAndCount(t *testing.T) {
+// lets the oldest go.
+func TestUndoKeepsTheBarcodesOrder(t *testing.T) {
 	t.Parallel()
 
 	db, ana, ivo := withTwoUsers(t)
-	codes := make([]string, 0, 2*food.MaxBarcodes+2)
-	for i := range 2*food.MaxBarcodes + 2 {
+	codes := make([]string, 0, food.MaxBarcodes+1)
+	for i := range food.MaxBarcodes + 1 {
 		codes = append(codes, ean13(t, 400000000000+i))
 	}
 	anas := tuna(116)
@@ -452,62 +431,10 @@ func TestUndoKeepsTheBarcodesOrderAndCount(t *testing.T) {
 	if want := codes[1 : food.MaxBarcodes+1]; err != nil || !slices.Equal(got.Barcodes, want) {
 		t.Errorf("the tuna's barcodes after Ivo's undo and save again = %v, %v; want %v, the oldest gone", got.Barcodes, err, want)
 	}
-
-	// Ana's bar takes a barcode of the tuna's; ten newer come to the
-	// tuna; Ana's undo gives the barcode back, and the tuna keeps ten.
-	ivosBar := bar()
-	ivosBar.Aliases = nil
-	saveFood(t, db, ivo, ivosBar)
-	anasBar := bar()
-	anasBar.Aliases, anasBar.Barcodes = nil, codes[food.MaxBarcodes:food.MaxBarcodes+1]
-	saveFood(t, db, ana, anasBar)
-	newer := tuna(116)
-	newer.Aliases, newer.Barcodes = nil, codes[food.MaxBarcodes+2:]
-	saveFood(t, db, addEva(t, db), newer)
-	if _, err := db.UndoLast(t.Context(), ana, testActor, t0.Add(2*time.Minute)); err != nil {
-		t.Fatal(err)
-	}
-	var n int
-	if err := db.Read().QueryRowContext(t.Context(), "SELECT count(*) FROM catalog_barcodes WHERE catalog_id = ?",
-		got.ID.String()).Scan(&n); err != nil || n != food.MaxBarcodes {
-		t.Errorf("the tuna has %d barcodes, %v; want %d", n, err, food.MaxBarcodes)
-	}
-}
-
-// An undo gives a barcode back to the row it was taken from in its place
-// in age, so that row's next save lets its oldest go still.
-func TestUndoGivesABarcodeBackInItsPlace(t *testing.T) {
-	t.Parallel()
-
-	db, ana, ivo := withTwoUsers(t)
-	codes := make([]string, 0, food.MaxBarcodes+1)
-	for i := range food.MaxBarcodes + 1 {
-		codes = append(codes, ean13(t, 400000000000+i))
-	}
-	ivos := tuna(116)
-	ivos.Aliases, ivos.Barcodes = nil, codes[:food.MaxBarcodes]
-	ivos = saveFood(t, db, ivo, ivos)
-	ivosBar := bar()
-	ivosBar.Aliases = nil
-	saveFood(t, db, ivo, ivosBar)
-	anasBar := bar()
-	anasBar.Aliases, anasBar.Barcodes = nil, codes[:1]
-	saveFood(t, db, ana, anasBar)
-	if _, err := db.UndoLast(t.Context(), ana, testActor, t0.Add(time.Minute)); err != nil {
-		t.Fatal(err)
-	}
-	evas := ivos
-	evas.ID, evas.Barcodes = uuid.NewV7(), codes[food.MaxBarcodes:]
-	saveFood(t, db, addEva(t, db), evas)
-	got, err := db.CatalogFoodByBarcode(t.Context(), codes[1])
-	if want := codes[1:]; err != nil || !slices.Equal(got.Barcodes, want) {
-		t.Errorf("the tuna's barcodes = %v, %v; want %v, its oldest gone", got.Barcodes, err, want)
-	}
 }
 
 // Two saves undone newest first, as a meal's new foods are, put the
-// catalog back whole: the second's taking a barcode of the first's row
-// does not keep the first's undo from it.
+// catalog back whole.
 func TestUndoOfTwoSavesPutsBothBack(t *testing.T) {
 	t.Parallel()
 
@@ -521,8 +448,8 @@ func TestUndoOfTwoSavesPutsBothBack(t *testing.T) {
 	anas := tuna(120)
 	anas.Aliases, anas.Barcodes = nil, nil
 	saveFood(t, db, ana, anas)
-	// Ana's bar goes into Ivo's bar's row, by its name, and takes the
-	// tuna's barcode.
+	// Ana's bar goes into Ivo's bar's row, by its name, and leaves the
+	// tuna its barcode.
 	other := bar()
 	other.Aliases, other.Barcodes = nil, []string{"3850104000010"}
 	saveFood(t, db, ana, other)

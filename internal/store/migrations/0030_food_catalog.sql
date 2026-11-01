@@ -163,9 +163,9 @@ WHERE archived = 0 AND source IN ('label', 'reference', 'off');
 
 -- Their barcodes go to their rows, in the order of their foods' saves,
 -- so the newest have the highest rowids, which the store keeps; a
--- barcode of two names goes to the row of the food saved last, which
--- replaces it.
-INSERT OR REPLACE INTO catalog_barcodes (code, catalog_id)
+-- barcode stays the product's that had it first, as the store keeps it:
+-- of two names, the row of the food saved first.
+INSERT OR IGNORE INTO catalog_barcodes (code, catalog_id)
 SELECT
     b.code,
     f.catalog_id
