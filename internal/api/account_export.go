@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -126,7 +127,9 @@ func exportZip(tables []store.ExportTable, userID string, now time.Time) ([]byte
 }
 
 // csvValue is a value of a table's in a CSV file: NULL empty, a number
-// as Go writes it shortest.
+// as Go writes it shortest, and text that a spreadsheet would take for a
+// formula (a food's name from Open Food Facts, say "=HYPERLINK(…)")
+// after a quote, as OWASP advises; tdeemon.json keeps it as it is.
 func csvValue(v any) string {
 	switch v := v.(type) {
 	case nil:
@@ -136,6 +139,9 @@ func csvValue(v any) string {
 	case float64:
 		return strconv.FormatFloat(v, 'g', -1, 64)
 	case string:
+		if v != "" && strings.ContainsRune("=+-@\t\r", rune(v[0])) {
+			return "'" + v
+		}
 		return v
 	}
 	return fmt.Sprint(v)
