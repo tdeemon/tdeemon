@@ -197,6 +197,12 @@ kubectl exec deploy/tdeemon -- /tdeemon user create --admin --email you@example.
   generated or with `--password-stdin`, and ends their sessions: the way
   back when a password is lost. Their API tokens keep working; if they
   may have leaked too, revoke them (see API tokens below).
+- `tdeemon user delete --email … --yes` deletes a user and all their
+  data, for good; so does the admin's `DELETE /api/v1/users/{id}`, and a
+  user deletes their own account with `DELETE /api/v1/account`, their
+  address in the body. The instance's only admin cannot be deleted.
+  Snapshots of the database taken before keep the data until they go
+  ([Data](#data)).
 - The commands read the same `TDEEMON_*` variables as the server, and
   they refuse a database the server has not migrated to their version.
 

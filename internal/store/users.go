@@ -267,3 +267,39 @@ func (db *DB) ChangeSettings(ctx context.Context, id uuid.UUID, c SettingsChange
 	}
 	return u, nil
 }
+
+// ErrLastAdmin reports a change that would leave the instance without
+// an admin.
+var ErrLastAdmin = errors.New("the instance's last admin")
+
+// DeleteUser deletes the user with id and all of their data, which every
+// table of a user's refers to with ON DELETE CASCADE, or returns
+// ErrNotFound; ErrLastAdmin for the instance's only admin, whom nobody
+// could replace. It returns the user deleted.
+func (db *DB) DeleteUser(ctx context.Context, id uuid.UUID) (user.User, error) {
+	var u user.User
+	err := db.WriteTx(ctx, func(tx *sql.Tx) error {
+		var err error
+		u, err = scanUser(tx.QueryRowContext(ctx, "SELECT "+userColumns+" FROM users WHERE id = ?", id.String()).Scan)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		} else if err != nil {
+			return fmt.Errorf("delete user: %w", err)
+		}
+		if u.Role == user.RoleAdmin {
+			var others bool
+			if err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM users WHERE role = ? AND id <> ?)",
+				string(user.RoleAdmin), id.String()).Scan(&others); err != nil {
+				return fmt.Errorf("delete user: %w", err)
+			}
+			if !others {
+				return ErrLastAdmin
+			}
+		}
+		if _, err := tx.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id.String()); err != nil {
+			return fmt.Errorf("delete user: %w", err)
+		}
+		return nil
+	})
+	return u, err
+}

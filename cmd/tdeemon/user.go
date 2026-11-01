@@ -43,6 +43,8 @@ func userCommand(ctx context.Context, args []string, lookup config.LookupFunc, i
 		return setTelegram(ctx, args[1:], lookup, out)
 	case "set-locale":
 		return setLocale(ctx, args[1:], lookup, out)
+	case "delete":
+		return deleteUser(ctx, args[1:], lookup, out)
 	}
 	return fmt.Errorf("%w: user: unknown subcommand %q", errUsage, args[0])
 }
@@ -343,6 +345,69 @@ func setLocale(ctx context.Context, args []string, lookup config.LookupFunc, out
 		return err
 	}
 	_, err = fmt.Fprintf(out, "Set the language of %s to %s.\n", email, f.locale)
+	return err
+}
+
+type deleteUserFlags struct {
+	email string
+	yes   bool
+}
+
+func parseDeleteUserFlags(args []string) (deleteUserFlags, error) {
+	var f deleteUserFlags
+	set := flag.NewFlagSet("user delete", flag.ContinueOnError)
+	set.SetOutput(io.Discard) // exitCode prints the error and the usage.
+	set.StringVar(&f.email, "email", "", "")
+	set.BoolVar(&f.yes, "yes", false, "")
+	if err := set.Parse(args); errors.Is(err, flag.ErrHelp) {
+		return f, err
+	} else if err != nil {
+		return f, fmt.Errorf("%w: user delete: %w", errUsage, err)
+	}
+	if set.NArg() > 0 {
+		return f, fmt.Errorf("%w: user delete: unexpected argument %q", errUsage, set.Arg(0))
+	}
+	if f.email == "" {
+		return f, fmt.Errorf("%w: user delete: --email is required", errUsage)
+	}
+	if !f.yes {
+		return f, fmt.Errorf("%w: user delete: the user and all their data go for good; confirm with --yes", errUsage)
+	}
+	return f, nil
+}
+
+// deleteUser deletes the user with --email and all their data. Like
+// createUser, it never migrates.
+func deleteUser(ctx context.Context, args []string, lookup config.LookupFunc, out io.Writer) error {
+	f, err := parseDeleteUserFlags(args)
+	if errors.Is(err, flag.ErrHelp) {
+		_, err = io.WriteString(out, usage)
+		return err
+	} else if err != nil {
+		return err
+	}
+	cfg, err := config.Load(lookup)
+	if err != nil {
+		return fmt.Errorf("invalid configuration:\n%w", err)
+	}
+	email := user.NormalizeEmail(f.email)
+	err = withDatabase(ctx, cfg.DataDir, func(db *store.DB) error {
+		u, err := db.UserByEmail(ctx, email)
+		if errors.Is(err, store.ErrNotFound) {
+			return fmt.Errorf("no user with the address %q", email)
+		} else if err != nil {
+			return err
+		}
+		_, err = db.DeleteUser(ctx, u.ID)
+		if errors.Is(err, store.ErrLastAdmin) {
+			return fmt.Errorf("%s is the instance's only admin: make another user an admin first", email)
+		}
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(out, "Deleted %s and all their data.\n", email)
 	return err
 }
 

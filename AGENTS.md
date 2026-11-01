@@ -14,7 +14,9 @@ API. It is early: the skeleton, the database layer, users, sign-in
 meals, recipes, metrics and the plan (profile, phases, targets, limits) in the
 domain and the database with an event log and undo, the proposals of
 changes of the plan and their life in the domain and the database, the
-API for the profile, the limits, the autopilot, the settings, the notes for a coach,
+API for an account's delete with all its data (by its user, the admin or
+the CLI, never the last admin), the profile, the limits, the autopilot,
+the settings, the notes for a coach,
 the devices subscribed to notifications by Web Push (the key, a
 subscription, their list, a delete and a test), the morning summary and
 the watchdog's alarms by push to them, the morning summary of a date
@@ -144,7 +146,7 @@ both themes and languages, exist.
 
 | Path | What |
 | --- | --- |
-| `cmd/tdeemon` | the binary: the server (configuration, wiring, start and stop) and the `user create`, `user set-password`, `user set-telegram` and `user set-locale` commands |
+| `cmd/tdeemon` | the binary: the server (configuration, wiring, start and stop) and the `user create`, `user set-password`, `user set-telegram`, `user set-locale` and `user delete` commands |
 | `internal/config` | settings from `TDEEMON_*` environment variables |
 | `internal/domain` | the domain types and their rules, one package each: `user`, `day` (the logical day, its status and its calendar week), `food` (foods, nutrients and barcodes), `meal` (items, totals, warnings), `recipe` (a dish of the user's foods that is a food of its own, its values per 100 g of the cooked dish, its servings the whole and a portion), `metric` (a day's measurements and their merge rules), `profile` (sex, birth date and height, and the age, BMI, BMR and protein's reference mass that follow), `plan` (phases and their rates, targets by type of day, the type of a day), `limits` (the three levels of limits of a plan, and `Validate`, whose contract is docs/limits.md), `proposal` (a proposed change of the plan, the user's limits among it, each change with the state before and after, its life (pending, applied, rejected, expired, superseded, reverted) and its check against the limits; DESIGN.md §8), `calibration` (the trend weight, the measured TDEE with its interval, of the window up to a day or of a target's days, what it needs and about when a first comes, and the verdict on a phase, DESIGN.md §7), `autopilot` (the weekly review: its settings, its history of waits and drift from the plan's revisions, and `Decide`, a step, a hold, a proposal or no step and why; DESIGN.md §8), `recovery` (the last week's sleep, resting heart rate and HRV against the weeks before, and their usual range), `event` (who wrote what, for the audit trail and undo), `clientid` (the ids a client makes for a meal or an undo, so a retry is known), `text` (the rules for free text, shared by the others) |
 | `internal/auth` | credentials: password rules, argon2id hashes, session and API tokens, scopes, sealed values and who a request acts for |

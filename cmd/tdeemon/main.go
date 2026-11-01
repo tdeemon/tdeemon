@@ -44,6 +44,7 @@ const usage = `Usage:
   tdeemon user set-telegram [flags] set the Telegram chat a user's
                                     notifications go to
   tdeemon user set-locale [flags]   set a user's language
+  tdeemon user delete [flags]       delete a user and all their data
   tdeemon help                      show this help
 
 Flags of user create:
@@ -73,6 +74,11 @@ Flags of user set-locale:
   --email ADDRESS    the user's address (required)
   --locale LANG      en or hr (required): the language of the app, the
                      morning summary and the alerts
+
+Flags of user delete:
+  --email ADDRESS    the user's address (required)
+  --yes              confirm: the user and all their data go, for good
+                     (required). The instance's only admin cannot go
 
 The user commands work on the database of a server that has started at
 least once, which creates and migrates it; the server may be running.

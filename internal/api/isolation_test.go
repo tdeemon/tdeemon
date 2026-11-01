@@ -894,6 +894,42 @@ func isolateSavePush(t *testing.T, e isolationEnv) {
 	}
 }
 
+// isolateDeleteAccount is delete-account's case: the owner's address
+// deletes nothing; the other's own deletes them, and the owner stays. An
+// admin, the only one, gets another admin first.
+func isolateDeleteAccount(t *testing.T, e isolationEnv) {
+	t.Helper()
+	session := []*http.Cookie{e.other.session}
+	if e.other.user.Role == user.RoleAdmin {
+		e.in.addUser(t, user.RoleAdmin)
+	}
+	if rec := e.in.do(t, http.MethodDelete, "/api/v1/account", `{"email": "`+e.owner.user.Email+`"}`, session, nil); rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("with the owner's address: %d %s, want 422", rec.Code, rec.Body.String())
+	}
+	if rec := e.in.do(t, http.MethodDelete, "/api/v1/account", `{"email": "`+e.other.user.Email+`"}`, session, nil); rec.Code != http.StatusNoContent {
+		t.Errorf("with their own: %d %s, want 204", rec.Code, rec.Body.String())
+	}
+}
+
+// isolateDeleteUser is delete-user's case: a user deletes nobody, the
+// owner nor themselves; an admin deletes the user named, a third one.
+func isolateDeleteUser(t *testing.T, e isolationEnv) {
+	t.Helper()
+	session := []*http.Cookie{e.other.session}
+	if e.other.user.Role != user.RoleAdmin {
+		for _, id := range []uuid.UUID{e.owner.user.ID, e.other.user.ID} {
+			if rec := e.in.do(t, http.MethodDelete, "/api/v1/users/"+id.String(), "", session, nil); rec.Code != http.StatusForbidden {
+				t.Errorf("a user deletes %s: %d %s, want 403", id, rec.Code, rec.Body.String())
+			}
+		}
+		return
+	}
+	zoe := e.in.addUser(t, user.RoleUser)
+	if rec := e.in.do(t, http.MethodDelete, "/api/v1/users/"+zoe.ID.String(), "", session, nil); rec.Code != http.StatusNoContent {
+		t.Errorf("the admin deletes a third user: %d %s, want 204", rec.Code, rec.Body.String())
+	}
+}
+
 // isolateDeletePush is delete-push-subscription's case: the owner's
 // subscription answers the other as one that does not exist; their own
 // goes.
@@ -985,6 +1021,8 @@ func isolationCases() map[string]isolationCase {
 		}),
 		"save-push-subscription":   isolateSavePush,
 		"delete-push-subscription": isolateDeletePush,
+		"delete-account":           isolateDeleteAccount,
+		"delete-user":              isolateDeleteUser,
 		"test-push":                isolateTestPush,
 		"set-notes":                isolateSetNotes,
 		"revoke-tokens":            isolateRevokeTokens,
@@ -1081,6 +1119,9 @@ func isolationCases() map[string]isolationCase {
 	}
 }
 
+// adminOnly are the operations only the instance's admin may call.
+var adminOnly = map[string]bool{"delete-user": true}
+
 func TestIsolation(t *testing.T) {
 	t.Parallel()
 
@@ -1096,6 +1137,11 @@ func TestIsolation(t *testing.T) {
 					t.Parallel()
 					e := newIsolationEnv(t, adminActs)
 					e.isolated(t, run, func() {
+						// A user reaches an admin's operation no further than
+						// its 403.
+						if !adminActs && adminOnly[op] {
+							return
+						}
 						if o, ok := ops[op]; ok && !e.hits.reached(o) {
 							t.Errorf("the case got no 2xx from %s %s, its operation", o.method, o.route)
 						}
