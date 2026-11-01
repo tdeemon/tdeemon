@@ -107,6 +107,7 @@ func newIsolationEnv(t *testing.T, adminActs bool) isolationEnv {
 			t.Fatalf("%s's token: %d", p.user.Name, rec.Code)
 		}
 		p.bread = saveIsolationFoods(t, in.db, p.user, now)
+		saveIsolationCatalog(t, in.db, p.user, now)
 		saveIsolationRecipe(t, in.db, p.user, p.bread, now)
 		p.meal = saveIsolationMeals(t, in.db, p.user, p.bread, now)
 		saveIsolationMetrics(t, in.db, p.user, now)
@@ -205,6 +206,20 @@ func saveIsolationFoods(t *testing.T, db *store.DB, u user.User, now time.Time) 
 		t.Fatalf("archive %s's food: %v", u.Name, err)
 	}
 	return bread
+}
+
+// saveIsolationCatalog gives u a label's product the other party has
+// too, so each has a save of it in the catalog (catalog_saves), which
+// holds it once, and neither's search of it shows it.
+func saveIsolationCatalog(t *testing.T, db *store.DB, u user.User, now time.Time) {
+	t.Helper()
+	crackers := food.Food{
+		ID: uuid.NewV7(), Name: "Rye crackers", Brand: "Isola", Basis: food.Per100g, Source: food.Label,
+		Nutrients: food.Nutrients{Kcal: 380, Protein: 10, Carbs: 70, Fat: 4},
+	}
+	if _, err := db.SaveFood(t.Context(), u.ID, isolationActor, crackers, now); err != nil {
+		t.Fatalf("save %s's food: %v", u.Name, err)
+	}
 }
 
 // saveIsolationInvite gives u an invite of a friend of theirs, straight

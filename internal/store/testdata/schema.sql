@@ -72,7 +72,10 @@ CREATE TABLE catalog_foods (
     -- Only declared values: never an estimate, a user's word or a dish.
     source TEXT NOT NULL CHECK (source IN ('label', 'reference', 'off')),
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    -- One more with each save; an undo puts back the version before
+    -- with the row, so a save's undo tells whether another came since.
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1)
 ) STRICT;
 
 CREATE UNIQUE INDEX catalog_foods_name_brand ON catalog_foods (
@@ -100,6 +103,17 @@ CREATE TABLE 'catalog_fts_data'(id INTEGER PRIMARY KEY, block BLOB);
 CREATE TABLE 'catalog_fts_docsize'(id INTEGER PRIMARY KEY, sz BLOB);
 
 CREATE TABLE 'catalog_fts_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID;
+
+CREATE TABLE catalog_saves (
+    user_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    catalog_id TEXT NOT NULL REFERENCES catalog_foods (id) ON DELETE CASCADE,
+    version INTEGER NOT NULL CHECK (version >= 1),
+    before_state TEXT CHECK (before_state IS NULL OR json_valid(before_state)),
+    link_before TEXT CHECK (link_before IS NULL OR length(link_before) = 36),
+    PRIMARY KEY (user_id, event_id),
+    FOREIGN KEY (user_id, event_id) REFERENCES events (user_id, id) ON DELETE CASCADE
+) STRICT;
 
 CREATE TABLE catalog_servings (
     catalog_id TEXT NOT NULL REFERENCES catalog_foods (id) ON DELETE CASCADE,

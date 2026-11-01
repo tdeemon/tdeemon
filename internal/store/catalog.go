@@ -32,27 +32,138 @@ func catalogued(f food.Food) bool {
 	return false
 }
 
-// syncCatalog puts userID's food f, as saved, into the catalog, unless
-// it is not catalogued, and links f to its row. The row is the
-// product of f's name and brand; else the row f names already, renamed
-// to f's; else the row of one of f's barcodes; else a new one. Its values
-// and servings become f's, and f's barcodes become its, taken from any
-// other row that had them.
-func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, now time.Time) error {
-	if !catalogued(f) {
+// catalogState is a catalog row as a save found it, for the save's
+// undo: its food, its version, and the barcodes the save took from other
+// rows, by the row each was taken from.
+type catalogState struct {
+	Food    food.Food         `json:"food"`
+	Version int64             `json:"version"`
+	Moved   map[string]string `json:"moved,omitempty"`
+}
+
+// syncCatalog puts userID's food f, as its save of event saved it, into
+// the catalog, unless it is not catalogued, links f to its row, and
+// records what it did for the save's undo (catalog_saves). The row is
+// the product of f's name and brand; else the row f names already,
+// renamed to f's; else the row of one of f's barcodes; else a new one.
+// Its values and servings become f's, and f's barcodes become its, taken
+// from any other row that had them.
+func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, saved uuid.UUID, now time.Time) error {
+	if !catalogued(f) || saved == uuid.Nil() {
 		return nil
 	}
 	nameKey, brandKey := food.Key(f.Name), food.Key(f.Brand)
+	link, err := foodCatalogID(ctx, tx, userID, f.ID)
+	if err != nil {
+		return err
+	}
 	target, err := catalogTarget(ctx, tx, userID, f, nameKey, brandKey)
 	if err != nil {
 		return err
 	}
-	if err := writeCatalogFood(ctx, tx, target, f, nameKey, brandKey, now); err != nil {
+	var before *catalogState
+	version := int64(1)
+	if target.exists {
+		st, err := catalogStateInTx(ctx, tx, target.id)
+		if err != nil {
+			return err
+		}
+		if st.Moved, err = movedCodes(ctx, tx, target.id, f.Barcodes); err != nil {
+			return err
+		}
+		before, version = &st, st.Version+1
+	}
+	if err := writeCatalogFood(ctx, tx, target, f, version, false, now); err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, "UPDATE foods SET catalog_id = ? WHERE user_id = ? AND id = ?",
-		target.id, userID.String(), f.ID.String())
+	if _, err := tx.ExecContext(ctx, "UPDATE foods SET catalog_id = ? WHERE user_id = ? AND id = ?",
+		target.id, userID.String(), f.ID.String()); err != nil {
+		return err
+	}
+	state, err := stateJSON(before)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO catalog_saves (user_id, event_id, catalog_id, version, before_state, link_before)
+		VALUES (?, ?, ?, ?, ?, ?)`, userID.String(), saved.String(), target.id, version, state, link)
 	return err
+}
+
+// movedCodes returns the codes of codes another row than id has, by that
+// row.
+func movedCodes(ctx context.Context, tx *sql.Tx, id string, codes []string) (map[string]string, error) {
+	var moved map[string]string
+	for _, code := range codes {
+		var from string
+		err := tx.QueryRowContext(ctx, "SELECT catalog_id FROM catalog_barcodes WHERE code = ? AND catalog_id <> ?", code, id).Scan(&from)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if moved == nil {
+			moved = map[string]string{}
+		}
+		moved[code] = from
+	}
+	return moved, nil
+}
+
+// restoreCatalog takes back what userID's save of event saved did to the
+// catalog, after the food is put back (or gone): the food names its row
+// before again, and the row, unless a save came since, which it leaves,
+// is put back as it was, its barcodes given back to the rows they were
+// taken from; or a row the save made goes, when no food names it.
+func restoreCatalog(ctx context.Context, tx *sql.Tx, userID, saved uuid.UUID, now time.Time) error {
+	var (
+		id      string
+		version int64
+		state   sql.NullString
+		link    sql.NullString
+	)
+	err := tx.QueryRowContext(ctx, "SELECT catalog_id, version, before_state, link_before FROM catalog_saves WHERE user_id = ? AND event_id = ?",
+		userID.String(), saved.String()).Scan(&id, &version, &state, &link)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var foodID string
+	if err := tx.QueryRowContext(ctx, "SELECT entity FROM events WHERE user_id = ? AND id = ?", userID.String(), saved.String()).
+		Scan(&foodID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE foods SET catalog_id = ? WHERE user_id = ? AND id = ?", link, userID.String(), foodID); err != nil {
+		return err
+	}
+	var current int64
+	err = tx.QueryRowContext(ctx, "SELECT version FROM catalog_foods WHERE id = ?", id).Scan(&current)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && current != version) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !state.Valid {
+		_, err := tx.ExecContext(ctx, "DELETE FROM catalog_foods WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM foods WHERE catalog_id = ?1)", id)
+		return err
+	}
+	var before catalogState
+	if err := decode([]byte(state.String), &before); err != nil {
+		return err
+	}
+	if err := writeCatalogFood(ctx, tx, catalogRow{id, true}, before.Food, before.Version, true, now); err != nil {
+		return err
+	}
+	for code, from := range before.Moved {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO catalog_barcodes (code, catalog_id) SELECT ?1, id FROM catalog_foods WHERE id = ?2
+			ON CONFLICT (code) DO UPDATE SET catalog_id = excluded.catalog_id`, code, from); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // catalogRow is the catalog's row a food goes into: its id, and whether
@@ -93,9 +204,13 @@ func catalogTarget(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Foo
 	return catalogRow{uuid.NewV7().String(), false}, nil
 }
 
-// writeCatalogFood writes f's name, values, servings and barcodes into
-// row, and its words into the search.
-func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Food, nameKey, brandKey string, now time.Time) error {
+// writeCatalogFood writes f's name, values and servings into row at
+// version, and its words into the search. f's barcodes become the row's,
+// taken from any other row that had them; the row's others stay, the
+// newest up to food.MaxBarcodes in all, unless onlyF, which leaves it
+// f's alone.
+func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Food, version int64, onlyF bool, now time.Time) error {
+	nameKey, brandKey := food.Key(f.Name), food.Key(f.Brand)
 	o := optionalNutrients(&f.Nutrients)
 	var portion any
 	if f.PortionGrams > 0 {
@@ -104,22 +219,27 @@ func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Fo
 	values := []any{
 		f.Name, f.Brand, nameKey, brandKey, string(f.Basis), f.Nutrients.Kcal, f.Nutrients.Protein, f.Nutrients.Carbs,
 		f.Nutrients.Fat, nullable(*o[0]), nullable(*o[1]), nullable(*o[2]), nullable(*o[3]), nullable(*o[4]),
-		nullable(*o[5]), portion, string(f.Source), formatTime(now),
+		nullable(*o[5]), portion, string(f.Source), formatTime(now), version,
 	}
 	var err error
 	if row.exists {
 		_, err = tx.ExecContext(ctx, `UPDATE catalog_foods SET name = ?, brand = ?, name_key = ?, brand_key = ?, basis = ?,
 			kcal = ?, protein = ?, carbs = ?, fat = ?, fiber = ?, saturated_fat = ?, sugars = ?, salt = ?, polyols = ?,
-			alcohol = ?, portion_g = ?, source = ?, updated_at = ? WHERE id = ?`, append(values, row.id)...)
+			alcohol = ?, portion_g = ?, source = ?, updated_at = ?, version = ? WHERE id = ?`, append(values, row.id)...)
 	} else {
 		_, err = tx.ExecContext(ctx, `INSERT INTO catalog_foods (name, brand, name_key, brand_key, basis, kcal, protein,
-			carbs, fat, fiber, saturated_fat, sugars, salt, polyols, alcohol, portion_g, source, updated_at, id, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append(values, row.id, formatTime(now))...)
+			carbs, fat, fiber, saturated_fat, sugars, salt, polyols, alcohol, portion_g, source, updated_at, version, id,
+			created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			append(values, row.id, formatTime(now))...)
 	}
 	if err != nil {
 		return err
 	}
-	for _, q := range []string{"DELETE FROM catalog_servings WHERE catalog_id = ?", "DELETE FROM catalog_fts WHERE catalog_id = ?"} {
+	deletes := []string{"DELETE FROM catalog_servings WHERE catalog_id = ?", "DELETE FROM catalog_fts WHERE catalog_id = ?"}
+	if onlyF {
+		deletes = append(deletes, "DELETE FROM catalog_barcodes WHERE catalog_id = ?")
+	}
+	for _, q := range deletes {
 		if _, err := tx.ExecContext(ctx, q, row.id); err != nil {
 			return err
 		}
@@ -130,26 +250,48 @@ func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Fo
 			return err
 		}
 	}
-	for _, code := range f.Barcodes {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO catalog_barcodes (code, catalog_id) VALUES (?, ?)
-			ON CONFLICT (code) DO UPDATE SET catalog_id = excluded.catalog_id`, code, row.id); err != nil {
-			return err
-		}
+	if err := writeCatalogCodes(ctx, tx, row.id, f.Barcodes); err != nil {
+		return err
 	}
 	_, err = tx.ExecContext(ctx, "INSERT INTO catalog_fts (catalog_id, name, brand) VALUES (?, ?, ?)",
 		row.id, searchText(f.Name), searchText(f.Brand))
 	return err
 }
 
-// dropCatalogOrphan deletes the catalog's row id when no food names it
-// any more: a food undone before anyone else had it takes its row along.
-func dropCatalogOrphan(ctx context.Context, tx *sql.Tx, id sql.NullString) error {
-	if !id.Valid {
-		return nil
+// writeCatalogCodes makes codes the row id's, taken from any other row
+// that had them, and leaves the row food.MaxBarcodes at most: codes,
+// and the newest of its others.
+func writeCatalogCodes(ctx context.Context, tx *sql.Tx, id string, codes []string) error {
+	for _, code := range codes {
+		// A code moved deletes its row and inserts it anew, so the newest
+		// rowids are the codes of the latest saves.
+		if _, err := tx.ExecContext(ctx, "DELETE FROM catalog_barcodes WHERE code = ?", code); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "INSERT INTO catalog_barcodes (code, catalog_id) VALUES (?, ?)", code, id); err != nil {
+			return err
+		}
 	}
-	_, err := tx.ExecContext(ctx, "DELETE FROM catalog_foods WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM foods WHERE catalog_id = ?1)",
-		id.String)
+	_, err := tx.ExecContext(ctx, `DELETE FROM catalog_barcodes WHERE catalog_id = ?1 AND rowid NOT IN (
+		SELECT rowid FROM catalog_barcodes WHERE catalog_id = ?1 ORDER BY rowid DESC LIMIT ?2)`, id, food.MaxBarcodes)
 	return err
+}
+
+// catalogStateInTx reads the catalog's row id whole, for a save's undo.
+func catalogStateInTx(ctx context.Context, tx *sql.Tx, id string) (catalogState, error) {
+	found, err := queryFoods(ctx, tx, "SELECT "+catalogColumns+" FROM catalog_foods AS c WHERE c.id = ?", id)
+	if err != nil {
+		return catalogState{}, err
+	}
+	if len(found) == 0 {
+		return catalogState{}, ErrNotFound
+	}
+	st := catalogState{Food: found[0]}
+	if err := catalogChildren(ctx, tx, &st.Food); err != nil {
+		return catalogState{}, err
+	}
+	err = tx.QueryRowContext(ctx, "SELECT version FROM catalog_foods WHERE id = ?", id).Scan(&st.Version)
+	return st, err
 }
 
 // foodCatalogID returns the catalog's row userID's food id names, if any.
@@ -243,7 +385,7 @@ func (db *DB) catalogFood(ctx context.Context, where, arg string) (food.Food, er
 }
 
 // catalogChildren reads the servings and barcodes of the catalog's food
-// f, in the order written.
+// f, in the order written, food.MaxBarcodes of them at most.
 func catalogChildren(ctx context.Context, tx *sql.Tx, f *food.Food) error {
 	id := f.ID.String()
 	rows, err := tx.QueryContext(ctx, "SELECT name, amount FROM catalog_servings WHERE catalog_id = ? ORDER BY rowid", id)
@@ -261,7 +403,10 @@ func catalogChildren(ctx context.Context, tx *sql.Tx, f *food.Food) error {
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	brows, err := tx.QueryContext(ctx, "SELECT code FROM catalog_barcodes WHERE catalog_id = ? ORDER BY rowid", id)
+	// The newest, as a food takes no more; a row the migration made may
+	// have more.
+	brows, err := tx.QueryContext(ctx, `SELECT code FROM (SELECT code, rowid AS r FROM catalog_barcodes WHERE catalog_id = ?
+		ORDER BY rowid DESC LIMIT ?) ORDER BY r`, id, food.MaxBarcodes)
 	if err != nil {
 		return err
 	}

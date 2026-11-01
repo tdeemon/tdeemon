@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -256,6 +257,109 @@ func TestUndoPutsTheCatalogBack(t *testing.T) {
 	}
 }
 
+// An undo puts back the row as the save found it, another user's values
+// in it, and a row the save did not make stays, even with no food left
+// that names it; a save that came since stays as it is.
+func TestUndoPutsBackAnotherUsersRow(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	saveFood(t, db, ana, tuna(116))
+	ivos := tuna(120)
+	ivos.Aliases = nil
+	ivos.Barcodes = []string{"5060000000016"}
+	saveFood(t, db, ivo, ivos)
+	if _, err := db.UndoLast(t.Context(), ivo, testActor, t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	got, err := db.CatalogFoodByBarcode(t.Context(), "3850104000010")
+	if err != nil || got.Nutrients.Kcal != 116 || !slices.Equal(got.Barcodes, []string{"3850104000010"}) {
+		t.Errorf("the tuna after Ivo undid his save = %+v, %v; want Ana's 116 kcal and her barcode alone", got, err)
+	}
+
+	if _, err := db.DeleteUser(t.Context(), ana); err != nil {
+		t.Fatal(err)
+	}
+	saveFood(t, db, ivo, ivos)
+	if _, err := db.UndoLast(t.Context(), ivo, testActor, t0.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := db.CatalogFood(t.Context(), got.ID); err != nil || got.Nutrients.Kcal != 116 {
+		t.Errorf("Ana's tuna after Ivo undid his save, she gone = %+v, %v; want it, at 116 kcal", got, err)
+	}
+
+	// Eva's save since stays when Ivo undoes his.
+	eva := addUser(t, db, "eva@example.com")
+	saveFood(t, db, ivo, ivos)
+	evas := tuna(118)
+	evas.Aliases, evas.Barcodes = nil, nil
+	saveFood(t, db, eva, evas)
+	if _, err := db.UndoLast(t.Context(), ivo, testActor, t0.Add(3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := db.CatalogFood(t.Context(), got.ID); err != nil || got.Nutrients.Kcal != 118 {
+		t.Errorf("the tuna after Ivo undid his save before Eva's = %+v, %v; want Eva's 118 kcal", got, err)
+	}
+}
+
+// A barcode taken from another row goes back to it with an undo, and a
+// row keeps food.MaxBarcodes of its barcodes, the newest, so a food made
+// of it is valid.
+func TestCatalogBarcodes(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	saveFood(t, db, ana, tuna(116))
+	other := bar()
+	other.Aliases, other.Barcodes = nil, []string{"3850104000010"}
+	saveFood(t, db, ivo, other)
+	moved, err := db.CatalogFoodByBarcode(t.Context(), "3850104000010")
+	if err != nil || moved.Name != other.Name {
+		t.Fatalf("the barcode's food after Ivo's save = %+v, %v; want his bar", moved, err)
+	}
+	if _, err := db.UndoLast(t.Context(), ivo, testActor, t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if back, err := db.CatalogFoodByBarcode(t.Context(), "3850104000010"); err != nil || back.Name != "Tuna u vlastitom soku" {
+		t.Errorf("the barcode's food after Ivo's undo = %+v, %v; want the tuna again", back, err)
+	}
+
+	codes := func(first int) []string {
+		var out []string
+		for i := first; i < first+food.MaxBarcodes; i++ {
+			out = append(out, ean13(t, 400000000000+i))
+		}
+		return out
+	}
+	anas, ivos := tuna(116), tuna(116)
+	anas.Name, anas.Aliases, anas.Barcodes = "Keksi", nil, codes(0)
+	ivos.Name, ivos.Aliases, ivos.Barcodes = "Keksi", nil, codes(5)
+	saveFood(t, db, ana, anas)
+	saveFood(t, db, ivo, ivos)
+	got := findCatalog(t, db, addUser(t, db, "eva@example.com"), "keksi")
+	if len(got) != 1 || len(got[0].Barcodes) != food.MaxBarcodes || got[0].Validate() != nil {
+		t.Fatalf("Eva's search for keksi = %+v; want one valid food of %d barcodes", got, food.MaxBarcodes)
+	}
+	if !slices.Contains(got[0].Barcodes, codes(5)[food.MaxBarcodes-1]) || slices.Contains(got[0].Barcodes, codes(0)[0]) {
+		t.Errorf("the barcodes kept %v: want Ivo's, the newest", got[0].Barcodes)
+	}
+}
+
+// ean13 is the EAN-13 of the 12 digits of n and its check digit.
+func ean13(t *testing.T, n int) string {
+	t.Helper()
+	s := fmt.Sprintf("%012d", n)
+	sum := 0
+	for i, c := range s {
+		d := int(c - '0')
+		if i%2 == 1 {
+			d *= 3
+		}
+		sum += d
+	}
+	return s + fmt.Sprint((10-sum%10)%10)
+}
+
 // A user's deletion leaves the catalog: what they added is the
 // instance's.
 func TestCatalogOutlivesItsUser(t *testing.T) {
@@ -275,4 +379,14 @@ func TestCatalogOutlivesItsUser(t *testing.T) {
 	if _, err := db.CatalogFoodByBarcode(t.Context(), "4000000000006"); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("CatalogFoodByBarcode of no row: %v, want ErrNotFound", err)
 	}
+}
+
+// addUser adds a user of email to db and returns their id.
+func addUser(t *testing.T, db *store.DB, email string) uuid.UUID {
+	t.Helper()
+	u := newUser(email)
+	if err := db.CreateUser(t.Context(), u, ""); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	return u.ID
 }
