@@ -304,6 +304,11 @@ const screens: Screen[] = [
         .getByRole('button', { name: /^(Log|Upiši) 80 g$/ })
         .click()
       const sheet = page.getByRole('dialog', { name: /^(New meal|Novi obrok)$/ })
+      // The food, open on its amount, first in the list.
+      await sheet
+        .getByRole('button', { name: /^(Add|Dodaj): / })
+        .first()
+        .click()
       await sheet.getByRole('button', { name: /^(Log 1 item|Upiši 1 stavku) · / }).click()
       await expect(
         page.getByRole('link', { name: /^(See it today|Pogledaj danas)$/ }),

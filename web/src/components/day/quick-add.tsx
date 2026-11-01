@@ -52,6 +52,9 @@ interface Start {
   remaining: number | undefined
   // A food the meal starts with.
   initial?: Food | undefined
+  // Whether the initial food waits for its amount, as a recipe does,
+  // rather than being in the meal at once.
+  pick?: boolean | undefined
   onLogged?: ((meal: Meal) => void) | undefined
 }
 
@@ -66,8 +69,9 @@ interface Start {
 // of which can be changed. Each opening is a meal anew. The focus goes to
 // the search, but on a touch screen, whose keyboard would cover the
 // lists, until it is tapped. A food it opens with (initial) is in the
-// meal; a recipe, open for its amount instead, whose field has the
-// focus, so its portion or share is chosen, not taken over. opener is
+// meal; a recipe, or any food when pick is set, open for its amount
+// instead, whose field has the focus, so its amount, portion or share is
+// chosen, not taken over. opener is
 // what opened it, which the focus
 // goes back to; onLogged is told the meal logged, before the sheet
 // closes, so the focus may go to the meal's row instead.
@@ -85,7 +89,7 @@ export function QuickAdd({
   const t = useMessages()
   const search = useRef<HTMLInputElement>(null)
   const amount = useRef<HTMLInputElement>(null)
-  const choosing = meal.initial !== undefined && isRecipe(meal.initial)
+  const choosing = meal.initial !== undefined && (meal.pick === true || isRecipe(meal.initial))
   return (
     <Sheet
       open={open}
@@ -119,6 +123,7 @@ export function QuickAdd({
 function Composer({
   remaining,
   initial,
+  pick,
   onLogged,
   search,
   amount,
@@ -155,8 +160,9 @@ function Composer({
     )
     onLogged?.(answer.meal)
   })
-  // A recipe it opens with waits in the finder for its amount.
-  const choosing = initial !== undefined && isRecipe(initial)
+  // A recipe it opens with, or any food when pick is set, waits in the
+  // finder for its amount.
+  const choosing = initial !== undefined && (pick === true || isRecipe(initial))
   const [entries, setEntries] = useState<Entry[]>(() =>
     initial === undefined || choosing ? [] : [foodEntry(initial, f.field)],
   )

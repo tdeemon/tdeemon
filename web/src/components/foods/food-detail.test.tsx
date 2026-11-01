@@ -227,26 +227,34 @@ test('a food of many servings picks the amount in a list', async () => {
   expect(table()[0]).toBe('Energy: 111 kcal')
 })
 
-test('Log 80 g opens the meal to log with the food in it, as it was eaten last', async () => {
+test('Log 80 g opens the meal to log on the food, in the amount it was eaten in last, which is changed', async () => {
   const server = foodServer()
   renderAt(`/foods/${id}`)
 
   fireEvent.click(await screen.findByRole('button', { name: 'Log 80 g' }))
 
   const sheet = within(await screen.findByRole('dialog', { name: 'New meal' }))
+  const amount = sheet.getByLabelText(/^Amount: /)
+  expect(amount).toHaveProperty('value', '80')
+  await waitFor(() => {
+    expect(document.activeElement).toBe(amount)
+  })
+  fireEvent.change(amount, { target: { value: '120' } })
+  fireEvent.click(sheet.getByRole('button', { name: /^Add: / }))
   const basket = within(sheet.getByRole('list', { name: 'In the meal' })).getAllByRole('listitem')
   expect(basket.map((li) => li.textContent.replace('×', ''))).toEqual([
-    'Rolled oats · 80 g · 296 kcal',
+    'Rolled oats · 120 g · 444 kcal',
   ])
-  fireEvent.click(sheet.getByRole('button', { name: 'Log 1 item · 296 kcal' }))
+  fireEvent.click(sheet.getByRole('button', { name: 'Log 1 item · 444 kcal' }))
 
-  expect(await screen.findByText('Logged: Breakfast · 296 kcal')).toBeDefined()
+  // The toast says what the server answered.
+  expect(await screen.findByText(/^Logged: Breakfast · /)).toBeDefined()
   expect(server.sent).toEqual([
     {
       path: '/api/v1/meals',
       body: {
         id: expect.any(String) as unknown,
-        items: [{ id: expect.any(String) as unknown, food_id: id, amount: 80, unit: 'g' }],
+        items: [{ id: expect.any(String) as unknown, food_id: id, amount: 120, unit: 'g' }],
       },
     },
   ])
