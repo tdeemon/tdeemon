@@ -1,10 +1,15 @@
 package store
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 	"uuid"
+
+	"github.com/zarnautovic/tdeemon/internal/domain/event"
+	"github.com/zarnautovic/tdeemon/internal/domain/food"
 )
 
 // catalogSeed is a food saved before the catalog.
@@ -158,4 +163,95 @@ func checkCatalogSearch(t *testing.T, db *DB, grape string) {
 			t.Errorf("Eva's FindCatalog(%q) = %+v, %v; want none", q, found, err)
 		}
 	}
+}
+
+// An undo of a save made before the catalog takes back what the
+// migration made of it: a correction's values, and a new food's row.
+func TestUndoOfASaveBeforeTheCatalog(t *testing.T) {
+	t.Parallel()
+
+	db := openEmpty(t)
+	if err := db.migrate(t.Context(), upTo(t, "0029_food_reference.sql"), discard()); err != nil {
+		t.Fatalf("migrate to 0029: %v", err)
+	}
+	seedCatalog(t, db)
+	if err := db.migrate(t.Context(), upTo(t, "0031_food_catalog_search.sql"), discard()); err != nil {
+		t.Fatalf("migrate to 0031: %v", err)
+	}
+	ivo := uuid.MustParse(catalogUsers["Ivo"])
+	apple := uuid.MustParse(catalogSeeds[2].id)
+	grapes := uuid.MustParse(catalogSeeds[1].id)
+	// The events of Ivo's saves before: the grapes new, the apple new at
+	// 50 kcal, and corrected since.
+	after, err := db.FoodByID(t.Context(), ivo, apple)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := after
+	before.Nutrients.Kcal = 50
+	newGrapes, err := db.FoodByID(t.Context(), ivo, grapes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, ev := range []legacySave{{grapes, nil, newGrapes}, {apple, nil, before}, {apple, before, after}} {
+		ev.record(t, db, ivo, i)
+	}
+	actor := event.Actor{Kind: event.User, Client: "web"}
+	now := time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC)
+	if _, err := db.UndoLast(t.Context(), ivo, actor, now); err != nil {
+		t.Fatalf("undo the apple's correction: %v", err)
+	}
+	if got := findCatalogOf(t, db, "jabuk"); len(got) != 1 || got[0].Nutrients.Kcal != 50 {
+		t.Errorf("the catalog's apple after the undo = %+v; want 50 kcal, as before the correction", got)
+	}
+	// The apple Ivo made, his alone, goes, and its row too.
+	if _, err := db.UndoLast(t.Context(), ivo, actor, now.Add(time.Minute)); err != nil {
+		t.Fatalf("undo the apple: %v", err)
+	}
+	if got := findCatalogOf(t, db, "jabuk"); len(got) != 0 {
+		t.Errorf("the catalog's apple after Ivo undid it = %+v; want none", got)
+	}
+	// The grapes Ivo made are Ana's too: their row stays.
+	if _, err := db.UndoLast(t.Context(), ivo, actor, now.Add(2*time.Minute)); err != nil {
+		t.Fatalf("undo the grapes: %v", err)
+	}
+	if got := findCatalogOf(t, db, "grozd"); len(got) != 1 {
+		t.Errorf("the catalog's grapes after Ivo's undo = %+v; want them, Ana's too", got)
+	}
+}
+
+// legacySave is a food's save made before the catalog, of the food
+// entity, from before to after.
+type legacySave struct {
+	entity        uuid.UUID
+	before, after any
+}
+
+// record writes ev as user's i-th event, as the store wrote one before
+// the catalog: with nothing in catalog_saves.
+func (ev legacySave) record(t *testing.T, db *DB, user uuid.UUID, i int) {
+	t.Helper()
+	b, err := stateJSON(ev.before)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := stateJSON(ev.after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.write.ExecContext(t.Context(), `INSERT INTO events (id, user_id, at, actor, client, operation, entity, before_state, after_state)
+		VALUES (?, ?, ?, 'user', 'web', 'food.save', ?, ?, ?)`, fmt.Sprintf("0199f0a0-0000-7000-8000-0000000000e%d", i), user.String(),
+		"2026-10-20T08:00:00Z", ev.entity.String(), b, a); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// findCatalogOf is Eva's FindCatalog of query, who has no foods.
+func findCatalogOf(t *testing.T, db *DB, query string) []food.Food {
+	t.Helper()
+	got, err := db.FindCatalog(t.Context(), uuid.MustParse(catalogUsers["Eva"]), query, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
 }

@@ -786,12 +786,12 @@ func takeBackFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Eve
 			if err := setArchived(ctx, tx, userID, id, true, now); err != nil {
 				return err
 			}
-			return restoreCatalog(ctx, tx, userID, e.ID, now)
+			return restoreCatalog(ctx, tx, userID, e, now)
 		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM foods WHERE user_id = ? AND id = ?", userID.String(), id.String()); err != nil {
 			return err
 		}
-		return restoreCatalog(ctx, tx, userID, e.ID, now)
+		return restoreCatalog(ctx, tx, userID, e, now)
 	}
 	var f food.Food
 	if err := decode(e.Before, &f); err != nil {
@@ -806,7 +806,7 @@ func takeBackFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Eve
 	if err := replaceFoodChildren(ctx, tx, userID, f); err != nil {
 		return err
 	}
-	return restoreCatalog(ctx, tx, userID, e.ID, now)
+	return restoreCatalog(ctx, tx, userID, e, now)
 }
 
 // checkFoodClash refuses to put food f back when another food has taken
