@@ -27,6 +27,7 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/domain/clientid"
 	"github.com/zarnautovic/tdeemon/internal/domain/day"
 	"github.com/zarnautovic/tdeemon/internal/domain/meal"
+	"github.com/zarnautovic/tdeemon/internal/domain/user"
 )
 
 // document is the API's description: the operations by the route they
@@ -205,6 +206,22 @@ func answerCases() map[string]answerCase {
 			t.Helper()
 			in.do(t, http.MethodPut, "/api/v1/push/subscriptions", pushBody(t, "https://web.push.apple.com/answer"), []*http.Cookie{session},
 				map[string]string{"User-Agent": iPhoneSafari})
+		},
+		"delete-account": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			cookies := []*http.Cookie{session}
+			in.do(t, http.MethodDelete, "/api/v1/account", `{"email": "not.ana@example.com"}`, cookies, nil)
+			in.do(t, http.MethodDelete, "/api/v1/account", `{"email": "ana@example.com"}`, cookies, nil)
+			in.addUser(t, user.RoleAdmin)
+			in.do(t, http.MethodDelete, "/api/v1/account", `{"email": "Ana@Example.com"}`, cookies, nil)
+		},
+		"delete-user": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			cookies := []*http.Cookie{session}
+			zoe := in.addUser(t, user.RoleUser)
+			in.do(t, http.MethodDelete, "/api/v1/users/"+zoe.ID.String(), "", cookies, nil)
+			in.do(t, http.MethodDelete, "/api/v1/users/"+zoe.ID.String(), "", cookies, nil)
+			in.do(t, http.MethodDelete, "/api/v1/users/"+in.user.ID.String(), "", cookies, nil)
 		},
 		"delete-push-subscription": func(t *testing.T, in *instance, session *http.Cookie) {
 			t.Helper()

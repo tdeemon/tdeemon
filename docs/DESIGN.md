@@ -34,7 +34,9 @@ LLM only decides *what* was eaten and *how much*. Code does the rest.**
   the wording assumes weight loss.
 - Self-host as **one container + one SQLite file**.
 - **Multi-user from day one.** A household or a few friends on one
-  instance; the admin invites them. No public sign-up by default.
+  instance; the admin invites them. No public sign-up. A user's data
+  are theirs: they export them, and delete their account with all of
+  it; the admin deletes a user too, never the last admin.
 - **Not tied to any AI vendor or app.** The MCP server is the foundation:
   any MCP client, any model. A built-in chat uses your own API key.
 - Apple Health metrics ingest (Health Auto Export) plus a generic JSON

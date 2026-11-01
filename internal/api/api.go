@@ -446,6 +446,7 @@ func register(a huma.API, info infoBody, s *sessions, o *oidcLogin) {
 	s.registerChanges(a)
 	s.registerSettings(a)
 	s.registerPush(a)
+	s.registerAccounts(a)
 	s.registerMorning(a)
 	s.registerIngest(a)
 	registerTools(a, s.tools())
