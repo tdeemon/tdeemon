@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"time"
 	"uuid"
 
@@ -186,25 +185,24 @@ func putBackCatalogRow(ctx context.Context, tx *sql.Tx, id, state string, now ti
 	if err := writeCatalogFood(ctx, tx, catalogRow{id, true}, before.Food, before.Version, now); err != nil {
 		return err
 	}
+	// No save into the row came since, so its barcodes are its own
+	// before, but those the save let go, and the save's: the save's go,
+	// back to the rows they were taken from, and its own come back in
+	// their order, but those another row has since.
 	codes, err := catalogCodes(ctx, tx, id)
 	if err != nil {
 		return err
 	}
 	for _, code := range codes {
-		if slices.Contains(before.Food.Barcodes, code) {
-			continue
-		}
-		q, args := "DELETE FROM catalog_barcodes WHERE code = ?", []any{code}
 		if m, ok := before.Moved[code]; ok {
-			q, args = `UPDATE catalog_barcodes SET catalog_id = ?2 WHERE code = ?1 AND EXISTS (SELECT 1 FROM catalog_foods WHERE id = ?2)`,
-				[]any{code, m.Row}
+			if _, err := tx.ExecContext(ctx, `UPDATE catalog_barcodes SET catalog_id = ?2
+				WHERE code = ?1 AND EXISTS (SELECT 1 FROM catalog_foods WHERE id = ?2)`, code, m.Row); err != nil {
+				return err
+			}
 		}
-		if _, err := tx.ExecContext(ctx, q, args...); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, "DELETE FROM catalog_barcodes WHERE code = ? AND catalog_id = ?", code, id); err != nil {
-			return err
-		}
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM catalog_barcodes WHERE catalog_id = ?", id); err != nil {
+		return err
 	}
 	for _, code := range before.Food.Barcodes {
 		if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO catalog_barcodes (code, catalog_id) VALUES (?, ?)", code, id); err != nil {
@@ -212,12 +210,23 @@ func putBackCatalogRow(ctx context.Context, tx *sql.Tx, id, state string, now ti
 		}
 	}
 	for _, m := range before.Moved {
+		if err := trimCatalogCodes(ctx, tx, m.Row); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, "UPDATE catalog_foods SET version = ?1 WHERE id = ?2 AND version = ?1 + 1",
 			m.Version, m.Row); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// trimCatalogCodes leaves the catalog's row id the newest
+// food.MaxBarcodes of its barcodes.
+func trimCatalogCodes(ctx context.Context, tx *sql.Tx, id string) error {
+	_, err := tx.ExecContext(ctx, `DELETE FROM catalog_barcodes WHERE catalog_id = ?1 AND rowid NOT IN (
+		SELECT rowid FROM catalog_barcodes WHERE catalog_id = ?1 ORDER BY rowid DESC LIMIT ?2)`, id, food.MaxBarcodes)
+	return err
 }
 
 // catalogCodes returns the barcodes of the catalog's row id.
@@ -341,9 +350,7 @@ func writeCatalogCodes(ctx context.Context, tx *sql.Tx, id string, codes []strin
 			return err
 		}
 	}
-	_, err := tx.ExecContext(ctx, `DELETE FROM catalog_barcodes WHERE catalog_id = ?1 AND rowid NOT IN (
-		SELECT rowid FROM catalog_barcodes WHERE catalog_id = ?1 ORDER BY rowid DESC LIMIT ?2)`, id, food.MaxBarcodes)
-	return err
+	return trimCatalogCodes(ctx, tx, id)
 }
 
 // catalogStateInTx reads the catalog's row id whole, for a save's undo.

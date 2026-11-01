@@ -427,6 +427,53 @@ func TestUndoLeavesABarcodeAnotherRowTookSince(t *testing.T) {
 	}
 }
 
+// An undo puts a row's barcodes back in their order, so the next save
+// lets the oldest go; and a row given back a barcode keeps
+// food.MaxBarcodes of them.
+func TestUndoKeepsTheBarcodesOrderAndCount(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	codes := make([]string, 0, 2*food.MaxBarcodes+2)
+	for i := range 2*food.MaxBarcodes + 2 {
+		codes = append(codes, ean13(t, 400000000000+i))
+	}
+	anas := tuna(116)
+	anas.Aliases, anas.Barcodes = nil, codes[:food.MaxBarcodes]
+	saveFood(t, db, ana, anas)
+	ivos := tuna(116)
+	ivos.Aliases, ivos.Barcodes = nil, codes[food.MaxBarcodes:food.MaxBarcodes+1]
+	saveFood(t, db, ivo, ivos)
+	if _, err := db.UndoLast(t.Context(), ivo, testActor, t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	saveFood(t, db, ivo, ivos)
+	got, err := db.CatalogFoodByBarcode(t.Context(), codes[1])
+	if want := codes[1 : food.MaxBarcodes+1]; err != nil || !slices.Equal(got.Barcodes, want) {
+		t.Errorf("the tuna's barcodes after Ivo's undo and save again = %v, %v; want %v, the oldest gone", got.Barcodes, err, want)
+	}
+
+	// Ana's bar takes a barcode of the tuna's; ten newer come to the
+	// tuna; Ana's undo gives the barcode back, and the tuna keeps ten.
+	ivosBar := bar()
+	ivosBar.Aliases = nil
+	saveFood(t, db, ivo, ivosBar)
+	anasBar := bar()
+	anasBar.Aliases, anasBar.Barcodes = nil, codes[food.MaxBarcodes:food.MaxBarcodes+1]
+	saveFood(t, db, ana, anasBar)
+	newer := tuna(116)
+	newer.Aliases, newer.Barcodes = nil, codes[food.MaxBarcodes+2:]
+	saveFood(t, db, addEva(t, db), newer)
+	if _, err := db.UndoLast(t.Context(), ana, testActor, t0.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := db.Read().QueryRowContext(t.Context(), "SELECT count(*) FROM catalog_barcodes WHERE catalog_id = ?",
+		got.ID.String()).Scan(&n); err != nil || n != food.MaxBarcodes {
+		t.Errorf("the tuna has %d barcodes, %v; want %d", n, err, food.MaxBarcodes)
+	}
+}
+
 // Two saves undone newest first, as a meal's new foods are, put the
 // catalog back whole: the second's taking a barcode of the first's row
 // does not keep the first's undo from it.
