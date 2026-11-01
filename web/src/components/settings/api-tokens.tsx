@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bot, Plus, Smartphone } from 'lucide-react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 
 import { $api } from '@/api/client'
 import { statusOf } from '@/api/errors'
 import { sessionQuery } from '@/api/session'
+import { Ask } from '@/components/ask'
 import { SaveStatus } from '@/components/day/save-status'
 import { LoadError } from '@/components/load-error'
 import { Connect } from '@/components/settings/connect'
@@ -181,6 +182,7 @@ export function ApiTokens({ connect }: { connect?: ConnectKind | 'choose' | unde
               {asking === tok.id && (
                 <Ask
                   question={t.settings.confirmRevoke(tok.name)}
+                  yes={t.settings.yesRevoke}
                   pending={revoke.isPending}
                   onYes={() => {
                     revoke.mutate({ params: { path: { id: tok.id } } })
@@ -212,6 +214,7 @@ export function ApiTokens({ connect }: { connect?: ConnectKind | 'choose' | unde
           {askingAll ? (
             <Ask
               question={t.settings.confirmRevokeAll}
+              yes={t.settings.yesRevoke}
               pending={revokeAll.isPending}
               onYes={() => {
                 revokeAll.mutate({})
@@ -260,46 +263,5 @@ export function ApiTokens({ connect }: { connect?: ConnectKind | 'choose' | unde
         />
       </Sheet>
     </section>
-  )
-}
-
-// Ask is the question before a revoke, which cannot be taken back: the
-// focus goes to Keep, the safe answer, and the question describes both.
-function Ask({
-  question,
-  pending,
-  onYes,
-  onKeep,
-}: {
-  question: string
-  pending: boolean
-  onYes: () => void
-  onKeep: () => void
-}) {
-  const t = useMessages()
-  const id = useId()
-  const keep = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    keep.current?.focus()
-  }, [])
-
-  return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span id={id} className="w-full">
-        {question}
-      </span>
-      <Button
-        variant="destructive"
-        size="sm"
-        aria-describedby={id}
-        disabled={pending}
-        onClick={onYes}
-      >
-        {t.settings.yesRevoke}
-      </Button>
-      <Button ref={keep} variant="ghost" size="sm" aria-describedby={id} onClick={onKeep}>
-        {t.settings.keep}
-      </Button>
-    </div>
   )
 }

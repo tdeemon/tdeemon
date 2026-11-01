@@ -39,3 +39,20 @@ export async function openMeal(meal: Locator) {
   }
   await expect(meal.getByRole('button', { expanded: true })).toBeVisible()
 }
+
+// invite has the tests' user, the admin, invite an address through the
+// API, and returns the link the invite answers.
+export async function invite(page: Page, email: string): Promise<string> {
+  const answer = await page.request.post('/api/v1/invites', { data: { email } })
+  expect(answer.ok()).toBe(true)
+  const body: unknown = await answer.json()
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('url' in body) ||
+    typeof body.url !== 'string'
+  ) {
+    throw new Error('the invite answered no link')
+  }
+  return body.url
+}

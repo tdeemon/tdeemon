@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { Bell, Globe, History, LogOut, Palette, Smartphone } from 'lucide-react'
+import { Bell, Globe, History, LogOut, Palette, Smartphone, Users } from 'lucide-react'
 import { useState } from 'react'
 
 import { $api, fetchClient } from '@/api/client'
@@ -17,8 +17,8 @@ import { useTheme } from '@/lib/theme'
 
 // SettingsList is the user's settings, each a row to its page with its
 // value in short: this browser's theme, the account's language, time zone
-// and day's start, and the devices and AI clients with a token; the
-// recent changes, in a sheet; then signing out, as whom, and what the
+// and day's start, and the devices and AI clients with a token; for the
+// admin, the users; the recent changes, in a sheet; then signing out, as whom, and what the
 // server is. On the plan's page it has its heading; the settings' page is
 // its title.
 export function SettingsList({
@@ -110,6 +110,9 @@ export function SettingsList({
         to="/settings/notifications"
         summary={notified.data && s.notifications.summary(notified.data.subscriptions.length)}
       />
+      {user?.role === 'admin' && (
+        <ListRow icon={Users} title={s.users} to="/settings/users" summary={s.usersSummary} />
+      )}
       <ListRow
         icon={History}
         title={t.changes.title}

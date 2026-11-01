@@ -44,7 +44,8 @@ that serves them at `/mcp`, with the coaching sessions as its prompts
 and the methodology as its resource, the API contract and the web app's frame
 (installed as an app, a PWA whose shell opens without a network and
 whose new version a toast offers; signing in, under the product's mark
-and what it is, and out, its
+and what it is, and out, an account made by an invite's link (a password
+or the provider), its
 sections in a bar at the bottom on a phone and
 a sidebar on a desktop, Log a meal over the screen shown, sheets with a
 handle, dragged down to close, keyboard shortcuts (a skip to the
@@ -135,7 +136,11 @@ a row to its page: the profile, the limits in groups that open, a wrong
 one focused at its field, the autopilot's settings (asking before it is
 turned on, the review's weekday, what it may and never changes and when
 it waits), the notes for a coach) and the settings as a
-list (the theme, the account with a time zone found by its name, the
+list (the theme, the account with a time zone found by its name, its
+data exported as a ZIP and the account deleted once its address is typed,
+the admin's users (someone invited in a sheet whose link is shown once,
+the invites waiting, each revoked, the accounts deactivated, made an admin
+or deleted, each after it asks), the
 devices and AI coaches connected in a guided sheet, an access key (a
 token) shown once with the steps to give it (an AI coach's MCP address
 and commands, Health Auto Export's checklist) and its first call seen

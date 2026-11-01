@@ -24,6 +24,7 @@ import { DevicesPage } from '@/pages/devices'
 import { FoodPage } from '@/pages/food'
 import { FoodsPage } from '@/pages/foods'
 import { FoodsIndexPage } from '@/pages/foods-index'
+import { InvitePage } from '@/pages/invite'
 import { LimitsPage } from '@/pages/limits'
 import { LoginPage } from '@/pages/login'
 import { NewFoodPage } from '@/pages/new-food'
@@ -35,6 +36,7 @@ import { PlanPage } from '@/pages/plan'
 import { ProfilePage } from '@/pages/profile'
 import { RootLayout } from '@/pages/root-layout'
 import { SettingsPage } from '@/pages/settings'
+import { UsersPage } from '@/pages/users'
 
 // Routes are declared in code, not generated from files: the app has few
 // screens, and this keeps type-safe routing without a generated route tree.
@@ -100,6 +102,14 @@ const loginRoute = createRoute({
     }
   },
   component: LoginPage,
+})
+
+// An invite's link, its token after the #: open to anyone, signed in or
+// not, as it makes another account.
+const inviteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/invite',
+  component: InvitePage,
 })
 
 // The day's date, YYYY-MM-DD; without it, with one that is no date
@@ -264,6 +274,12 @@ const notificationsRoute = createRoute({
   path: '/settings/notifications',
   component: NotificationsPage,
 })
+// The admin's users and invites; anyone else is told it is the admin's.
+const usersRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/settings/users',
+  component: UsersPage,
+})
 // The addresses of before, the charts' and the plan's under the settings,
 // lead where they are now.
 const chartsRoute = createRoute({
@@ -299,8 +315,10 @@ const routeTree = rootRoute.addChildren([
     accountRoute,
     devicesRoute,
     notificationsRoute,
+    usersRoute,
   ]),
   loginRoute,
+  inviteRoute,
   chartsRoute,
   oldPlanRoute,
 ])

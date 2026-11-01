@@ -648,8 +648,8 @@ generator writes it.
 - Asynchronous UI is awaited with `findBy…` queries, never with sleeps.
 - **End-to-end tests** (`web/e2e`, Playwright, `make e2e`) run the app in
   Chromium as a phone sees it (Pixel 7), against the binary built with
-  it, over a fresh database with two made-up users: the tests' own, and
-  a new one whom only the first steps sign in as
+  it, over a fresh database with two made-up users: the tests' own, an
+  admin, and a new one whom only the first steps sign in as
   (`scripts/e2e-server.sh`). They are few: a path a person takes through
   a screen, signing in, the day, the foods, the charts, the settings,
   the profile and the limits; the rest is

@@ -73,7 +73,9 @@
     "maxAge": 130
   },
   "user": {
-    "maxNameLen": 100
+    "maxNameLen": 100,
+    "minPasswordLen": 15,
+    "maxPasswordLen": 256
   },
   "history": {
     "since": "1900-01-01"

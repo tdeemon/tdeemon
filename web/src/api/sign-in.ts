@@ -21,3 +21,16 @@ export async function signIn(body: components['schemas']['LoginInputBody']): Pro
   }
   throw new HttpError(response.status, parseRetryAfter(response.headers.get('Retry-After')))
 }
+
+// acceptInvite makes the account an invite's link is for, and starts its
+// web session, as signIn does. A refusal is an HttpError, with
+// Retry-After.
+export async function acceptInvite(
+  body: components['schemas']['AcceptInviteInputBody'],
+): Promise<Session> {
+  const { data, response } = await fetchClient.POST('/api/v1/invites/accept', { body })
+  if (data) {
+    return data
+  }
+  throw new HttpError(response.status, parseRetryAfter(response.headers.get('Retry-After')))
+}
