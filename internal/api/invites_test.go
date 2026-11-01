@@ -133,3 +133,22 @@ func TestInviteRefuses(t *testing.T) {
 		t.Errorf("an address a user has since: %d, want 409", got)
 	}
 }
+
+// An admin's invites go when they are an admin no more, deactivated or
+// made a user: a link of theirs makes no account, an admin's least.
+func TestInvitesGoWithTheirAdmin(t *testing.T) {
+	t.Parallel()
+
+	for _, change := range []string{`{"active": false}`, `{"role": "user"}`} {
+		in, session := signedIn(t)
+		eve := in.invite(t, session, "eve@example.com")
+		in.addUser(t, user.RoleAdmin) // so that ana is not the last admin
+		rec := in.do(t, http.MethodPatch, "/api/v1/users/"+in.user.ID.String(), change, []*http.Cookie{session}, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", change, rec.Code, rec.Body.String())
+		}
+		if rec := in.do(t, http.MethodPost, "/api/v1/invites/check", `{"token": "`+eve+`"}`, nil, nil); rec.Code != http.StatusNotFound {
+			t.Errorf("%s: ana's invite after: %d, want 404", change, rec.Code)
+		}
+	}
+}
