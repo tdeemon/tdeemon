@@ -42,11 +42,13 @@ type catalogState struct {
 	Moved   map[string]movedCode `json:"moved,omitempty"`
 }
 
-// movedCode is the row a save took a barcode from, and the row's version
-// before, which the save made one more.
+// movedCode is the row a save took a barcode from, the row's version
+// before, which the save made one more, and the barcode's rowid there,
+// its place among the row's in age.
 type movedCode struct {
 	Row     string `json:"row"`
 	Version int64  `json:"version"`
+	Rowid   int64  `json:"rowid"`
 }
 
 // syncCatalog puts userID's food f, as its save of event saved it, into
@@ -106,8 +108,8 @@ func movedCodes(ctx context.Context, tx *sql.Tx, id string, codes []string) (map
 	var moved map[string]movedCode
 	for _, code := range codes {
 		var m movedCode
-		err := tx.QueryRowContext(ctx, `SELECT c.id, c.version FROM catalog_barcodes AS b JOIN catalog_foods AS c ON c.id = b.catalog_id
-			WHERE b.code = ? AND c.id <> ?`, code, id).Scan(&m.Row, &m.Version)
+		err := tx.QueryRowContext(ctx, `SELECT c.id, c.version, b.rowid FROM catalog_barcodes AS b
+			JOIN catalog_foods AS c ON c.id = b.catalog_id WHERE b.code = ? AND c.id <> ?`, code, id).Scan(&m.Row, &m.Version, &m.Rowid)
 		if errors.Is(err, sql.ErrNoRows) {
 			continue
 		}
@@ -193,16 +195,15 @@ func putBackCatalogRow(ctx context.Context, tx *sql.Tx, id, state string, now ti
 	if err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM catalog_barcodes WHERE catalog_id = ?", id); err != nil {
+		return err
+	}
 	for _, code := range codes {
 		if m, ok := before.Moved[code]; ok {
-			if _, err := tx.ExecContext(ctx, `UPDATE catalog_barcodes SET catalog_id = ?2
-				WHERE code = ?1 AND EXISTS (SELECT 1 FROM catalog_foods WHERE id = ?2)`, code, m.Row); err != nil {
+			if err := giveBackCode(ctx, tx, code, m); err != nil {
 				return err
 			}
 		}
-	}
-	if _, err := tx.ExecContext(ctx, "DELETE FROM catalog_barcodes WHERE catalog_id = ?", id); err != nil {
-		return err
 	}
 	for _, code := range before.Food.Barcodes {
 		if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO catalog_barcodes (code, catalog_id) VALUES (?, ?)", code, id); err != nil {
@@ -226,6 +227,22 @@ func putBackCatalogRow(ctx context.Context, tx *sql.Tx, id, state string, now ti
 func trimCatalogCodes(ctx context.Context, tx *sql.Tx, id string) error {
 	_, err := tx.ExecContext(ctx, `DELETE FROM catalog_barcodes WHERE catalog_id = ?1 AND rowid NOT IN (
 		SELECT rowid FROM catalog_barcodes WHERE catalog_id = ?1 ORDER BY rowid DESC LIMIT ?2)`, id, food.MaxBarcodes)
+	return err
+}
+
+// giveBackCode gives code back to the row m it was taken from, if it is
+// still there, in its place in age when that rowid is free.
+func giveBackCode(ctx context.Context, tx *sql.Tx, code string, m movedCode) error {
+	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO catalog_barcodes (rowid, code, catalog_id)
+		SELECT ?1, ?2, id FROM catalog_foods WHERE id = ?3`, m.Rowid, code, m.Row)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil || n > 0 {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO catalog_barcodes (code, catalog_id)
+		SELECT ?1, id FROM catalog_foods WHERE id = ?2`, code, m.Row)
 	return err
 }
 

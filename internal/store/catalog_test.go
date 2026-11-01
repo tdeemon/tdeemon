@@ -474,6 +474,37 @@ func TestUndoKeepsTheBarcodesOrderAndCount(t *testing.T) {
 	}
 }
 
+// An undo gives a barcode back to the row it was taken from in its place
+// in age, so that row's next save lets its oldest go still.
+func TestUndoGivesABarcodeBackInItsPlace(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	codes := make([]string, 0, food.MaxBarcodes+1)
+	for i := range food.MaxBarcodes + 1 {
+		codes = append(codes, ean13(t, 400000000000+i))
+	}
+	ivos := tuna(116)
+	ivos.Aliases, ivos.Barcodes = nil, codes[:food.MaxBarcodes]
+	ivos = saveFood(t, db, ivo, ivos)
+	ivosBar := bar()
+	ivosBar.Aliases = nil
+	saveFood(t, db, ivo, ivosBar)
+	anasBar := bar()
+	anasBar.Aliases, anasBar.Barcodes = nil, codes[:1]
+	saveFood(t, db, ana, anasBar)
+	if _, err := db.UndoLast(t.Context(), ana, testActor, t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	evas := ivos
+	evas.ID, evas.Barcodes = uuid.NewV7(), codes[food.MaxBarcodes:]
+	saveFood(t, db, addEva(t, db), evas)
+	got, err := db.CatalogFoodByBarcode(t.Context(), codes[1])
+	if want := codes[1:]; err != nil || !slices.Equal(got.Barcodes, want) {
+		t.Errorf("the tuna's barcodes = %v, %v; want %v, its oldest gone", got.Barcodes, err, want)
+	}
+}
+
 // Two saves undone newest first, as a meal's new foods are, put the
 // catalog back whole: the second's taking a barcode of the first's row
 // does not keep the first's undo from it.
