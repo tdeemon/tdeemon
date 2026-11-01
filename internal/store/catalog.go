@@ -3,8 +3,10 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 	"uuid"
 
@@ -34,11 +36,18 @@ func catalogued(f food.Food) bool {
 
 // catalogState is a catalog row as a save found it, for the save's
 // undo: its food, its version, and the barcodes the save took from other
-// rows, by the row each was taken from.
+// rows, each with the row it was taken from.
 type catalogState struct {
-	Food    food.Food         `json:"food"`
-	Version int64             `json:"version"`
-	Moved   map[string]string `json:"moved,omitempty"`
+	Food    food.Food            `json:"food"`
+	Version int64                `json:"version"`
+	Moved   map[string]movedCode `json:"moved,omitempty"`
+}
+
+// movedCode is the row a save took a barcode from, and the row's version
+// before, which the save made one more.
+type movedCode struct {
+	Row     string `json:"row"`
+	Version int64  `json:"version"`
 }
 
 // syncCatalog puts userID's food f, as its save of event saved it, into
@@ -73,7 +82,10 @@ func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food,
 		}
 		before, version = &st, st.Version+1
 	}
-	if err := writeCatalogFood(ctx, tx, target, f, version, false, now); err != nil {
+	if err := writeCatalogFood(ctx, tx, target, f, version, now); err != nil {
+		return err
+	}
+	if err := writeCatalogCodes(ctx, tx, target.id, f.Barcodes); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, "UPDATE foods SET catalog_id = ? WHERE user_id = ? AND id = ?",
@@ -89,13 +101,14 @@ func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food,
 	return err
 }
 
-// movedCodes returns the codes of codes another row than id has, by that
-// row.
-func movedCodes(ctx context.Context, tx *sql.Tx, id string, codes []string) (map[string]string, error) {
-	var moved map[string]string
+// movedCodes returns the codes of codes another row than id has, with
+// that row and its version.
+func movedCodes(ctx context.Context, tx *sql.Tx, id string, codes []string) (map[string]movedCode, error) {
+	var moved map[string]movedCode
 	for _, code := range codes {
-		var from string
-		err := tx.QueryRowContext(ctx, "SELECT catalog_id FROM catalog_barcodes WHERE code = ? AND catalog_id <> ?", code, id).Scan(&from)
+		var m movedCode
+		err := tx.QueryRowContext(ctx, `SELECT c.id, c.version FROM catalog_barcodes AS b JOIN catalog_foods AS c ON c.id = b.catalog_id
+			WHERE b.code = ? AND c.id <> ?`, code, id).Scan(&m.Row, &m.Version)
 		if errors.Is(err, sql.ErrNoRows) {
 			continue
 		}
@@ -103,9 +116,9 @@ func movedCodes(ctx context.Context, tx *sql.Tx, id string, codes []string) (map
 			return nil, err
 		}
 		if moved == nil {
-			moved = map[string]string{}
+			moved = map[string]movedCode{}
 		}
-		moved[code] = from
+		moved[code] = m
 	}
 	return moved, nil
 }
@@ -154,9 +167,12 @@ func restoreCatalog(ctx context.Context, tx *sql.Tx, userID, saved uuid.UUID, no
 }
 
 // putBackCatalogRow puts the catalog's row id back as state, a save's
-// catalogState, found it, and the barcodes the save took back to their
-// rows; unless another row took its name and brand since, whose save
-// stays, and so does this row, as it is.
+// catalogState, found it, unless another row took its name and brand
+// since, whose save stays, and so does this row, as it is. Of its
+// barcodes, the save's own go, back to the rows they were taken from;
+// and its own before come back, but those another row has since, which
+// stay that row's. A row a code was taken from gets its version before
+// back, unless a save changed it since.
 func putBackCatalogRow(ctx context.Context, tx *sql.Tx, id, state string, now time.Time) error {
 	var before catalogState
 	if err := decode([]byte(state), &before); err != nil {
@@ -167,16 +183,59 @@ func putBackCatalogRow(ctx context.Context, tx *sql.Tx, id, state string, now ti
 		food.Key(before.Food.Name), food.Key(before.Food.Brand), id).Scan(&taken); err != nil || taken {
 		return err
 	}
-	if err := writeCatalogFood(ctx, tx, catalogRow{id, true}, before.Food, before.Version, true, now); err != nil {
+	if err := writeCatalogFood(ctx, tx, catalogRow{id, true}, before.Food, before.Version, now); err != nil {
 		return err
 	}
-	for code, from := range before.Moved {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO catalog_barcodes (code, catalog_id) SELECT ?1, id FROM catalog_foods WHERE id = ?2
-			ON CONFLICT (code) DO UPDATE SET catalog_id = excluded.catalog_id`, code, from); err != nil {
+	codes, err := catalogCodes(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+	for _, code := range codes {
+		if slices.Contains(before.Food.Barcodes, code) {
+			continue
+		}
+		q, args := "DELETE FROM catalog_barcodes WHERE code = ?", []any{code}
+		if m, ok := before.Moved[code]; ok {
+			q, args = `UPDATE catalog_barcodes SET catalog_id = ?2 WHERE code = ?1 AND EXISTS (SELECT 1 FROM catalog_foods WHERE id = ?2)`,
+				[]any{code, m.Row}
+		}
+		if _, err := tx.ExecContext(ctx, q, args...); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "DELETE FROM catalog_barcodes WHERE code = ? AND catalog_id = ?", code, id); err != nil {
+			return err
+		}
+	}
+	for _, code := range before.Food.Barcodes {
+		if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO catalog_barcodes (code, catalog_id) VALUES (?, ?)", code, id); err != nil {
+			return err
+		}
+	}
+	for _, m := range before.Moved {
+		if _, err := tx.ExecContext(ctx, "UPDATE catalog_foods SET version = ?1 WHERE id = ?2 AND version = ?1 + 1",
+			m.Version, m.Row); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// catalogCodes returns the barcodes of the catalog's row id.
+func catalogCodes(ctx context.Context, tx *sql.Tx, id string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx, "SELECT code FROM catalog_barcodes WHERE catalog_id = ? ORDER BY rowid", id)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var code string
+		if err := rows.Scan(&code); err != nil {
+			return nil, err
+		}
+		out = append(out, code)
+	}
+	return out, rows.Err()
 }
 
 // catalogRow is the catalog's row a food goes into: its id, and whether
@@ -218,11 +277,8 @@ func catalogTarget(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Foo
 }
 
 // writeCatalogFood writes f's name, values and servings into row at
-// version, and its words into the search. f's barcodes become the row's,
-// taken from any other row that had them; the row's others stay, the
-// newest up to food.MaxBarcodes in all, unless onlyF, which leaves it
-// f's alone.
-func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Food, version int64, onlyF bool, now time.Time) error {
+// version, and its words into the search, but not its barcodes.
+func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Food, version int64, now time.Time) error {
 	nameKey, brandKey := food.Key(f.Name), food.Key(f.Brand)
 	o := optionalNutrients(&f.Nutrients)
 	var portion any
@@ -248,11 +304,7 @@ func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Fo
 	if err != nil {
 		return err
 	}
-	deletes := []string{"DELETE FROM catalog_servings WHERE catalog_id = ?", "DELETE FROM catalog_fts WHERE catalog_id = ?"}
-	if onlyF {
-		deletes = append(deletes, "DELETE FROM catalog_barcodes WHERE catalog_id = ?")
-	}
-	for _, q := range deletes {
+	for _, q := range []string{"DELETE FROM catalog_servings WHERE catalog_id = ?", "DELETE FROM catalog_fts WHERE catalog_id = ?"} {
 		if _, err := tx.ExecContext(ctx, q, row.id); err != nil {
 			return err
 		}
@@ -263,9 +315,6 @@ func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Fo
 			return err
 		}
 	}
-	if err := writeCatalogCodes(ctx, tx, row.id, f.Barcodes); err != nil {
-		return err
-	}
 	_, err = tx.ExecContext(ctx, "INSERT INTO catalog_fts (catalog_id, name, brand) VALUES (?, ?, ?)",
 		row.id, searchText(f.Name), searchText(f.Brand))
 	return err
@@ -275,13 +324,14 @@ func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Fo
 // that had them, and leaves the row food.MaxBarcodes at most: codes,
 // and the newest of its others.
 func writeCatalogCodes(ctx context.Context, tx *sql.Tx, id string, codes []string) error {
+	// A row a code is taken from changes too: one version more, once, so
+	// an undo of a save before leaves it.
+	if _, err := tx.ExecContext(ctx, `UPDATE catalog_foods SET version = version + 1 WHERE id IN
+		(SELECT catalog_id FROM catalog_barcodes WHERE code IN (SELECT value FROM json_each(?1)) AND catalog_id <> ?2)`,
+		jsonList(codes), id); err != nil {
+		return err
+	}
 	for _, code := range codes {
-		// The row a code is taken from changes too: one version more, so
-		// an undo of a save before leaves it.
-		if _, err := tx.ExecContext(ctx, `UPDATE catalog_foods SET version = version + 1
-			WHERE id = (SELECT catalog_id FROM catalog_barcodes WHERE code = ?1 AND catalog_id <> ?2)`, code, id); err != nil {
-			return err
-		}
 		// A code moved deletes its row and inserts it anew, so the newest
 		// rowids are the codes of the latest saves.
 		if _, err := tx.ExecContext(ctx, "DELETE FROM catalog_barcodes WHERE code = ?", code); err != nil {
@@ -438,4 +488,13 @@ func catalogChildren(ctx context.Context, tx *sql.Tx, f *food.Food) error {
 		f.Barcodes = append(f.Barcodes, code)
 	}
 	return brows.Err()
+}
+
+// jsonList is codes as a JSON array, for json_each.
+func jsonList(codes []string) string {
+	b, err := json.Marshal(codes)
+	if err != nil || codes == nil {
+		return "[]"
+	}
+	return string(b)
 }

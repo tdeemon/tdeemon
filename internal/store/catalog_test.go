@@ -289,7 +289,7 @@ func TestUndoPutsBackAnotherUsersRow(t *testing.T) {
 	}
 
 	// Eva's save since stays when Ivo undoes his.
-	eva := addUser(t, db, "eva@example.com")
+	eva := addEva(t, db)
 	saveFood(t, db, ivo, ivos)
 	evas := tuna(118)
 	evas.Aliases, evas.Barcodes = nil, nil
@@ -323,7 +323,7 @@ func TestUndoLeavesARowWhoseNameWasTaken(t *testing.T) {
 	if got, err := db.FoodByID(t.Context(), ana, anas.ID); err != nil || got.Name != anas.Name {
 		t.Errorf("Ana's food after her undo = %+v, %v; want its name back", got, err)
 	}
-	if got := findCatalog(t, db, addUser(t, db, "eva@example.com"), "tuna"); len(got) != 2 {
+	if got := findCatalog(t, db, addEva(t, db), "tuna"); len(got) != 2 {
 		t.Errorf("the catalog's tunas after Ana's undo = %+v; want Ivo's and the one Ana renamed, as they are", got)
 	}
 }
@@ -387,12 +387,75 @@ func TestCatalogBarcodes(t *testing.T) {
 	ivos.Name, ivos.Aliases, ivos.Barcodes = "Keksi", nil, codes(5)
 	saveFood(t, db, ana, anas)
 	saveFood(t, db, ivo, ivos)
-	got := findCatalog(t, db, addUser(t, db, "eva@example.com"), "keksi")
+	got := findCatalog(t, db, addEva(t, db), "keksi")
 	if len(got) != 1 || len(got[0].Barcodes) != food.MaxBarcodes || got[0].Validate() != nil {
 		t.Fatalf("Eva's search for keksi = %+v; want one valid food of %d barcodes", got, food.MaxBarcodes)
 	}
 	if !slices.Contains(got[0].Barcodes, codes(5)[food.MaxBarcodes-1]) || slices.Contains(got[0].Barcodes, codes(0)[0]) {
 		t.Errorf("the barcodes kept %v: want Ivo's, the newest", got[0].Barcodes)
+	}
+}
+
+// An undo gives a row back a barcode the save let go only when no other
+// row has it since.
+func TestUndoLeavesABarcodeAnotherRowTookSince(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	codes := make([]string, 0, food.MaxBarcodes+1)
+	for i := range food.MaxBarcodes + 1 {
+		codes = append(codes, ean13(t, 400000000000+i))
+	}
+	anas := tuna(116)
+	anas.Aliases, anas.Barcodes = nil, codes[:food.MaxBarcodes]
+	anas = saveFood(t, db, ana, anas)
+	ivos := tuna(116)
+	ivos.Aliases, ivos.Barcodes = nil, codes[food.MaxBarcodes:]
+	saveFood(t, db, ivo, ivos) // the row lets codes[0] go, its oldest
+	other := bar()
+	other.Aliases, other.Barcodes = nil, codes[:1]
+	saveFood(t, db, addEva(t, db), other)
+	if _, err := db.UndoLast(t.Context(), ivo, testActor, t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := db.CatalogFoodByBarcode(t.Context(), codes[0]); err != nil || got.Name != other.Name {
+		t.Errorf("the food of %s after Ivo's undo = %+v, %v; want Eva's bar, which has it since", codes[0], got, err)
+	}
+	got, err := db.CatalogFoodByBarcode(t.Context(), codes[1])
+	if err != nil || !slices.Equal(got.Barcodes, codes[1:food.MaxBarcodes]) {
+		t.Errorf("the tuna after Ivo's undo = %+v, %v; want Ana's barcodes but the one Eva's bar has", got, err)
+	}
+}
+
+// Two saves undone newest first, as a meal's new foods are, put the
+// catalog back whole: the second's taking a barcode of the first's row
+// does not keep the first's undo from it.
+func TestUndoOfTwoSavesPutsBothBack(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	ivos := tuna(116)
+	ivos.Aliases = nil
+	saveFood(t, db, ivo, ivos)
+	ivosBar := bar()
+	ivosBar.Aliases = nil
+	saveFood(t, db, ivo, ivosBar)
+	anas := tuna(120)
+	anas.Aliases, anas.Barcodes = nil, nil
+	saveFood(t, db, ana, anas)
+	// Ana's bar goes into Ivo's bar's row, by its name, and takes the
+	// tuna's barcode.
+	other := bar()
+	other.Aliases, other.Barcodes = nil, []string{"3850104000010"}
+	saveFood(t, db, ana, other)
+	for i := range 2 {
+		if _, err := db.UndoLast(t.Context(), ana, testActor, t0.Add(time.Duration(i+1)*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := db.CatalogFoodByBarcode(t.Context(), "3850104000010")
+	if err != nil || got.Name != "Tuna u vlastitom soku" || got.Nutrients.Kcal != 116 {
+		t.Errorf("the tuna after Ana undid both = %+v, %v; want Ivo's, at 116 kcal, with its barcode", got, err)
 	}
 }
 
@@ -432,10 +495,10 @@ func TestCatalogOutlivesItsUser(t *testing.T) {
 	}
 }
 
-// addUser adds a user of email to db and returns their id.
-func addUser(t *testing.T, db *store.DB, email string) uuid.UUID {
+// addEva adds a third user, Eva, to db and returns her id.
+func addEva(t *testing.T, db *store.DB) uuid.UUID {
 	t.Helper()
-	u := newUser(email)
+	u := newUser("eva@example.com")
 	if err := db.CreateUser(t.Context(), u, ""); err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
