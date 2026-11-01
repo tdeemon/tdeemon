@@ -12,15 +12,23 @@ import (
 // per account (the normalized address signed in with, known or not, so
 // the limit tells nothing about which accounts exist).
 const (
-	// signInFailures failed sign-ins in signInWindow, per address and per
-	// account, and further sign-ins answer 429 until the window passes. A
-	// correct password then waits too: the limit is not a hint.
-	signInFailures = 10
-	signInWindow   = 15 * time.Minute
+	// signInFailures failed sign-ins in signInWindow from an address, or
+	// accountFailures for an account from anywhere, and further sign-ins
+	// from there, or for it, answer 429 until the window passes. A
+	// correct password then waits too: the limit is not a hint. An
+	// account takes ten times an address's, so that someone who knows a
+	// user's address cannot keep them from signing in from one or a few
+	// addresses of their own: it takes ten, each blocked after ten.
+	signInFailures  = 10
+	accountFailures = 100
+	signInWindow    = 15 * time.Minute
 	// badTokenFailures requests with a Bearer token that is no live API
-	// token in badTokenWindow, per address, and further Bearer requests
-	// from there answer 429 until the window passes. A device with a
-	// revoked token that retries every minute stays under it.
+	// token in badTokenWindow, per address, and further bad tokens from
+	// there answer 429 until the window passes. A good token goes on: a
+	// device behind the same NAT as one with a revoked token keeps
+	// working, and a token is too long to guess, so its 200 among the
+	// 429s gives nothing away. A device with a revoked token that
+	// retries every minute stays under it.
 	badTokenFailures = 50
 	badTokenWindow   = 15 * time.Minute
 	// offLookups barcodes a user may look up at Open Food Facts in

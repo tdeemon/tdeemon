@@ -210,16 +210,17 @@ a `__Host-` cookie.
 Against guessing and floods:
 
 - **Failed sign-ins:** after 10 in 15 minutes from one client address
-  (an IPv6 address counts by its /64), or for one account (from
+  (an IPv6 address counts by its /64), or 100 for one account (from
   anywhere, and the same for an address no account has), sign-ins from
   there or for it answer 429 with `Retry-After` until the 15 minutes
-  have passed, the right password included. Sign-ins still being checked
-  count too, so a burst sent at once gets no further. A successful
-  sign-in starts the account's count over. Single sign-on is not
-  counted.
-- **Bad API tokens:** after 50 in 15 minutes from one address, every
-  request with a Bearer token from there answers 429, a good token
-  included, until the 15 minutes have passed.
+  have passed, the right password included. Someone who knows your
+  email address cannot keep you out from an address or two of theirs:
+  it takes ten. Sign-ins still being checked count too, so a burst sent
+  at once gets no further. A successful sign-in starts the account's
+  count over. Single sign-on is not counted.
+- **Bad API tokens:** after 50 in 15 minutes from one address, a bad
+  token from there answers 429 until the 15 minutes have passed. A good
+  one goes on, so a device behind the same NAT keeps working.
 - **Behind a reverse proxy**, set `TDEEMON_TRUSTED_PROXIES` to its
   addresses, so the limits count the client it forwards
   (`X-Forwarded-For`, the right-most address that is not a trusted

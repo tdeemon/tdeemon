@@ -130,27 +130,32 @@ func writeBadToken(w http.ResponseWriter) {
 }
 
 // authenticateToken handles a request with a Bearer token. An address
-// that sent too many bad tokens lately gets 429 for every Bearer request,
-// a good token included, until its window passes (limit.go).
+// that sent too many bad tokens lately gets 429 for a bad one until its
+// window passes; a good one goes on (limit.go).
 func (s *sessions) authenticateToken(w http.ResponseWriter, r *http.Request, token string, next http.Handler) {
 	addr := addrKey(clientAddrFrom(r.Context()))
-	attempt, wait, ok := s.badTokens.take(addr)
-	if !ok {
-		maps.Copy(w.Header(), retryAfter(wait))
-		writeProblem(w, http.StatusTooManyRequests, "too many invalid API tokens from this address; try again later")
-		return
+	attempt, wait, counted := s.badTokens.take(addr)
+	bad := func() {
+		if !counted {
+			maps.Copy(w.Header(), retryAfter(wait))
+			writeProblem(w, http.StatusTooManyRequests, "too many invalid API tokens from this address; try again later")
+			return
+		}
+		writeBadToken(w)
 	}
 	// The attempt take reserved stays a failure, unless the token is good.
 	if !strings.HasPrefix(token, auth.TokenPrefix) {
-		writeBadToken(w)
+		bad()
 		return
 	}
 	t, u, err := s.db.APITokenUser(r.Context(), auth.SessionID(token))
 	if errors.Is(err, store.ErrNotFound) {
-		writeBadToken(w)
+		bad()
 		return
 	}
-	s.badTokens.release(attempt)
+	if counted {
+		s.badTokens.release(attempt)
+	}
 	if err != nil {
 		s.logger.Log(r.Context(), logLevel(err), "looking up an API token failed", "error", err)
 		writeProblem(w, http.StatusInternalServerError, "the API token could not be checked")
