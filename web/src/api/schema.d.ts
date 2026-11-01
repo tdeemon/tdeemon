@@ -1369,25 +1369,6 @@ export interface components {
             /** @description Its name to a person. */
             title: string;
         };
-        Cookie: {
-            Domain: string;
-            /** Format: date-time */
-            Expires: string;
-            HttpOnly: boolean;
-            /** Format: int64 */
-            MaxAge: number;
-            Name: string;
-            Partitioned: boolean;
-            Path: string;
-            Quoted: boolean;
-            Raw: string;
-            RawExpires: string;
-            /** Format: int64 */
-            SameSite: number;
-            Secure: boolean;
-            Unparsed: string[] | null;
-            Value: string;
-        };
         CreateInviteInputBody: {
             /** @description The address the new user will sign in with. */
             email: string;
@@ -6305,7 +6286,7 @@ export interface operations {
             200: {
                 headers: {
                     "Cache-Control"?: string;
-                    "Set-Cookie"?: components["schemas"]["Cookie"];
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {

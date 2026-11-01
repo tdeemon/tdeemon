@@ -232,16 +232,20 @@ func TestAcceptInviteBySSORefuses(t *testing.T) {
 	p := newIDP(t)
 	in := newOIDCInstance(t, p)
 	flow, callback := in.begin(t, p, "") // links ana's identity
-	in.finish(t, callback, flow)
+	session := cookieNamed(in.finish(t, callback, flow), "tdeemon_session")
 	token := in.storeInvite(t, "zoe@example.com")
 	rec := in.do(t, http.MethodPost, "/api/v1/invites/sso", `{"token": "`+token+`", "timezone": "UTC", "locale": "en"}`, nil, nil)
 	var started struct {
 		URL string `json:"url"`
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &started)
-	back := in.finish(t, p.authorize(t, started.URL), cookieNamed(rec, "tdeemon_oidc"))
+	// Ana, signed in, follows the invite: refused, she stays signed in.
+	back := in.finish(t, p.authorize(t, started.URL), cookieNamed(rec, "tdeemon_oidc"), session)
 	if back.Code != http.StatusConflict || cookieNamed(back, "tdeemon_session") != nil {
 		t.Errorf("ana's identity: %d %s, want 409 and no session", back.Code, back.Body.String())
+	}
+	if rec := in.do(t, http.MethodGet, "/api/v1/auth/session", "", []*http.Cookie{session}, nil); rec.Code != http.StatusOK {
+		t.Errorf("ana's session after the refusal: %d, want 200", rec.Code)
 	}
 	for body, want := range map[string]int{
 		`{"token": "nothing", "timezone": "UTC", "locale": "en"}`:                http.StatusNotFound,

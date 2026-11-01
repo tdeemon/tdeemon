@@ -527,79 +527,6 @@
         ],
         "type": "object"
       },
-      "Cookie": {
-        "additionalProperties": false,
-        "properties": {
-          "Domain": {
-            "type": "string"
-          },
-          "Expires": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "HttpOnly": {
-            "type": "boolean"
-          },
-          "MaxAge": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "Name": {
-            "type": "string"
-          },
-          "Partitioned": {
-            "type": "boolean"
-          },
-          "Path": {
-            "type": "string"
-          },
-          "Quoted": {
-            "type": "boolean"
-          },
-          "Raw": {
-            "type": "string"
-          },
-          "RawExpires": {
-            "type": "string"
-          },
-          "SameSite": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "Secure": {
-            "type": "boolean"
-          },
-          "Unparsed": {
-            "items": {
-              "type": "string"
-            },
-            "type": [
-              "array",
-              "null"
-            ]
-          },
-          "Value": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "Name",
-          "Value",
-          "Quoted",
-          "Path",
-          "Domain",
-          "Expires",
-          "RawExpires",
-          "MaxAge",
-          "Secure",
-          "HttpOnly",
-          "SameSite",
-          "Partitioned",
-          "Raw",
-          "Unparsed"
-        ],
-        "type": "object"
-      },
       "CreateInviteInputBody": {
         "additionalProperties": false,
         "properties": {
@@ -8957,8 +8884,8 @@
               },
               "Set-Cookie": {
                 "schema": {
-                  "$ref": "#/components/schemas/Cookie",
-                  "description": "The sign-in's flow cookie."
+                  "description": "The sign-in's flow cookie.",
+                  "type": "string"
                 }
               }
             }

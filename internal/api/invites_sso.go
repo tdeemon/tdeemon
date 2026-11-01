@@ -24,8 +24,8 @@ type inviteSSOInput struct {
 }
 
 type inviteSSOOutput struct {
-	SetCookie    *http.Cookie `header:"Set-Cookie" doc:"The sign-in's flow cookie."`
-	CacheControl string       `header:"Cache-Control" doc:"no-store"`
+	SetCookie    http.Cookie `header:"Set-Cookie" doc:"The sign-in's flow cookie."`
+	CacheControl string      `header:"Cache-Control" doc:"no-store"`
 	Body         struct {
 		URL string `json:"url" doc:"The provider's page to send the browser to; back from it, the account is made and signed in."`
 	}
@@ -68,7 +68,7 @@ func (o *oidcLogin) startInvite(ctx context.Context, in *inviteSSOInput) (*invit
 	if err != nil {
 		return nil, huma.Error502BadGateway("the sign-in provider cannot be reached; try again, or choose a password")
 	}
-	out := &inviteSSOOutput{SetCookie: cookie, CacheControl: "no-store"}
+	out := &inviteSSOOutput{SetCookie: *cookie, CacheControl: "no-store"}
 	out.Body.URL = to
 	return out, nil
 }
