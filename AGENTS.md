@@ -108,9 +108,10 @@ weigh it", warned of when far off its raw ingredients', its portions
 and a note, what it comes to said at its foot as it is typed; a food's
 page with its energy and its split, its
 nutrition per 100 g or a serving, its barcodes, how often it was
-logged, logged again in its last amount, archived with Undo, and
-corrected in its own form, which warns when the kcal and the macros
-disagree and adds a barcode, scanned or typed, or takes one away;
+logged, logged again from its last amount, changed first, archived
+with Undo, and corrected in its own form, which warns when the kcal
+and the macros disagree and adds a barcode, scanned or typed, or takes
+one away;
 beside the list on a desktop), the progress (the phase's verdict as its
 hero, or until the TDEE is reliable calibration on its way to it, its
 counts against what it needs and about when a first comes; the weight,

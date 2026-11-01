@@ -46,6 +46,7 @@ export function LogFood({ food, className }: { food: Food; className?: string })
           open={open}
           onOpenChange={setOpen}
           initial={food}
+          pick
           opener={button}
           remaining={day.data?.remaining?.kcal}
           date={date}
