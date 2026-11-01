@@ -194,7 +194,11 @@ func TestUndoOfASaveBeforeTheCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i, ev := range []legacySave{{grapes, nil, newGrapes, ""}, {apple, nil, before, ""}, {apple, before, after, ""}} {
+	for i, ev := range []legacySave{
+		{grapes, nil, newGrapes, catalogSeeds[1].updated},
+		{apple, nil, before, "2026-10-01T08:00:00Z"},
+		{apple, before, after, catalogSeeds[2].updated},
+	} {
 		ev.record(t, db, ivo, i)
 	}
 	actor := event.Actor{Kind: event.User, Client: "web"}
@@ -298,6 +302,10 @@ func TestUndoBeforeTheCatalogLeavesOthersRows(t *testing.T) {
 	before := after
 	before.Nutrients.Kcal = 60
 	legacySave{grapes, before, after, catalogSeeds[0].updated}.record(t, db, ana, 0)
+	// Ivo, whose grapes the row is of, goes: the row stays his.
+	if _, err := db.DeleteUser(t.Context(), uuid.MustParse(catalogUsers["Ivo"])); err != nil {
+		t.Fatal(err)
+	}
 	actor := event.Actor{Kind: event.User, Client: "web"}
 	if _, err := db.UndoLast(t.Context(), ana, actor, time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC)); err != nil {
 		t.Fatal(err)
@@ -306,11 +314,8 @@ func TestUndoBeforeTheCatalogLeavesOthersRows(t *testing.T) {
 		t.Errorf("the grapes after Ana's undo = %+v; want Ivo's 69 kcal, saved after hers", got)
 	}
 
-	// Ivo goes, and his apple's row names no food; Eva's estimate of its
-	// name and values, undone, leaves it.
-	if _, err := db.DeleteUser(t.Context(), uuid.MustParse(catalogUsers["Ivo"])); err != nil {
-		t.Fatal(err)
-	}
+	// Ivo's apple's row names no food now; Eva's estimate of its name
+	// and values, undone, leaves it.
 	eva := uuid.MustParse(catalogUsers["Eva"])
 	estimate := food.Food{
 		ID: uuid.NewV7(), Name: "Jabuka", Basis: food.Per100g, Source: food.Estimate,
@@ -360,5 +365,56 @@ func TestUndoOfALinkToARowGone(t *testing.T) {
 	var link sql.NullString
 	if err := db.write.QueryRowContext(t.Context(), "SELECT catalog_id FROM foods WHERE id = ?", apple.ID.String()).Scan(&link); err != nil || link.Valid {
 		t.Errorf("the apple's link after the undo = %v, %v; want none (its row before went), not %s", link, err, row)
+	}
+}
+
+// An undo of the save before the catalog that the migration made a row
+// of: a correction gives the row its values before and leaves another's
+// barcodes; a save that made a label's food of an estimate takes the row
+// along, and the food out of it.
+func TestUndoBeforeTheCatalogOfTheRowsOwnSave(t *testing.T) {
+	t.Parallel()
+
+	db := migratedCatalog(t, false)
+	ivo := uuid.MustParse(catalogUsers["Ivo"])
+	grapes := uuid.MustParse(catalogSeeds[1].id)
+	after, err := db.FoodByID(t.Context(), ivo, grapes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := after
+	before.Nutrients.Kcal, before.Barcodes = 60, nil
+	legacySave{grapes, before, after, catalogSeeds[1].updated}.record(t, db, ivo, 0)
+	apple := uuid.MustParse(catalogSeeds[2].id)
+	label, err := db.FoodByID(t.Context(), ivo, apple)
+	if err != nil {
+		t.Fatal(err)
+	}
+	estimate := label
+	estimate.Source = food.Estimate
+	legacySave{apple, estimate, label, catalogSeeds[2].updated}.record(t, db, ivo, 1)
+	actor := event.Actor{Kind: event.User, Client: "web"}
+	now := time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC)
+
+	if _, err := db.UndoLast(t.Context(), ivo, actor, now); err != nil {
+		t.Fatalf("undo the apple's label: %v", err)
+	}
+	if got := findCatalogOf(t, db, "jabuk"); len(got) != 0 {
+		t.Errorf("the catalog's apple after its label was undone = %+v; want none", got)
+	}
+	var link sql.NullString
+	if err := db.write.QueryRowContext(t.Context(), "SELECT catalog_id FROM foods WHERE id = ?", apple.String()).Scan(&link); err != nil || link.Valid {
+		t.Errorf("the apple's link = %v, %v; want none", link, err)
+	}
+
+	if _, err := db.UndoLast(t.Context(), ivo, actor, now.Add(time.Minute)); err != nil {
+		t.Fatalf("undo the grapes' correction: %v", err)
+	}
+	got := findCatalogOf(t, db, "grozd")
+	if len(got) != 1 || got[0].Nutrients.Kcal != 60 {
+		t.Fatalf("the grapes after Ivo's undo = %+v; want 60 kcal", got)
+	}
+	if !slices.Contains(got[0].Barcodes, anasCodes[len(anasCodes)-1]) || slices.Contains(got[0].Barcodes, "5060000000016") {
+		t.Errorf("the grapes' barcodes = %v; want Ana's, and not Ivo's, which his correction brought", got[0].Barcodes)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 	"uuid"
 
@@ -135,72 +136,90 @@ func restoreCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.E
 }
 
 // restoreLegacyCatalog takes back what userID's save of food e, made
-// before the catalog, gave it through the migration: the row of the
-// name and brand the save left, untouched since (its first version), as
-// the save left it, and of no food saved after it, gets the food's
-// values before; or, for a save that made the food, goes, when no other
-// food names it. Anything else stays, and a save of a food the catalog
-// does not take never changes it.
+// before the catalog, gave it through the migration, which made a row
+// of the food saved last, and of its time: the row of the name and brand
+// the save left, untouched since (its first version) and made of this
+// save (its time e's). A save that made the food, or made a food the
+// catalog does not take one it does, takes its row along when no other
+// food names it; any other gets the food's values before back, and its
+// barcodes, but those of the save's own, leaving another's; and the row
+// takes the time of the food's save before, whose undo it is then of.
+// Anything else stays, and a save of a food the catalog does not take
+// never changes it.
 func restoreLegacyCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Event, now time.Time) error {
-	if e.Action != event.FoodSave || e.After == nil {
-		return nil
-	}
-	var after food.Food
-	if err := decode(e.After, &after); err != nil {
+	id, before, after, err := legacyRow(ctx, tx, e)
+	if err != nil || id == "" {
 		return err
 	}
-	if !catalogued(after) {
-		return nil
+	if before == nil || !catalogued(*before) {
+		if _, err := tx.ExecContext(ctx, "UPDATE foods SET catalog_id = NULL WHERE user_id = ? AND id = ?", userID.String(), e.Entity); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, "DELETE FROM catalog_foods WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM foods WHERE catalog_id = ?1)", id)
+		return err
+	}
+	var taken bool
+	if err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM catalog_foods WHERE name_key = ? AND brand_key = ? AND id <> ?)",
+		food.Key(before.Name), food.Key(before.Brand), id).Scan(&taken); err != nil || taken {
+		return err
+	}
+	if err := writeCatalogFood(ctx, tx, catalogRow{id, true}, *before, 1, now); err != nil {
+		return err
+	}
+	if err := putBackLegacyCodes(ctx, tx, id, before.Barcodes, after.Barcodes); err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `UPDATE catalog_foods SET updated_at = coalesce((SELECT max(at) FROM events
+		WHERE user_id = ?1 AND entity = ?2 AND operation = 'food.save' AND undone_by IS NULL AND id <> ?3 AND at <= ?4), updated_at)
+		WHERE id = ?5`, userID.String(), e.Entity, e.ID.String(), formatTime(e.At), id)
+	return err
+}
+
+// legacyRow returns the row the migration made of the food's save e, a
+// catalogued food's, as restoreLegacyCatalog says, with the food before
+// (nil for none) and after e; or "" for none.
+func legacyRow(ctx context.Context, tx *sql.Tx, e event.Event) (string, *food.Food, food.Food, error) {
+	var after food.Food
+	if e.Action != event.FoodSave || e.After == nil {
+		return "", nil, after, nil
+	}
+	if err := decode(e.After, &after); err != nil || !catalogued(after) {
+		return "", nil, after, err
 	}
 	// By the name and brand the save left, as the food may be gone.
 	var id string
-	err := tx.QueryRowContext(ctx, "SELECT id FROM catalog_foods WHERE name_key = ? AND brand_key = ? AND version = 1",
-		food.Key(after.Name), food.Key(after.Brand)).Scan(&id)
+	err := tx.QueryRowContext(ctx, "SELECT id FROM catalog_foods WHERE name_key = ? AND brand_key = ? AND version = 1 AND updated_at = ?",
+		food.Key(after.Name), food.Key(after.Brand), formatTime(e.At)).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil
+		return "", nil, after, nil
 	}
-	if err != nil {
-		return err
-	}
-	row, err := catalogStateInTx(ctx, tx, id)
-	if err != nil {
-		return err
-	}
-	if !sameCatalogValues(row.Food, after) {
-		return nil
-	}
-	// The migration made the row of the food saved last: another's saved
-	// after e is the row's, which stays.
-	var later bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM foods WHERE catalog_id = ? AND NOT (user_id = ? AND id = ?)
-		AND updated_at > ? AND archived = 0 AND source IN ('label', 'reference', 'off'))`,
-		id, userID.String(), e.Entity, formatTime(e.At)).Scan(&later); err != nil || later {
-		return err
-	}
-	if e.Before == nil {
-		_, err := tx.ExecContext(ctx, "UPDATE foods SET catalog_id = NULL WHERE user_id = ? AND id = ?", userID.String(), e.Entity)
-		if err != nil {
-			return err
-		}
-		_, err = tx.ExecContext(ctx, "DELETE FROM catalog_foods WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM foods WHERE catalog_id = ?1)", id)
-		return err
+	if err != nil || e.Before == nil {
+		return id, nil, after, err
 	}
 	var before food.Food
 	if err := decode(e.Before, &before); err != nil {
-		return err
+		return "", nil, after, err
 	}
-	if !catalogued(before) {
-		return nil
-	}
-	return putBackCatalogRow(ctx, tx, id, catalogState{Food: before, Version: 1}, now)
+	return id, &before, after, nil
 }
 
-// sameCatalogValues reports whether the catalog's row a holds food b's
-// name, brand and values.
-func sameCatalogValues(a, b food.Food) bool {
-	return food.Key(a.Name) == food.Key(b.Name) && food.Key(a.Brand) == food.Key(b.Brand) && a.Basis == b.Basis &&
-		a.Nutrients.Kcal == b.Nutrients.Kcal && a.Nutrients.Protein == b.Nutrients.Protein &&
-		a.Nutrients.Carbs == b.Nutrients.Carbs && a.Nutrients.Fat == b.Nutrients.Fat && a.PortionGrams == b.PortionGrams
+// putBackLegacyCodes takes the barcodes a save brought (in after, not
+// before) out of the row id, and gives it back those of before no other
+// row has, leaving another's.
+func putBackLegacyCodes(ctx context.Context, tx *sql.Tx, id string, before, after []string) error {
+	for _, code := range after {
+		if !slices.Contains(before, code) {
+			if _, err := tx.ExecContext(ctx, "DELETE FROM catalog_barcodes WHERE code = ? AND catalog_id = ?", code, id); err != nil {
+				return err
+			}
+		}
+	}
+	for _, code := range before {
+		if _, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO catalog_barcodes (code, catalog_id) VALUES (?, ?)", code, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // putBackCatalogRow puts the catalog's row id back as before, as a save
