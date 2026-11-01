@@ -143,12 +143,21 @@ export function InvitePage() {
     )
   } else if (check.isPending) {
     body = <Skeleton blocks={['h-6', 'h-44']} />
-  } else if (check.isError) {
+  } else if (check.data === undefined) {
     body = <LoadError error={check.error} onRetry={() => void check.refetch()} />
   } else {
     const invite = check.data
     body = (
       <>
+        {/* Asked again and failed, the invite that came stays, and its form. */}
+        {check.isError && (
+          <output className="flex flex-wrap items-baseline gap-x-2 text-small text-muted-foreground">
+            {problem(t, check.error)}
+            <Button variant="link" className="h-auto p-0" onClick={() => void check.refetch()}>
+              {t.retry}
+            </Button>
+          </output>
+        )}
         <div className="space-y-1">
           <p>{t.invite.forEmail(invite.email)}</p>
           <p className="text-small text-muted-foreground">

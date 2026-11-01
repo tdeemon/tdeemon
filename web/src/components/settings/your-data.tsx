@@ -14,9 +14,10 @@ import { fieldLabel, inputClass } from '@/lib/styles'
 import { cn } from '@/lib/utils'
 
 // normalized is an address as the server compares it
-// (user.NormalizeEmail): trimmed, in lower case, in NFC.
+// (user.NormalizeEmail): trimmed, in lower case, in NFC. A final Σ is
+// ς in JavaScript's lower case and σ in Go's, so ς is σ here.
 function normalized(email: string): string {
-  return email.trim().toLowerCase().normalize('NFC')
+  return email.trim().toLowerCase().replaceAll('ς', 'σ').normalize('NFC')
 }
 
 // why says why the account was not deleted.

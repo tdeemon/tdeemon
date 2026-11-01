@@ -122,3 +122,18 @@ test('an address typed in decomposed letters is the same address', async () => {
   expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeDefined()
   expect(sent).toEqual([{ email: decomposed.trim() }])
 })
+
+test("a final Σ typed is the server's σ, as Go lowers it", async () => {
+  const sent = server(undefined, 'οσ@example.com')
+  renderAt('/settings/account')
+
+  fireEvent.click(await (await yourData()).findByRole('button', { name: 'Delete your account' }))
+  const sheet = within(await screen.findByRole('dialog'))
+  fireEvent.change(sheet.getByLabelText('Your email address'), {
+    target: { value: 'ΟΣ@example.com' },
+  })
+  fireEvent.click(sheet.getByRole('button', { name: 'Delete my account' }))
+
+  expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeDefined()
+  expect(sent).toEqual([{ email: 'ΟΣ@example.com' }])
+})

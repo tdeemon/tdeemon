@@ -3,6 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 
 import { setLocale } from '@/i18n/locale'
 import {
+  askAgain,
   fakeServer,
   problem,
   renderAt,
@@ -288,4 +289,26 @@ test("back from the provider's page through the browser's cache, both ways are o
     expect(provider.hasAttribute('disabled')).toBe(false)
   })
   expect(submit.hasAttribute('disabled')).toBe(false)
+})
+
+test('an invite that came stays with its form when asking again fails', async () => {
+  let fails = false
+  server({
+    'POST /api/v1/invites/check': () =>
+      fails ? problem(500) : Response.json({ email: invited, expires_at: '2026-10-30T10:00:00Z' }),
+  })
+  const router = renderAt(`/invite#${token}`)
+
+  expect(await screen.findByText(`Your account will sign in as ${invited}.`)).toBeDefined()
+  fails = true
+  await askAgain(router)
+
+  expect((await screen.findByRole('status')).textContent).toContain('The server failed to answer.')
+  expect(screen.getByText(`Your account will sign in as ${invited}.`)).toBeDefined()
+  expect(screen.getByLabelText('Password')).toBeDefined()
+  fails = false
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+  await waitFor(() => {
+    expect(screen.queryByRole('status')).toBeNull()
+  })
 })
