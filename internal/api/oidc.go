@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -90,6 +91,17 @@ type flow struct {
 	Verifier  string    `json:"verifier"`
 	ReturnTo  string    `json:"return_to"`
 	ExpiresAt time.Time `json:"expires_at"`
+	// Invite, when not nil, makes the account of an invite for the
+	// identity, rather than sign in the one it belongs to.
+	Invite *flowInvite `json:"invite,omitempty"`
+}
+
+// flowInvite is the invite a flow makes an account by, and the account's
+// time zone and language, the browser's.
+type flowInvite struct {
+	Token    string `json:"token"`
+	TimeZone string `json:"timezone"`
+	Locale   string `json:"locale"`
 }
 
 func (o *oidcLogin) register(mux *http.ServeMux) {
@@ -199,18 +211,31 @@ func (o *oidcLogin) oauth2Config(p *oidc.Provider) *oauth2.Config {
 // start sends the browser to the provider. return_to, a path on this
 // instance, is where the browser lands after signing in.
 func (o *oidcLogin) start(w http.ResponseWriter, r *http.Request) {
-	p, err := o.getProvider(r.Context())
+	cookie, to, err := o.begin(r.Context(), safeReturnTo(r.URL.Query().Get("return_to")), nil)
 	if err != nil {
-		o.sessions.logger.ErrorContext(r.Context(), "the OIDC provider cannot be reached", "error", err)
 		writeProblem(w, http.StatusBadGateway, "the sign-in provider cannot be reached; try again, or sign in with a password")
 		return
+	}
+	http.SetCookie(w, cookie)
+	w.Header().Set("Cache-Control", "no-store")
+	http.Redirect(w, r, to, http.StatusFound) //nolint:gosec // G710: the provider's authorization URL; return_to rides in the sealed cookie, not in it
+}
+
+// begin starts a flow to returnTo, of inv when not nil: it returns the
+// flow cookie to set and the provider's URL to send the browser to.
+func (o *oidcLogin) begin(ctx context.Context, returnTo string, inv *flowInvite) (*http.Cookie, string, error) {
+	p, err := o.getProvider(ctx)
+	if err != nil {
+		o.sessions.logger.ErrorContext(ctx, "the OIDC provider cannot be reached", "error", err)
+		return nil, "", err
 	}
 	f := flow{
 		State:     rand.Text(),
 		Nonce:     rand.Text(),
 		Verifier:  oauth2.GenerateVerifier(),
-		ReturnTo:  safeReturnTo(r.URL.Query().Get("return_to")),
+		ReturnTo:  returnTo,
 		ExpiresAt: o.sessions.now().Add(flowLifetime),
+		Invite:    inv,
 	}
 	// Without HTML escaping: it would turn every & or < of return_to into
 	// six bytes. A struct of strings and a time always encodes.
@@ -218,10 +243,8 @@ func (o *oidcLogin) start(w http.ResponseWriter, r *http.Request) {
 	enc := json.NewEncoder(&value)
 	enc.SetEscapeHTML(false)
 	_ = enc.Encode(f)
-	http.SetCookie(w, o.flowCookie(auth.Seal(o.secret, sealPurpose, value.Bytes()), int(flowLifetime.Seconds())))
-	w.Header().Set("Cache-Control", "no-store")
-	to := o.oauth2Config(p).AuthCodeURL(f.State, oidc.Nonce(f.Nonce), oauth2.S256ChallengeOption(f.Verifier))
-	http.Redirect(w, r, to, http.StatusFound)
+	cookie := o.flowCookie(auth.Seal(o.secret, sealPurpose, value.Bytes()), int(flowLifetime.Seconds()))
+	return cookie, o.oauth2Config(p).AuthCodeURL(f.State, oidc.Nonce(f.Nonce), oauth2.S256ChallengeOption(f.Verifier)), nil
 }
 
 // callback finishes the sign-in: it checks that this browser started the
@@ -259,6 +282,10 @@ func (o *oidcLogin) callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := o.sessions.now()
+	if f.Invite != nil {
+		o.acceptInvite(w, r, id, f, now)
+		return
+	}
 	u, err := o.sessions.db.SignInWithIdentity(ctx, id, now)
 	if msg, refused := refusal(err); refused {
 		// The reason, never the address: the log is no place for it.
@@ -357,8 +384,10 @@ func (o *oidcLogin) verify(ctx context.Context, code string, f flow) (store.Iden
 		return store.Identity{}, errors.New("the ID token's nonce is not this sign-in's")
 	}
 	var claims struct {
-		Email         string   `json:"email"`
-		EmailVerified flexBool `json:"email_verified"`
+		Email             string   `json:"email"`
+		EmailVerified     flexBool `json:"email_verified"`
+		Name              string   `json:"name"`
+		PreferredUsername string   `json:"preferred_username"`
 	}
 	if err := idt.Claims(&claims); err != nil {
 		return store.Identity{}, err
@@ -367,6 +396,7 @@ func (o *oidcLogin) verify(ctx context.Context, code string, f flow) (store.Iden
 	return store.Identity{
 		Issuer: idt.Issuer, Subject: idt.Subject,
 		Email: email, EmailNotLinkable: !linkable, EmailVerified: bool(claims.EmailVerified),
+		Name: cmp.Or(strings.TrimSpace(claims.Name), strings.TrimSpace(claims.PreferredUsername)),
 	}, nil
 }
 

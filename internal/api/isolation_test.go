@@ -1032,6 +1032,16 @@ func isolateAcceptInvite(t *testing.T, e isolationEnv) {
 	}
 }
 
+// isolateInviteSSO is start-invite-sso's case: without a provider, it
+// starts nothing (oidc_test.go has it with one).
+func isolateInviteSSO(t *testing.T, e isolationEnv) {
+	t.Helper()
+	body := `{"token": "` + inviteWithToken(t, e, "mia@example.com") + `", "timezone": "UTC", "locale": "en"}`
+	if rec := e.in.do(t, http.MethodPost, "/api/v1/invites/sso", body, nil, nil); rec.Code != http.StatusNotFound {
+		t.Errorf("without a provider: %d %s, want 404", rec.Code, rec.Body.String())
+	}
+}
+
 // isolateDeleteAccount is delete-account's case: the owner's address
 // deletes nothing; the other's own deletes them, and the owner stays. An
 // admin, the only one, gets another admin first.
@@ -1167,6 +1177,7 @@ func isolationCases() map[string]isolationCase {
 		"delete-invite":            isolateDeleteInvite,
 		"check-invite":             isolateCheckInvite,
 		"accept-invite":            isolateAcceptInvite,
+		"start-invite-sso":         isolateInviteSSO,
 		"change-user":              isolateChangeUser,
 		"delete-user":              isolateDeleteUser,
 		"test-push":                isolateTestPush,
@@ -1265,6 +1276,11 @@ func isolationCases() map[string]isolationCase {
 	}
 }
 
+// needsProvider are the operations of an instance with an OpenID Connect
+// provider, which the isolation instance has not: oidc_test.go tests
+// them.
+var needsProvider = map[string]bool{"start-invite-sso": true}
+
 // adminOnly are the operations only the instance's admin may call. The
 // admin's answers to them may show the owner's account (its users row:
 // the address, the name, the id), never their data.
@@ -1292,8 +1308,9 @@ func TestIsolation(t *testing.T) {
 					}
 					e.isolated(t, run, func() {
 						// A user reaches an admin's operation no further than
-						// its 403.
-						if !adminActs && adminOnly[op] {
+						// its 403, and an instance without a sign-in provider
+						// its operations no further than their 404.
+						if !adminActs && adminOnly[op] || needsProvider[op] {
 							return
 						}
 						if o, ok := ops[op]; ok && !e.hits.reached(o) {

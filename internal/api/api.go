@@ -453,6 +453,7 @@ func register(a huma.API, info infoBody, s *sessions, o *oidcLogin) {
 	s.registerIngest(a)
 	registerTools(a, s.tools())
 	registerMethods(a, o)
+	registerInviteSSO(a, o)
 	huma.Register(a, huma.Operation{
 		OperationID: "get-info",
 		Method:      http.MethodGet,

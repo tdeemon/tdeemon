@@ -207,7 +207,10 @@ kubectl exec deploy/tdeemon -- /tdeemon user create --admin --email you@example.
 - The admin invites a user by their address (`POST /api/v1/invites`,
   as a user or an admin) and sends them the link it answers, once: it
   makes one account for the address in the next 7 days, with the name,
-  password, time zone and language they give, and signs it in. A new
+  password, time zone and language they give, and signs it in. With a
+  provider (single sign-on below), they may choose it instead of a
+  password: the account takes the provider's name and is linked to
+  the identity it vouches for, whatever address the provider has. A new
   invite of an address replaces the admin's own before (another admin's
   is refused), and the admin revokes one (`DELETE
   /api/v1/invites/{id}`). The link's token is after its

@@ -35,6 +35,9 @@ type Identity struct {
 	EmailNotLinkable bool
 	// EmailVerified is the provider's word that the user controls Email.
 	EmailVerified bool
+	// Name is the name the provider gives, "" for none: an account an
+	// invite makes takes it.
+	Name string
 }
 
 // SignInWithIdentity returns the user that id belongs to. An identity

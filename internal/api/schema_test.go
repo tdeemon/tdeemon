@@ -261,6 +261,16 @@ func answerCases() map[string]answerCase {
 			in.do(t, http.MethodPost, "/api/v1/invites/check", `{"token": "`+token+`"}`, nil, nil)
 			in.do(t, http.MethodPost, "/api/v1/invites/check", `{"token": "nothing"}`, nil, nil)
 		},
+		"start-invite-sso": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			body := func(token string) string { return `{"token": "` + token + `", "timezone": "UTC", "locale": "en"}` }
+			in.do(t, http.MethodPost, "/api/v1/invites/sso", body(in.invite(t, session, "zoe@example.com")), nil, nil)
+			// Its success needs a provider, which in has not.
+			withIDP := newOIDCInstance(t, newIDP(t))
+			withIDP.do(t, http.MethodPost, "/api/v1/invites/sso", body(withIDP.storeInvite(t, "zoe@example.com")), nil, nil)
+			withIDP.do(t, http.MethodPost, "/api/v1/invites/sso", body("nothing"), nil, nil)
+			in.adopt(withIDP)
+		},
 		"accept-invite": func(t *testing.T, in *instance, session *http.Cookie) {
 			t.Helper()
 			token := in.invite(t, session, "zoe@example.com")
