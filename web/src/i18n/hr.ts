@@ -673,6 +673,7 @@ export const hr: Messages = {
     sources: {
       label: 'deklaracije',
       estimate: 'procjene',
+      reference: 'tablice namirnica',
       user: 'mog unosa',
       dish: 'jela',
       off: 'Open Food Factsa',

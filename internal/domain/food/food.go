@@ -53,8 +53,12 @@ type Source string
 const (
 	// Label is read off a nutrition label or a package: exact.
 	Label Source = "label"
-	// Estimate is a judgement: a restaurant dish, a guess from a photo.
+	// Estimate is a judgement: a canteen's or a restaurant's plate, a
+	// dish of parts nobody weighed, a guess from a photo.
 	Estimate Source = "estimate"
+	// Reference is a standard table's (USDA, a national food composition
+	// table): a plain food, an apple or an egg, no estimate.
+	Reference Source = "reference"
 	// User is what the user stated, from wherever they know it.
 	User Source = "user"
 	// Dish is a cooked dish worked out from its ingredients and the weight
@@ -71,7 +75,9 @@ const (
 )
 
 // Sources lists every source.
-func Sources() []Source { return []Source{Label, Estimate, User, Dish, OpenFoodFacts, Recipe} }
+func Sources() []Source {
+	return []Source{Label, Estimate, Reference, User, Dish, OpenFoodFacts, Recipe}
+}
 
 // Limits on a food's fields.
 const (

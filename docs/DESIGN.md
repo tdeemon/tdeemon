@@ -94,7 +94,7 @@ store layer and covered by tests that run every query as the wrong user.
 | `sessions` | id (SHA-256 of the cookie's token), user_id, created_at, last_seen_at, expires_at | web sessions; 30 days from sign-in |
 | `user_identities` | issuer, subject, user_id | OpenID Connect identities (Authentik…); linked once by a verified email, then by subject |
 | `api_tokens` | id, user_id, name, hash, scopes, last_used_at | scopes: `ingest` (phone), `tools` (MCP/clients), `read` |
-| `foods` | id, user_id, name, brand, basis (100g/100ml/portion), kcal, protein, carbs, fat, optional fiber/saturated_fat/sugars/salt/polyols/alcohol, portion_g?, source (label/estimate/user/dish/off/recipe), note, archived | the user's food DB; values per 100 g or 100 ml, or per portion for a food by the piece; one food, never a dish ("Foods" below); "same name + same brand" is the same food, which `upsert_food` corrects in place and a new food sent with a meal takes as it is |
+| `foods` | id, user_id, name, brand, basis (100g/100ml/portion), kcal, protein, carbs, fat, optional fiber/saturated_fat/sugars/salt/polyols/alcohol, portion_g?, source (label/estimate/reference/user/dish/off/recipe), note, archived | the user's food DB; values per 100 g or 100 ml, or per portion for a food by the piece; one food, never a dish ("Foods" below); "same name + same brand" is the same food, which `upsert_food` corrects in place and a new food sent with a meal takes as it is |
 | `food_servings` | food_id, user_id, name, amount | named amounts of a food by weight or volume: "piece" = 60 g of egg, "slice" = 40 g of bread |
 | `food_aliases` | food_id, user_id, alias | "the dessert from last Sunday", "my bread" |
 | `food_barcodes` | food_id, user_id, code | the product's barcodes, one for each size of its package, a scan of one finding the food; a barcode leads to one food of the user's; an EAN-13, EAN-8 or GTIN-14 by its digits, checked by its check digit, a UPC-A kept as its EAN-13 (a 0 before it) and a GTIN-14 of a 0 first as that EAN-13, so any form a scan reads finds it |
@@ -130,22 +130,31 @@ product or a plain one, never several eaten together (decided October
   eaten whole or in part ("half a portion"). With the portion's weight
   known it can be logged in grams too.
 
-A meal of separate things is an item each, in its amount: the agent
-asks a part's amount the user gave no hint of ("some muesli"; "a
-banana" is one), and logs its estimate of a part the user did not weigh
-as an item of its own, beside the others, with no new food. A dish,
-cooked at home or not, and a restaurant's or a canteen's plate are no
-food: the agent logs each part the user names as an item, its estimate
-of the part when nobody weighed it, with the portion it took in the
-item's name ("Steak ~250 g"), and its estimate of the plate as one item
-when the user names no part; it asks no amount nobody weighed (decided
-on 26 October 2026: a part's estimate is no worse than the plate's, and
-says what it took, so a correction changes that part alone); a dish the
-user already has as a food is used as it is. Recipes are for a dish cooked
-again: a recipe stores its ingredients and produces a food
-of its own, with `source: recipe` (below). A food of `source: dish` or a dish
-per portion, which the code still takes, is what an earlier client or
-an import may have saved.
+A food's `source` says how far to trust its values: `label` read off a
+package (a restaurant's stated values too), `off` Open Food Facts',
+`reference` a standard food table's (USDA, a national one) for a plain
+food, `user` the user's word, `recipe` a recipe's, and `estimate` a
+judgement. A plain food the user counts ("an apple", "2 eggs") is a
+food of `reference` with a typical piece as a serving, logged by its
+count; an estimate is only a plate's, a dish's or a restaurant's or a
+canteen's, whose parts or weight nobody knows (decided 1 November
+2026: an apple is no estimate, and a meal marked as one should say
+that something in it was judged).
+
+A meal of separate things is an item each, in its amount: the agent asks
+a part's amount the user gave no hint of ("some muesli"; "a banana" is
+one, a piece). A dish, cooked at home or not, and a restaurant's or a
+canteen's plate are no food: the agent logs each part the user names as
+an item, its estimate of the part when nobody weighed it, with the
+portion it took in the item's name ("Steak ~250 g"), and its estimate of
+the plate as one item when the user names no part; it asks no amount
+nobody weighed (decided on 26 October 2026: a part's estimate is no
+worse than the plate's, and says what it took, so a correction changes
+that part alone); a dish the user already has as a food is used as it
+is. Recipes are for a dish cooked again: a recipe stores its ingredients
+and produces a food of its own, with `source: recipe` (below). A food of
+`source: dish` or a dish per portion, which the code still takes, is
+what an earlier client or an import may have saved.
 
 **Recipes.** A recipe is a food of the user's (`source: recipe`, by
 weight), so search finds it and a meal logs it as any food; its values

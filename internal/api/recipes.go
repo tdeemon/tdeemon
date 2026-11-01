@@ -51,7 +51,7 @@ type ingredientBody struct {
 	Amount    float64       `json:"amount" doc:"How much, in unit."`
 	Unit      string        `json:"unit" enum:"g,ml,portion"`
 	Nutrients nutrientsBody `json:"nutrients" doc:"What it brought when the recipe was saved."`
-	Source    string        `json:"source" enum:"label,estimate,user,dish,off,recipe"`
+	Source    string        `json:"source" enum:"label,estimate,reference,user,dish,off,recipe"`
 	Note      string        `json:"note,omitempty"`
 	Changed   bool          `json:"changed,omitempty" doc:"Its food's values give another amount now: the recipe saved again takes them."`
 }

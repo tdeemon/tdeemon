@@ -492,7 +492,12 @@ test('a new food is made, and its page shown', async () => {
   ] as const) {
     fireEvent.change(screen.getByLabelText(label), { target: { value } })
   }
-  fireEvent.change(screen.getByLabelText('Values from'), { target: { value: 'estimate' } })
+  expect(
+    within(screen.getByLabelText('Values from'))
+      .getAllByRole('option')
+      .map((o) => o.textContent),
+  ).toEqual(['Label', 'Food table', 'Estimate', 'Me', 'Dish'])
+  fireEvent.change(screen.getByLabelText('Values from'), { target: { value: 'reference' } })
   fireEvent.click(screen.getByRole('button', { name: 'Save the food' }))
 
   await waitFor(() => {
@@ -503,7 +508,7 @@ test('a new food is made, and its page shown', async () => {
       name: 'Kefir',
       basis: '100ml',
       nutrients: { kcal: 41, protein: 3.4, carbs: 4, fat: 1.5 },
-      source: 'estimate',
+      source: 'reference',
     },
   ])
 })

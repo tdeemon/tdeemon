@@ -133,7 +133,7 @@ CREATE TABLE food_servings (
     FOREIGN KEY (user_id, food_id) REFERENCES foods (user_id, id) ON DELETE CASCADE
 ) STRICT;
 
-CREATE TABLE foods (
+CREATE TABLE "foods" (
     -- A UUIDv7, chosen by the client that first saved the food. Ids are
     -- per user (the primary key is the pair), so another user's food
     -- under the same id is no row of this user's, and nothing tells it
@@ -162,9 +162,9 @@ CREATE TABLE foods (
     alcohol REAL CHECK (alcohol >= 0),
     -- The weight of one portion of a food per portion, when known.
     portion_g REAL CHECK (portion_g IS NULL OR (basis = 'portion' AND portion_g > 0)),
-    -- recipe and off (Open Food Facts) are planned (DESIGN.md §4); they
-    -- are allowed now, so adding them needs no rebuild of the table.
-    source TEXT NOT NULL CHECK (source IN ('label', 'estimate', 'user', 'dish', 'recipe', 'off')),
+    source TEXT NOT NULL CHECK (
+        source IN ('label', 'estimate', 'reference', 'user', 'dish', 'recipe', 'off')
+    ),
     note TEXT NOT NULL DEFAULT '',
     archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
     created_at TEXT NOT NULL,
@@ -178,7 +178,8 @@ CREATE UNIQUE INDEX foods_user_name_brand ON foods (user_id, name_key, brand_key
 
 CREATE TRIGGER foods_fts_delete AFTER DELETE ON foods
 BEGIN
-    DELETE FROM foods_fts WHERE food_id = old.id AND user_id = old.user_id;
+    DELETE FROM foods_fts
+    WHERE food_id = old.id AND user_id = old.user_id;
 END;
 
 CREATE VIRTUAL TABLE foods_fts USING fts5 (
@@ -228,7 +229,7 @@ CREATE TABLE job_runs (
     PRIMARY KEY (user_id, job, occurrence)
 ) STRICT;
 
-CREATE TABLE meal_items (
+CREATE TABLE "meal_items" (
     -- A UUIDv7 the client chose for a new item, or the store did; per
     -- user.
     id TEXT NOT NULL CHECK (length(id) = 36),
@@ -260,11 +261,13 @@ CREATE TABLE meal_items (
     salt REAL CHECK (salt >= 0),
     polyols REAL CHECK (polyols >= 0),
     alcohol REAL CHECK (alcohol >= 0),
-    -- As foods.source, the planned recipe and off included.
-    source TEXT NOT NULL CHECK (source IN ('label', 'estimate', 'user', 'dish', 'recipe', 'off')),
+    -- As foods.source.
+    source TEXT NOT NULL CHECK (
+        source IN ('label', 'estimate', 'reference', 'user', 'dish', 'recipe', 'off')
+    ),
     note TEXT NOT NULL DEFAULT '', sent_food TEXT CHECK (
-    sent_food IS NULL OR (length(sent_food) = 64 AND food_id IS NOT NULL)
-), brand TEXT NOT NULL DEFAULT '',
+        sent_food IS NULL OR (length(sent_food) = 64 AND food_id IS NOT NULL)
+    ), brand TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (user_id, id),
     FOREIGN KEY (user_id, meal_id) REFERENCES meals (user_id, id) ON DELETE CASCADE,
     -- Foods are archived, never deleted, while an item uses them.
@@ -420,7 +423,7 @@ CREATE TABLE push_subscriptions (
 
 CREATE INDEX push_subscriptions_user ON push_subscriptions (user_id);
 
-CREATE TABLE recipe_items (
+CREATE TABLE "recipe_items" (
     recipe_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     -- The ingredient's place in the recipe, from 0.
@@ -445,7 +448,9 @@ CREATE TABLE recipe_items (
     salt REAL CHECK (salt >= 0),
     polyols REAL CHECK (polyols >= 0),
     alcohol REAL CHECK (alcohol >= 0),
-    source TEXT NOT NULL CHECK (source IN ('label', 'estimate', 'user', 'dish', 'recipe', 'off')),
+    source TEXT NOT NULL CHECK (
+        source IN ('label', 'estimate', 'reference', 'user', 'dish', 'recipe', 'off')
+    ),
     note TEXT NOT NULL DEFAULT '', portion_grams REAL CHECK (portion_grams > 0),
     PRIMARY KEY (user_id, recipe_id, position),
     FOREIGN KEY (user_id, recipe_id) REFERENCES recipes (user_id, food_id) ON DELETE CASCADE,

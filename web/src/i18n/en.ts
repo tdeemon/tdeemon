@@ -768,6 +768,7 @@ export const en = {
     sources: {
       label: 'Label',
       estimate: 'Estimate',
+      reference: 'Food table',
       user: 'Me',
       dish: 'Dish',
       off: 'Open Food Facts',

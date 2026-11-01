@@ -38,7 +38,7 @@ type Nutrient = (typeof needed)[number] | (typeof optional)[number]
 const mass = ['protein', 'carbs', 'fat', 'alcohol'] as const
 
 const bases = ['100g', '100ml', 'portion'] as const
-const sources = ['label', 'estimate', 'user', 'dish', 'off'] as const
+const sources = ['label', 'reference', 'estimate', 'user', 'dish', 'off'] as const
 
 // A row of a list the form edits (a serving, another name), with a key of
 // its own, as rows come and go.
