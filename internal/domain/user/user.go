@@ -63,6 +63,9 @@ type User struct {
 	DayStartHour int
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	// DisabledAt is when the admin deactivated the user, who then cannot
+	// sign in; nil for an active user.
+	DisabledAt *time.Time
 }
 
 // NormalizeEmail returns the address as tdeemon stores and compares it:

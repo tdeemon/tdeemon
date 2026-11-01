@@ -10,9 +10,21 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/domain/user"
 )
 
-// Users returns every user, in the order they were created.
+// Users returns every user, deactivated ones too, in the order they were
+// created.
 func (db *DB) Users(ctx context.Context) ([]user.User, error) {
-	rows, err := db.read.QueryContext(ctx, "SELECT "+userColumns+" FROM users ORDER BY created_at, id")
+	return db.users(ctx, "SELECT "+userColumns+" FROM users ORDER BY created_at, id")
+}
+
+// ActiveUsers returns the users the admin has not deactivated, in the
+// order they were created: those the scheduler works for.
+func (db *DB) ActiveUsers(ctx context.Context) ([]user.User, error) {
+	return db.users(ctx, "SELECT "+userColumns+" FROM users WHERE disabled_at IS NULL ORDER BY created_at, id")
+}
+
+// users runs query, which selects userColumns.
+func (db *DB) users(ctx context.Context, query string) ([]user.User, error) {
+	rows, err := db.read.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("users: %w", err)
 	}

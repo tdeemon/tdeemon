@@ -73,7 +73,7 @@ func (db *DB) APITokenUser(ctx context.Context, tokenHash string) (APIToken, use
 	row := db.read.QueryRowContext(ctx, `
 		SELECT `+userColumnsOfU+`, `+tokenColumns+`
 		FROM api_tokens AS t JOIN users AS u ON u.id = t.user_id
-		WHERE t.token_hash = ?`, tokenHash)
+		WHERE t.token_hash = ? AND u.disabled_at IS NULL`, tokenHash)
 	u, err := scanUser(row.Scan, f.dest()...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return APIToken{}, user.User{}, ErrNotFound

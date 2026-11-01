@@ -230,6 +230,21 @@ func answerCases() map[string]answerCase {
 			in.do(t, http.MethodDelete, "/api/v1/users/"+in.user.ID.String(), "", cookies, nil)
 		},
 		"export-account": get("/api/v1/account/export"),
+		"list-users": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			zoe := in.addUser(t, user.RoleUser)
+			in.do(t, http.MethodPatch, "/api/v1/users/"+zoe.ID.String(), `{"active": false}`, []*http.Cookie{session}, nil)
+			in.do(t, http.MethodGet, "/api/v1/users", "", []*http.Cookie{session}, nil)
+		},
+		"change-user": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			cookies := []*http.Cookie{session}
+			zoe := in.addUser(t, user.RoleUser)
+			in.do(t, http.MethodPatch, "/api/v1/users/"+zoe.ID.String(), `{"active": false}`, cookies, nil)
+			in.do(t, http.MethodPatch, "/api/v1/users/"+zoe.ID.String(), `{"active": true, "role": "admin"}`, cookies, nil)
+			in.do(t, http.MethodPatch, "/api/v1/users/"+uuid.NewV7().String(), `{"active": false}`, cookies, nil)
+			in.do(t, http.MethodPatch, "/api/v1/users/"+in.user.ID.String(), `{"role": "user"}`, cookies, nil)
+		},
 		"delete-push-subscription": func(t *testing.T, in *instance, session *http.Cookie) {
 			t.Helper()
 			rec := in.do(t, http.MethodPut, "/api/v1/push/subscriptions", pushBody(t, "https://web.push.apple.com/answer"), []*http.Cookie{session}, nil)

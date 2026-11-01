@@ -323,6 +323,13 @@ func (s *sessions) login(ctx context.Context, in *loginInput) (*sessionOutput, e
 	if s.afterVerify != nil {
 		s.afterVerify(ctx)
 	}
+	// Said only to whoever knows the password: it tells nobody else that
+	// the account exists.
+	if u.DisabledAt != nil {
+		s.giveBack(attempt)
+		s.logger.InfoContext(ctx, "sign-in refused: the account is deactivated", "user_id", u.ID.String())
+		return nil, huma.Error403Forbidden("the admin deactivated this account")
+	}
 
 	now := s.now()
 	if auth.NeedsRehash(hash) {

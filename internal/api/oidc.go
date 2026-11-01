@@ -297,6 +297,8 @@ func refusal(err error) (string, bool) {
 			"(only ASCII letter case may differ); ask the admin", true
 	case errors.Is(err, store.ErrNoAccount):
 		return "there is no account for you on this instance; ask its admin to add you", true
+	case errors.Is(err, store.ErrDisabled):
+		return "the admin deactivated your account on this instance", true
 	}
 	return "", false
 }

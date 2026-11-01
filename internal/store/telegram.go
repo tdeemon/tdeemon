@@ -51,7 +51,8 @@ func (db *DB) TelegramChat(ctx context.Context, userID uuid.UUID) (int64, bool, 
 // no user's.
 func (db *DB) TelegramChatUsers(ctx context.Context, chatID int64) ([]user.User, error) {
 	rows, err := db.read.QueryContext(ctx, "SELECT "+userColumns+
-		" FROM users WHERE id IN (SELECT user_id FROM telegram_chats WHERE chat_id = ?) ORDER BY created_at, id", chatID)
+		" FROM users WHERE id IN (SELECT user_id FROM telegram_chats WHERE chat_id = ?) AND disabled_at IS NULL"+
+		" ORDER BY created_at, id", chatID)
 	if err != nil {
 		return nil, fmt.Errorf("telegram chat users: %w", err)
 	}

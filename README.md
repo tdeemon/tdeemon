@@ -203,6 +203,13 @@ kubectl exec deploy/tdeemon -- /tdeemon user create --admin --email you@example.
   address in the body. The instance's only admin cannot be deleted.
   Snapshots of the database taken before keep the data until they go
   ([Data](#data)).
+- The admin lists the users (`GET /api/v1/users`) and changes one
+  (`PATCH /api/v1/users/{id}`): `{"active": false}` deactivates them
+  (they cannot sign in, their sessions end and their API tokens are
+  refused, their data stay, and the scheduled jobs skip them),
+  `{"active": true}` brings them back, and `{"role": "admin"}` or
+  `"user"` sets their role. The instance's only active admin can be
+  neither deactivated nor made a user.
 - `GET /api/v1/account/export` gives a user all their data as a ZIP:
   `tdeemon.json`, every table of theirs, and a CSV file of each, without
   the secrets (hashes of the password, tokens and sessions; the
