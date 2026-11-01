@@ -371,11 +371,6 @@ func (s *sessions) login(ctx context.Context, in *loginInput) (*sessionOutput, e
 func (s *sessions) start(ctx context.Context, u user.User, now time.Time, method string,
 	create func(store.Session) error,
 ) (http.Cookie, store.Session, error) {
-	if p, ok := auth.PrincipalFrom(ctx); ok && p.Via == auth.ViaSession {
-		if err := s.db.DeleteSession(ctx, p.User.ID, p.SessionID); err != nil {
-			s.logger.WarnContext(ctx, "ending the previous session failed", "error", err)
-		}
-	}
 	now = now.Truncate(time.Second)
 	token, id := auth.NewSessionToken()
 	sess := store.Session{ID: id, UserID: u.ID, CreatedAt: now, LastSeenAt: now, ExpiresAt: now.Add(auth.SessionLifetime)}
@@ -384,6 +379,13 @@ func (s *sessions) start(ctx context.Context, u user.User, now time.Time, method
 			s.logger.Log(ctx, logLevel(err), "starting a session failed", "error", err)
 		}
 		return http.Cookie{}, store.Session{}, err
+	}
+	// The session the request came with ends once the new one is in: a
+	// sign-in refused leaves it as it was.
+	if p, ok := auth.PrincipalFrom(ctx); ok && p.Via == auth.ViaSession {
+		if err := s.db.DeleteSession(ctx, p.User.ID, p.SessionID); err != nil {
+			s.logger.WarnContext(ctx, "ending the previous session failed", "error", err)
+		}
 	}
 	s.logger.InfoContext(ctx, "signed in", "user_id", u.ID.String(), "method", method)
 	return s.cookie(token, now, sess.ExpiresAt), sess, nil

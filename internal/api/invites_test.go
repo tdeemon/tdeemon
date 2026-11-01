@@ -8,7 +8,9 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/zarnautovic/tdeemon/internal/auth"
 	"github.com/zarnautovic/tdeemon/internal/domain/user"
+	"github.com/zarnautovic/tdeemon/internal/store"
 )
 
 // invite has the admin of session invite address, and returns the token
@@ -149,6 +151,108 @@ func TestInvitesGoWithTheirAdmin(t *testing.T) {
 		}
 		if rec := in.do(t, http.MethodPost, "/api/v1/invites/check", `{"token": "`+eve+`"}`, nil, nil); rec.Code != http.StatusNotFound {
 			t.Errorf("%s: ana's invite after: %d, want 404", change, rec.Code)
+		}
+	}
+}
+
+// storeInvite stores an invite of address by in's user, an admin, straight
+// in the store, and returns its link's token.
+func (in *instance) storeInvite(t *testing.T, address string) string {
+	t.Helper()
+	now := in.clock.Now()
+	token, hash := auth.NewSessionToken()
+	inv := store.Invite{ID: uuid.NewV7(), By: in.user.ID, Email: address, Role: user.RoleUser, CreatedAt: now, ExpiresAt: now.Add(time.Hour)}
+	if err := in.db.CreateInvite(t.Context(), inv, hash); err != nil {
+		t.Fatal(err)
+	}
+	return token
+}
+
+// adopt counts the operations other checked as in's.
+func (in *instance) adopt(other *instance) {
+	other.mu.Lock()
+	defer other.mu.Unlock()
+	in.mu.Lock()
+	defer in.mu.Unlock()
+	for op := range other.succeeded {
+		if in.succeeded == nil {
+			in.succeeded = map[string]bool{}
+		}
+		in.succeeded[op] = true
+	}
+}
+
+// An invite's account made through the provider: the invite's address
+// and role, the provider's name, the browser's time zone and language,
+// linked to the identity, whatever address the provider gives; signed
+// in, and the invite used.
+func TestAcceptInviteBySSO(t *testing.T) {
+	t.Parallel()
+
+	p := newIDP(t)
+	p.mu.Lock()
+	p.claims["email"], p.claims["name"] = "zoe.private@example.org", "Zoe Z."
+	p.mu.Unlock()
+	in := newOIDCInstance(t, p)
+	token := in.storeInvite(t, "zoe@example.com")
+	rec := in.do(t, http.MethodPost, "/api/v1/invites/sso", `{"token": "`+token+`", "timezone": "Europe/Zagreb", "locale": "hr"}`, nil, nil)
+	var started struct {
+		URL string `json:"url"`
+	}
+	flow := cookieNamed(rec, "tdeemon_oidc")
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &started) != nil || flow == nil {
+		t.Fatalf("start: %d %s", rec.Code, rec.Body.String())
+	}
+	back := in.finish(t, p.authorize(t, started.URL), flow)
+	if back.Code != http.StatusSeeOther || back.Header().Get("Location") != "/" {
+		t.Fatalf("callback: %d %s", back.Code, back.Body.String())
+	}
+	session := cookieNamed(back, "tdeemon_session")
+	who := in.do(t, http.MethodGet, "/api/v1/auth/session", "", []*http.Cookie{session}, nil)
+	for _, want := range []string{`"email":"zoe@example.com"`, `"name":"Zoe Z."`, `"timezone":"Europe/Zagreb"`, `"locale":"hr"`, `"role":"user"`} {
+		if !strings.Contains(who.Body.String(), want) {
+			t.Errorf("zoe's session = %s, want %s", who.Body.String(), want)
+		}
+	}
+	// The identity is linked: a plain sign-in finds zoe.
+	flow2, callback := in.begin(t, p, "")
+	if rec := in.finish(t, callback, flow2); rec.Code != http.StatusSeeOther {
+		t.Errorf("a later sign-in: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := in.do(t, http.MethodPost, "/api/v1/invites/check", `{"token": "`+token+`"}`, nil, nil); rec.Code != http.StatusNotFound {
+		t.Errorf("the invite after: %d, want 404", rec.Code)
+	}
+}
+
+// An identity linked to a user already makes no account by an invite;
+// nor does a link that does not work.
+func TestAcceptInviteBySSORefuses(t *testing.T) {
+	t.Parallel()
+
+	p := newIDP(t)
+	in := newOIDCInstance(t, p)
+	flow, callback := in.begin(t, p, "") // links ana's identity
+	session := cookieNamed(in.finish(t, callback, flow), "tdeemon_session")
+	token := in.storeInvite(t, "zoe@example.com")
+	rec := in.do(t, http.MethodPost, "/api/v1/invites/sso", `{"token": "`+token+`", "timezone": "UTC", "locale": "en"}`, nil, nil)
+	var started struct {
+		URL string `json:"url"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &started)
+	// Ana, signed in, follows the invite: refused, she stays signed in.
+	back := in.finish(t, p.authorize(t, started.URL), cookieNamed(rec, "tdeemon_oidc"), session)
+	if back.Code != http.StatusConflict || cookieNamed(back, "tdeemon_session") != nil {
+		t.Errorf("ana's identity: %d %s, want 409 and no session", back.Code, back.Body.String())
+	}
+	if rec := in.do(t, http.MethodGet, "/api/v1/auth/session", "", []*http.Cookie{session}, nil); rec.Code != http.StatusOK {
+		t.Errorf("ana's session after the refusal: %d, want 200", rec.Code)
+	}
+	for body, want := range map[string]int{
+		`{"token": "nothing", "timezone": "UTC", "locale": "en"}`:                http.StatusNotFound,
+		`{"token": "` + token + `", "timezone": "Mars/Olympus", "locale": "en"}`: http.StatusUnprocessableEntity,
+	} {
+		if rec := in.do(t, http.MethodPost, "/api/v1/invites/sso", body, nil, nil); rec.Code != want {
+			t.Errorf("%s: %d, want %d", body, rec.Code, want)
 		}
 	}
 }
