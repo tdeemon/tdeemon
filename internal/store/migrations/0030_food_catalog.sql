@@ -161,13 +161,15 @@ UPDATE foods SET
     )
 WHERE archived = 0 AND source IN ('label', 'reference', 'off');
 
--- Their barcodes go to their rows; a barcode of two names, to the row of
--- the food saved last.
-INSERT OR IGNORE INTO catalog_barcodes (code, catalog_id)
+-- Their barcodes go to their rows, in the order of their foods' saves,
+-- so the newest have the highest rowids, which the store keeps; a
+-- barcode of two names goes to the row of the food saved last, which
+-- replaces it.
+INSERT OR REPLACE INTO catalog_barcodes (code, catalog_id)
 SELECT
     b.code,
     f.catalog_id
 FROM food_barcodes AS b
 INNER JOIN foods AS f ON b.user_id = f.user_id AND b.food_id = f.id
 WHERE f.catalog_id IS NOT NULL
-ORDER BY f.updated_at DESC, f.id DESC;
+ORDER BY f.updated_at, f.id, b.rowid;

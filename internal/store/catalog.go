@@ -150,8 +150,21 @@ func restoreCatalog(ctx context.Context, tx *sql.Tx, userID, saved uuid.UUID, no
 		_, err := tx.ExecContext(ctx, "DELETE FROM catalog_foods WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM foods WHERE catalog_id = ?1)", id)
 		return err
 	}
+	return putBackCatalogRow(ctx, tx, id, state.String, now)
+}
+
+// putBackCatalogRow puts the catalog's row id back as state, a save's
+// catalogState, found it, and the barcodes the save took back to their
+// rows; unless another row took its name and brand since, whose save
+// stays, and so does this row, as it is.
+func putBackCatalogRow(ctx context.Context, tx *sql.Tx, id, state string, now time.Time) error {
 	var before catalogState
-	if err := decode([]byte(state.String), &before); err != nil {
+	if err := decode([]byte(state), &before); err != nil {
+		return err
+	}
+	var taken bool
+	if err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM catalog_foods WHERE name_key = ? AND brand_key = ? AND id <> ?)",
+		food.Key(before.Food.Name), food.Key(before.Food.Brand), id).Scan(&taken); err != nil || taken {
 		return err
 	}
 	if err := writeCatalogFood(ctx, tx, catalogRow{id, true}, before.Food, before.Version, true, now); err != nil {
@@ -263,6 +276,12 @@ func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Fo
 // and the newest of its others.
 func writeCatalogCodes(ctx context.Context, tx *sql.Tx, id string, codes []string) error {
 	for _, code := range codes {
+		// The row a code is taken from changes too: one version more, so
+		// an undo of a save before leaves it.
+		if _, err := tx.ExecContext(ctx, `UPDATE catalog_foods SET version = version + 1
+			WHERE id = (SELECT catalog_id FROM catalog_barcodes WHERE code = ?1 AND catalog_id <> ?2)`, code, id); err != nil {
+			return err
+		}
 		// A code moved deletes its row and inserts it anew, so the newest
 		// rowids are the codes of the latest saves.
 		if _, err := tx.ExecContext(ctx, "DELETE FROM catalog_barcodes WHERE code = ?", code); err != nil {

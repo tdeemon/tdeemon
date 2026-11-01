@@ -2,6 +2,7 @@ package store
 
 import (
 	"slices"
+	"strings"
 	"testing"
 	"uuid"
 )
@@ -29,6 +30,12 @@ var catalogSeeds = []catalogSeed{
 	{"0199f0a0-0000-7000-8000-0000000000f3", "Ivo", "Jabuka", "jabuka", "reference", "2026-10-02T08:00:00Z", 52, 0},
 	{"0199f0a0-0000-7000-8000-0000000000f4", "Ana", "Gulaš iz menze", "gulaš iz menze", "estimate", "2026-10-03T08:00:00Z", 120, 0},
 	{"0199f0a0-0000-7000-8000-0000000000f5", "Ana", "Krekeri", "krekeri", "label", "2026-10-04T08:00:00Z", 430, 1},
+}
+
+// anasCodes are the barcodes of Ana's grapes.
+var anasCodes = []string{
+	"3850104000010", "4000000000006", "4000000000013", "4000000000020", "4000000000037",
+	"4000000000044", "4000000000051", "4000000000068", "4000000000075", "4000000000082",
 }
 
 // 0030 and 0031 make the catalog of the declared foods in use saved
@@ -74,8 +81,12 @@ func seedCatalog(t *testing.T, db *DB) {
 			f.archived, f.updated, f.updated)
 	}
 	ana, ivo := catalogSeeds[0], catalogSeeds[1]
-	must(`INSERT INTO food_barcodes (food_id, user_id, code) VALUES (?, ?, '3850104000010'), (?, ?, '5060000000016')`,
-		ana.id, catalogUsers["Ana"], ivo.id, catalogUsers["Ivo"])
+	// Ana's older grapes have ten barcodes more, all but the newest ten
+	// of the row's left out of a food made of it.
+	for _, code := range anasCodes {
+		must("INSERT INTO food_barcodes (food_id, user_id, code) VALUES (?, ?, ?)", ana.id, catalogUsers["Ana"], code)
+	}
+	must(`INSERT INTO food_barcodes (food_id, user_id, code) VALUES (?, ?, '5060000000016')`, ivo.id, catalogUsers["Ivo"])
 	must(`INSERT INTO food_servings (food_id, user_id, name, name_key, amount) VALUES (?, ?, 'bobica', 'bobica', 5),
 		(?, ?, 'grozd', 'grozd', 150)`, ana.id, catalogUsers["Ana"], ivo.id, catalogUsers["Ivo"])
 }
@@ -103,8 +114,12 @@ func checkCatalogRows(t *testing.T, db *DB) string {
 		(SELECT group_concat(name, ' ') FROM catalog_servings WHERE catalog_id = ?1)`, grape).Scan(&codes, &servings); err != nil {
 		t.Fatal(err)
 	}
-	if codes != "3850104000010 5060000000016" || servings != "grozd" {
-		t.Errorf("the grapes' barcodes %q and servings %q; want both barcodes and Ivo's serving", codes, servings)
+	if want := strings.Join(append(slices.Clone(anasCodes), "5060000000016"), " "); codes != want || servings != "grozd" {
+		t.Errorf("the grapes' barcodes %q and servings %q; want %q and Ivo's serving", codes, servings, want)
+	}
+	found, err := db.CatalogFood(t.Context(), id)
+	if err != nil || len(found.Barcodes) != 10 || !slices.Contains(found.Barcodes, "5060000000016") || slices.Contains(found.Barcodes, anasCodes[0]) {
+		t.Errorf("the grapes' food = %+v, %v; want the newest ten barcodes, Ivo's among them", found, err)
 	}
 	return grape
 }

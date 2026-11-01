@@ -302,6 +302,57 @@ func TestUndoPutsBackAnotherUsersRow(t *testing.T) {
 	}
 }
 
+// An undo leaves the row when another took its name since, and still
+// puts the user's food back.
+func TestUndoLeavesARowWhoseNameWasTaken(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	anas := tuna(116)
+	anas.Barcodes = nil
+	anas = saveFood(t, db, ana, anas)
+	renamed := anas
+	renamed.Name = "Tuna 160 g"
+	saveFood(t, db, ana, renamed)
+	ivos := tuna(120)
+	ivos.Aliases, ivos.Barcodes = nil, nil
+	saveFood(t, db, ivo, ivos)
+	if undone, err := db.UndoLast(t.Context(), ana, testActor, t0.Add(time.Minute)); err != nil {
+		t.Fatalf("Ana's undo of her rename = %+v, %v; want it done, not passed over", undone, err)
+	}
+	if got, err := db.FoodByID(t.Context(), ana, anas.ID); err != nil || got.Name != anas.Name {
+		t.Errorf("Ana's food after her undo = %+v, %v; want its name back", got, err)
+	}
+	if got := findCatalog(t, db, addUser(t, db, "eva@example.com"), "tuna"); len(got) != 2 {
+		t.Errorf("the catalog's tunas after Ana's undo = %+v; want Ivo's and the one Ana renamed, as they are", got)
+	}
+}
+
+// An undo leaves the row when a later save took a barcode of it.
+func TestUndoLeavesARowWhoseBarcodeWasTaken(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	anas := saveFood(t, db, ana, tuna(116))
+	anas.Nutrients.Kcal = 118
+	saveFood(t, db, ana, anas)
+	crackers := bar()
+	crackers.Aliases = nil
+	crackers = saveFood(t, db, ivo, crackers)
+	crackers.Barcodes = []string{"3850104000010"}
+	saveFood(t, db, ivo, crackers)
+	if _, err := db.UndoLast(t.Context(), ana, testActor, t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	got, err := db.CatalogFoodByBarcode(t.Context(), "3850104000010")
+	if err != nil || got.Name != crackers.Name {
+		t.Errorf("the barcode's food after Ana's undo = %+v, %v; want Ivo's bar, saved since", got, err)
+	}
+	if tunas := findCatalog(t, db, ivo, "tuna"); len(tunas) != 1 || tunas[0].Nutrients.Kcal != 118 {
+		t.Errorf("the tuna after Ana's undo = %+v; want her 118 kcal, left as it is", tunas)
+	}
+}
+
 // A barcode taken from another row goes back to it with an undo, and a
 // row keeps food.MaxBarcodes of its barcodes, the newest, so a food made
 // of it is valid.
