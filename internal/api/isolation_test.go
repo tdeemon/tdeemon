@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"bytes"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -207,18 +208,22 @@ func saveIsolationFoods(t *testing.T, db *store.DB, u user.User, now time.Time) 
 }
 
 // saveIsolationInvite gives u an invite of a friend of theirs, straight
-// in the store: the fixture needs one of each user's, admin or not.
+// in the table: the fixture needs one of each user's, admin or not, and
+// CreateInvite takes an admin's alone.
 func saveIsolationInvite(t *testing.T, db *store.DB, u user.User, now time.Time) uuid.UUID {
 	t.Helper()
-	inv := store.Invite{
-		ID: uuid.NewV7(), By: u.ID, Email: strings.ToLower(u.Name) + ".friend@example.com", Role: user.RoleUser,
-		CreatedAt: now, ExpiresAt: now.Add(7 * 24 * time.Hour),
-	}
+	id := uuid.NewV7()
 	_, hash := auth.NewSessionToken()
-	if err := db.CreateInvite(t.Context(), inv, hash); err != nil {
+	err := db.WriteTx(t.Context(), func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(t.Context(), "INSERT INTO invites (id, token_hash, user_id, email, role, created_at, expires_at) "+
+			"VALUES (?, ?, ?, ?, 'user', ?, ?)", id.String(), hash, u.ID.String(), strings.ToLower(u.Name)+".friend@example.com",
+			now.UTC().Format(time.RFC3339), now.Add(7*24*time.Hour).UTC().Format(time.RFC3339))
+		return err
+	})
+	if err != nil {
 		t.Fatalf("invite for %s: %v", u.Name, err)
 	}
-	return inv.ID
+	return id
 }
 
 // saveIsolationRecipe gives u a recipe of bread, in portions.
@@ -991,13 +996,14 @@ func isolateDeleteInvite(t *testing.T, e isolationEnv) {
 	asAdmin(t, e, http.MethodDelete, "/api/v1/invites/"+e.other.invite.String(), "", http.StatusNoContent)
 }
 
-// inviteWithToken stores an invite of the other's of address, and returns
-// its link's token.
+// inviteWithToken stores an invite of address by a third user, an admin,
+// and returns its link's token.
 func inviteWithToken(t *testing.T, e isolationEnv, address string) string {
 	t.Helper()
 	now := e.in.clock.Now()
 	token, hash := auth.NewSessionToken()
-	inv := store.Invite{ID: uuid.NewV7(), By: e.other.user.ID, Email: address, Role: user.RoleUser, CreatedAt: now, ExpiresAt: now.Add(time.Hour)}
+	zoe := e.in.addUser(t, user.RoleAdmin)
+	inv := store.Invite{ID: uuid.NewV7(), By: zoe.ID, Email: address, Role: user.RoleUser, CreatedAt: now, ExpiresAt: now.Add(time.Hour)}
 	if err := e.in.db.CreateInvite(t.Context(), inv, hash); err != nil {
 		t.Fatal(err)
 	}
@@ -1008,9 +1014,9 @@ func inviteWithToken(t *testing.T, e isolationEnv, address string) string {
 // invite's address.
 func isolateCheckInvite(t *testing.T, e isolationEnv) {
 	t.Helper()
-	token := inviteWithToken(t, e, "zoe@example.com")
+	token := inviteWithToken(t, e, "mia@example.com")
 	rec := e.in.do(t, http.MethodPost, "/api/v1/invites/check", `{"token": "`+token+`"}`, nil, nil)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "zoe@example.com") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "mia@example.com") {
 		t.Errorf("check: %d %s", rec.Code, rec.Body.String())
 	}
 }
@@ -1019,7 +1025,7 @@ func isolateCheckInvite(t *testing.T, e isolationEnv) {
 // account, and touches no other.
 func isolateAcceptInvite(t *testing.T, e isolationEnv) {
 	t.Helper()
-	token := inviteWithToken(t, e, "zoe@example.com")
+	token := inviteWithToken(t, e, "mia@example.com")
 	body := `{"token": "` + token + `", "name": "Zoe", "password": "` + password + `", "timezone": "UTC", "locale": "en"}`
 	if rec := e.in.do(t, http.MethodPost, "/api/v1/invites/accept", body, nil, nil); rec.Code != http.StatusCreated {
 		t.Errorf("accept: %d %s", rec.Code, rec.Body.String())
