@@ -76,8 +76,7 @@
         300
       ],
       "new_foods": [
-        "apple",
-        "egg"
+        "apple"
       ],
       "new_source": "reference",
       "estimates": 0,
@@ -127,8 +126,7 @@
       ],
       "not_tools": [
         "get_day"
-      ],
-      "estimates": 0
+      ]
     }
   },
   {
@@ -413,8 +411,7 @@
         300
       ],
       "new_foods": [
-        "jabuk",
-        "jaj"
+        "jabuk"
       ],
       "new_source": "reference",
       "estimates": 0,
@@ -463,8 +460,7 @@
       ],
       "not_tools": [
         "get_day"
-      ],
-      "estimates": 0
+      ]
     }
   },
   {
