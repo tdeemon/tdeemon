@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"uuid"
 
 	"github.com/zarnautovic/tdeemon/internal/domain/user"
 )
@@ -107,4 +108,25 @@ func isRefusal(err error) bool {
 		}
 	}
 	return false
+}
+
+// UnlinkIdentities removes the identities of the user with id, at issuer
+// alone when it is not "", and returns how many went: the user signs in
+// by single sign-on again only once a new identity links, by the
+// verified email or an invite.
+func (db *DB) UnlinkIdentities(ctx context.Context, id uuid.UUID, issuer string) (int, error) {
+	var n int64
+	err := db.WriteTx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, "DELETE FROM user_identities WHERE user_id = ? AND (? = '' OR issuer = ?)",
+			id.String(), issuer, issuer)
+		if err != nil {
+			return err
+		}
+		n, err = res.RowsAffected()
+		return err
+	})
+	if err != nil {
+		return 0, fmt.Errorf("unlink identities: %w", err)
+	}
+	return int(n), nil
 }

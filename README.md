@@ -424,7 +424,8 @@ for when the provider is down):
    (ASCII letter case aside) and the user has no other account at that
    provider; after that the provider's subject identifies them, whatever
    the address becomes. A refused sign-in says why, and the log records
-   the reason. There is no command yet to undo a link.
+   the reason. `tdeemon user unlink --email … [--issuer …]` undoes a
+   link, for a provider's account made anew or a subject that changed.
 
 The browser starts at `/api/v1/auth/oidc/login` (add `?return_to=/path`
 to land somewhere else on the instance); `GET /api/v1/auth/methods` says
