@@ -95,8 +95,8 @@ for the author and the reviewer.
   values, in `internal/ingest/testdata/` (Health Auto Export's in
   `hae/`, Strong's in `strong/`). Real ones stay outside git:
   `TestRealPayloads` reads the directory `TDEEMON_HAE_PAYLOADS` names,
-  such as an instance's archive
-  (`TDEEMON_DATA_DIR/ingest/<user>`), `.json` and `.json.gz`. It fails
+  such as bodies saved from Health Auto Export, `.json` and
+  `.json.gz`. It fails
   for a shape that does not read (a unit, a point, a date, a sleep
   stage) and for a metric whose points give no value; run with `-v`
   (`go test ./internal/ingest -run TestRealPayloads -v`), it says what
@@ -430,8 +430,8 @@ in `web/`.
     lookups) or outside one (OpenID Connect's browser flow, and the
     session a sign-in starts, which the two share) logs its failures
     itself and answers with a bare problem; so does a failure an
-    operation handles and goes on from (an ingest's archive), with the
-    user.
+    operation handles and goes on from (a password hash not upgraded), with
+    the user.
 - **`context.Context`** is the first parameter of anything that queries
   the database, talks to the network or waits on other goroutines, and is
   never stored in a struct. File system calls take none, as `os` has no

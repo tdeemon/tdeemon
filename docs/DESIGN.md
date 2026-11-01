@@ -1040,11 +1040,10 @@ the first spec.
     /api/v1/ingest/strong` takes Strong's CSV export, the whole history,
     as the body or a form's part `file`, and keeps its days of workouts
     (`workout_days`), each workout on the logical day it starts in, as a
-    meal; the latest export that read is kept past the 30 days, for P3 to
-    read the sets from (`internal/ingest`).
-  - All use a per-user `ingest` token, not a web session, and the
-    bodies are archived in the data directory; a user's days older than
-    30 go when their next body arrives.
+    meal (`internal/ingest`).
+  - All use a per-user `ingest` token, not a web session. tdeemon keeps
+    the values it reads, not the bodies: health data outside the
+    database would escape a user's export and deletion.
   - A value belongs to the calendar date of its point, as HAE writes it;
     the day keeps its earliest weighing, with body fat and lean mass from
     the same weighing, and each value is checked on its own.
@@ -1129,10 +1128,11 @@ the first spec.
     `OIDC_*`, `LIMIT_*`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_API_URL` and
     `OPEN_FOOD_FACTS_URL`; plus the standard `TZ`. The README has the current table.
   - Ships a `docker-compose.yml`; the homelab gets its own manifests.
-- **Backup:** a built-in daily `VACUUM INTO` snapshot with retention
-  (`TDEEMON_BACKUP_KEEP`, 7 by default; plus one before every migration),
-  and documented Litestream for continuous replication to S3/B2. Never
-  put the DB on NFS.
+- **Backup:** the host's, a snapshot of the volume. A snapshot before
+  every migration; a daily `VACUUM INTO` snapshot with retention
+  (`TDEEMON_BACKUP_KEEP`, none by default) for a backup that copies
+  files; documented Litestream for continuous replication to S3/B2.
+  Never put the DB on NFS.
 - **Dev process:**
   - **Principle:** latest stable versions of every language, runtime
     and tool, and current best practice for each language in the repo.
@@ -1417,7 +1417,7 @@ Done at the cut-over, on 2026-10-29.
 2. **New inputs for what the predecessor took in:** Health Auto Export
    directly (§9), the agent through `/mcp`, and Strong's CSV export
    (§9), whose days of workouts make the training days until P3 reads
-   its sets from the latest export kept.
+   its sets.
 3. **Cut-over:**
    - the agent switches to `/mcp`, and its health skill shrinks to a few
      lines;

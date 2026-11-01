@@ -56,8 +56,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Location != time.Local {
 		t.Errorf("Location = %v, want time.Local", cfg.Location)
 	}
-	if cfg.BackupKeep != 7 {
-		t.Errorf("BackupKeep = %d, want 7", cfg.BackupKeep)
+	if cfg.BackupKeep != 0 {
+		t.Errorf("BackupKeep = %d, want 0: the host backs up the volume", cfg.BackupKeep)
 	}
 }
 
@@ -71,7 +71,7 @@ func TestLoadOverrides(t *testing.T) {
 	vars["TDEEMON_LOG_LEVEL"] = "DEBUG"
 	vars["TDEEMON_LOG_FORMAT"] = "Text"
 	vars["TZ"] = "Europe/Zagreb"
-	vars["TDEEMON_BACKUP_KEEP"] = "0"
+	vars["TDEEMON_BACKUP_KEEP"] = " 3 "
 
 	cfg, err := config.Load(env(vars))
 	if err != nil {
@@ -96,8 +96,8 @@ func TestLoadOverrides(t *testing.T) {
 	if got := cfg.Location.String(); got != "Europe/Zagreb" {
 		t.Errorf("Location = %q, want Europe/Zagreb", got)
 	}
-	if cfg.BackupKeep != 0 {
-		t.Errorf("BackupKeep = %d, want 0", cfg.BackupKeep)
+	if cfg.BackupKeep != 3 {
+		t.Errorf("BackupKeep = %d, want 3", cfg.BackupKeep)
 	}
 }
 
@@ -236,7 +236,7 @@ func TestConfigLogValueRedactsSecret(t *testing.T) {
 	if !strings.Contains(out, "config.base_url=https://tdeemon.example.com") {
 		t.Errorf("log output is missing the base URL: %s", out)
 	}
-	if !strings.Contains(out, "config.backup_keep=7") {
+	if !strings.Contains(out, "config.backup_keep=0") {
 		t.Errorf("log output is missing the backups kept: %s", out)
 	}
 }

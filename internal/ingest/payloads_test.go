@@ -238,8 +238,8 @@ func TestShapeProblems(t *testing.T) {
 }
 
 // TestRealPayloads reads the payloads in the directory
-// TDEEMON_HAE_PAYLOADS names: real ones, kept outside git, such as the
-// archive of an instance (TDEEMON_DATA_DIR/ingest/<user>). Each must read
+// TDEEMON_HAE_PAYLOADS names: real ones, kept outside git, such as
+// bodies saved from Health Auto Export. Each must read
 // as HAE's, with nothing left out for its shape and a value from every
 // metric tdeemon reads that it has points of; with -v the test says what
 // each day kept, what it left out and what it ignored, without the

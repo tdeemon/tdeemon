@@ -2,15 +2,12 @@ package api_test
 
 import (
 	"bytes"
-	"compress/gzip"
 	"io"
-	"log/slog"
 	"maps"
 	"math"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -18,11 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/api"
 	"github.com/zarnautovic/tdeemon/internal/domain/day"
 	"github.com/zarnautovic/tdeemon/internal/domain/event"
 	"github.com/zarnautovic/tdeemon/internal/domain/metric"
-	"github.com/zarnautovic/tdeemon/internal/ingest"
 )
 
 // The values below are made up.
@@ -237,90 +232,6 @@ func TestIngestHAETooLarge(t *testing.T) {
 	if rec.Code != http.StatusOK || len(got.Rejected) != 1 || got.Rejected[0].Metric != "exercise_min" {
 		t.Errorf("POST = %d %s", rec.Code, rec.Body.String())
 	}
-}
-
-// withArchive gives in an archive of the bodies, and returns its
-// directory.
-func withArchive(t *testing.T, in *instance) string {
-	t.Helper()
-	dir := t.TempDir()
-	base, _ := url.Parse("http://localhost")
-	h, err := api.NewHandler(api.Config{
-		Info: testInfo, DB: in.db, BaseURL: base, Logger: slog.New(slog.NewJSONHandler(in.logs, nil)), Now: in.clock.Now,
-		IngestArchive: &ingest.Archive{Dir: dir, Keep: 30 * 24 * time.Hour, Now: in.clock.Now},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	in.h = h
-	return dir
-}
-
-// The latest Strong export that read is kept, the form's file rather than
-// the form; one that does not read is not.
-func TestIngestKeepsTheLatestExport(t *testing.T) {
-	t.Parallel()
-
-	in := newInstance(t, "http://localhost", "")
-	dir := withArchive(t, in)
-	tok := ingestToken(t, in, `"ingest"`)
-	in.do(t, http.MethodPost, "/api/v1/ingest/strong", "not, a, strong export", nil, tok)
-	latest := filepath.Join(dir, in.user.ID.String(), "latest-strong.csv.gz")
-	if _, err := os.Stat(latest); err == nil {
-		t.Error("an export that did not read was kept as the latest")
-	}
-	body, contentType := strongForm(t, strongExport(t))
-	postStrong(t, in, tok, body, contentType)
-	if got := gunzip(t, latest); got != strongExport(t) {
-		t.Errorf("the latest export = %q, want the form's file", got)
-	}
-	// The form itself is archived as one.
-	if forms, _ := filepath.Glob(filepath.Join(dir, in.user.ID.String(), "*", "*-strong.form.gz")); len(forms) != 1 {
-		t.Errorf("archived forms = %v, want the one", forms)
-	}
-}
-
-// The raw body goes to the user's archive, even one that does not read.
-func TestIngestArchives(t *testing.T) {
-	t.Parallel()
-
-	in := newInstance(t, "http://localhost", "")
-	dir := withArchive(t, in)
-	tok := ingestToken(t, in, `"ingest"`)
-	in.do(t, http.MethodPost, "/api/v1/ingest/hae", haeBody, nil, tok)
-	in.do(t, http.MethodPost, "/api/v1/ingest/hae", `{"not": "hae"}`, nil, tok)
-	in.do(t, http.MethodPost, "/api/v1/ingest/metrics", `{"date": "2026-10-21", "metrics": {"steps": 1}}`, nil, tok)
-	in.do(t, http.MethodPost, "/api/v1/ingest/strong", "not, a, strong export", nil, tok)
-	files, err := filepath.Glob(filepath.Join(dir, in.user.ID.String(), in.clock.Now().UTC().Format("2006-01-02"), "*.gz"))
-	if err != nil || len(files) != 4 {
-		t.Fatalf("archived %v, %v; want 4 bodies", files, err)
-	}
-	var hae, metrics, strong int
-	for _, f := range files {
-		switch {
-		case strings.HasSuffix(f, "-hae.json.gz"):
-			hae++
-		case strings.HasSuffix(f, "-metrics.json.gz"):
-			metrics++
-		case strings.HasSuffix(f, "-strong.csv.gz"):
-			strong++
-		}
-	}
-	if hae != 2 || metrics != 1 || strong != 1 {
-		t.Errorf("archived %d of HAE, %d of the simple form and %d of Strong", hae, metrics, strong)
-	}
-	// An archive that cannot be written does not stop the import; the
-	// log says whose body it lost.
-	if err := os.RemoveAll(dir); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(dir, []byte("a file where the archive was"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if rec := in.do(t, http.MethodPost, "/api/v1/ingest/metrics", `{"date": "2026-10-22", "metrics": {"steps": 2}}`, nil, tok); rec.Code != http.StatusOK {
-		t.Errorf("POST with a broken archive = %d %s", rec.Code, rec.Body.String())
-	}
-	in.checkLogged(t, logRecord{Level: "ERROR", Msg: "archiving an ingest failed", UserID: in.user.ID.String()})
 }
 
 // HAE's body and Strong's export may arrive past the server's own
@@ -610,25 +521,6 @@ func strongForm(t *testing.T, csv string) (string, string) {
 		t.Fatal(err)
 	}
 	return b.String(), w.FormDataContentType()
-}
-
-// gunzip returns the file at path, gunzipped.
-func gunzip(t *testing.T, path string) string {
-	t.Helper()
-	f, err := os.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = f.Close() }()
-	zr, err := gzip.NewReader(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := io.ReadAll(zr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(b)
 }
 
 // The export may come as the part file of a form, as the predecessor's

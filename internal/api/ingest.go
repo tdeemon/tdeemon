@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -208,11 +207,6 @@ func (s *sessions) ingestStrong(ctx context.Context, in *ingestStrongInput) (*st
 	if err != nil {
 		return nil, err
 	}
-	name := "strong.csv"
-	if form, _ := isForm(in.contentType); form {
-		name = "strong.form"
-	}
-	s.archive(ctx, p, name, in.RawBody)
 	export, err := strongCSV(in.contentType, in.RawBody)
 	if err != nil {
 		return nil, huma.Error422UnprocessableEntity(err.Error())
@@ -234,11 +228,6 @@ func (s *sessions) ingestStrong(ctx context.Context, in *ingestStrongInput) (*st
 	if err != nil {
 		return nil, internalError("importing the workouts failed", err)
 	}
-	if s.ingestArchive != nil {
-		if err := s.ingestArchive.SaveLatest(p.User.ID, "strong.csv", export); err != nil {
-			s.logger.ErrorContext(ctx, "keeping the latest export failed", "user_id", p.User.ID.String(), "error", err)
-		}
-	}
 	s.logger.InfoContext(ctx, "imported workouts", "user_id", p.User.ID.String(), "workouts", w.Count, "days", len(w.Days),
 		"added", len(added), "removed", len(removed))
 	return &strongOutput{Body: strongBody{Workouts: w.Count, Days: len(w.Days), Added: dateStrings(added), Removed: dateStrings(removed)}}, nil
@@ -257,7 +246,6 @@ func (s *sessions) ingestHAE(ctx context.Context, in *ingestHAEInput) (*ingestOu
 	if err != nil {
 		return nil, err
 	}
-	s.archive(ctx, p, "hae.json", in.RawBody)
 	r, err := ingest.ParseHAE(in.RawBody)
 	if errors.Is(err, ingest.ErrNotHAE) {
 		return nil, huma.Error422UnprocessableEntity(err.Error())
@@ -272,28 +260,11 @@ func (s *sessions) ingestMetrics(ctx context.Context, in *ingestMetricsInput) (*
 	if err != nil {
 		return nil, err
 	}
-	// The body as huma read it: one it refused is not archived. A date and
-	// a map of numbers always marshal.
-	raw, _ := json.Marshal(in.Body)
-	s.archive(ctx, p, "metrics.json", raw)
 	r, err := ingest.FromDays(map[string]map[string]float64{in.Body.Date: in.Body.Metrics})
 	if err != nil {
 		return nil, huma.Error422UnprocessableEntity(err.Error())
 	}
 	return s.store(ctx, p, "ingest", r)
-}
-
-// archive keeps body in the user's archive under name, its source and
-// format (ingest.Archive.Save), when the instance has one.
-// A failure is logged and does not stop the import: the values matter
-// more than the copy.
-func (s *sessions) archive(ctx context.Context, p auth.Principal, name string, body []byte) {
-	if s.ingestArchive == nil {
-		return
-	}
-	if err := s.ingestArchive.Save(p.User.ID, name, body); err != nil {
-		s.logger.ErrorContext(ctx, "archiving an ingest failed", "user_id", p.User.ID.String(), "error", err)
-	}
 }
 
 // store merges r's days into the user's, as an import of client's, and

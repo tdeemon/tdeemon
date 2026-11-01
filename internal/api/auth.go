@@ -13,7 +13,6 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/auth"
 	"github.com/zarnautovic/tdeemon/internal/domain/limits"
 	"github.com/zarnautovic/tdeemon/internal/domain/user"
-	"github.com/zarnautovic/tdeemon/internal/ingest"
 	"github.com/zarnautovic/tdeemon/internal/off"
 	"github.com/zarnautovic/tdeemon/internal/push"
 	"github.com/zarnautovic/tdeemon/internal/store"
@@ -43,8 +42,6 @@ type sessions struct {
 
 	// instance holds the instance's limits of a plan.
 	instance limits.Limits
-	// ingestArchive keeps the bodies of the ingest, when not nil.
-	ingestArchive *ingest.Archive
 	// openFoodFacts looks up a barcode, when not nil, so many a user in a
 	// window (offLookups).
 	openFoodFacts *off.Client
@@ -61,7 +58,6 @@ func newSessions(cfg Config) *sessions {
 		signInByAccount: newLimiter(signInFailures, signInWindow, cfg.Now),
 		badTokens:       newLimiter(badTokenFailures, badTokenWindow, cfg.Now),
 		instance:        cfg.Limits,
-		ingestArchive:   cfg.IngestArchive,
 		openFoodFacts:   cfg.OpenFoodFacts,
 		offLookups:      newLimiter(offLookups, offWindow, cfg.Now),
 		push:            cfg.Push,

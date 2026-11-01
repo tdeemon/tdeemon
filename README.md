@@ -100,8 +100,8 @@ All settings come from environment variables:
 | `TDEEMON_BASE_URL` | — (required) | public URL of the instance, without a path (tdeemon is served at the root of its host), e.g. `https://tdeemon.example.com` |
 | `TDEEMON_SECRET_KEY` | — (required) | at least 32 bytes; seals the single sign-on state, derives the Web Push (VAPID) key, and will encrypt stored secrets (sessions do not depend on it; a new one makes every device subscribe to notifications again) |
 | `TDEEMON_LISTEN` | `:8080` | address the HTTP server binds |
-| `TDEEMON_DATA_DIR` | `./data` | database (`tdeemon.db`), backups and archives; keep it on a local disk, never NFS |
-| `TDEEMON_BACKUP_KEEP` | `7` | how many daily snapshots of the database to keep in `TDEEMON_DATA_DIR/backups`, up to 366; `0` takes none ([Data](#data)) |
+| `TDEEMON_DATA_DIR` | `./data` | the database (`tdeemon.db`) and its snapshots; keep it on a local disk, never NFS |
+| `TDEEMON_BACKUP_KEEP` | `0` | how many daily snapshots of the database to keep in `TDEEMON_DATA_DIR/backups`, up to 366; for a backup that copies files ([Data](#data)) |
 | `TDEEMON_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
 | `TDEEMON_LOG_FORMAT` | `json` | `json` or `text` |
 | `TDEEMON_OIDC_ISSUER` | — | issuer URL of an OpenID Connect provider for single sign-on (https; http only for localhost) |
@@ -569,11 +569,8 @@ curl -H 'Authorization: Bearer tdm_…' -H 'Content-Type: application/json' \
 ```
 
 Both routes take an API token, not a web session: what they write is
-recorded as an import. The bodies are kept, compressed, in
-`TDEEMON_DATA_DIR/ingest/<user>/<day>/`, outside the database and its
-backups: Health Auto Export's as they came, even one that does not
-read, and the simple form's as read. A user's days older than 30 go
-when their next body arrives.
+recorded as an import. tdeemon keeps the values it reads, not the
+bodies.
 
 ### Import from Strong
 
@@ -597,34 +594,37 @@ curl -H 'Authorization: Bearer tdm_…' -H 'Content-Type: text/csv' \
 
 Each export replaces the days of the one before: a workout you deleted
 in Strong is no longer a day of a workout. An export without a workout
-is refused, so a wrong file cannot clear them. The export is archived
-with the other bodies, and the latest that read is kept past their 30
-days, as `TDEEMON_DATA_DIR/ingest/<user>/latest-strong.csv.gz`.
+is refused, so a wrong file cannot clear them.
 
 ## Data
 
 tdeemon keeps everything in one SQLite file, `TDEEMON_DATA_DIR/tdeemon.db`,
 which it creates readable by its owner only, and applies database
-migrations at startup. The bodies of imports are kept apart, about 30
-days, in `TDEEMON_DATA_DIR/ingest/` (see
-[Import from Apple Health](#import-from-apple-health)). Before it
-migrates a database that already has data, it saves a snapshot to
+migrations at startup. Before it migrates a database that already has
+data, it saves a snapshot to
 `TDEEMON_DATA_DIR/backups/pre-migrate-<version>-<time>.db`. It keeps the
 newest snapshot of each schema version, for the three newest versions.
 
-Once a day it saves a snapshot to
+Backing the data up is the host's: a snapshot of the volume, as
+Kubernetes' storage or a ZFS or LVM snapshot takes it, holds the
+database as a sudden stop would leave it, which SQLite recovers from.
+A backup that copies files while tdeemon runs (rsync, restic over the
+directory) can catch the database and its write-ahead log at different
+moments: for one, set `TDEEMON_BACKUP_KEEP` to 1 or more and back up
+the snapshots, not `tdeemon.db`.
+
+Then once a day it saves a snapshot to
 `TDEEMON_DATA_DIR/backups/daily-<time>.db` (the time in UTC): at startup
 when there is none of the last 23½ hours, and then at a check every hour,
 so at the same hour each day. It keeps the newest `TDEEMON_BACKUP_KEEP`
-of them, 7 unless set, and removes the older ones after each snapshot: a
-lower number takes effect with the next one, and `0` takes no more but
+of them and removes the older ones after each snapshot: a lower number
+takes effect with the next one, and `0`, the default, takes no more but
 leaves the ones there. A snapshot is a whole copy of the database,
 written with `VACUUM INTO` while tdeemon runs; writes wait for it. Leave
 room on the volume for one copy more than it keeps, as the oldest goes
 only once the new one is written, besides the three snapshots before a
-migration: with the default, 11 copies of the database. The snapshots
-sit on the same disk as the database: copy the backups directory off
-it, for example with a volume snapshot or a job of your backup tool.
+migration. A user's data deleted stays in the snapshots taken before,
+until they go.
 
 To restore a snapshot:
 

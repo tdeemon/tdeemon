@@ -79,7 +79,7 @@ func TestRunStartsAndStops(t *testing.T) {
 	t.Parallel()
 
 	dataDir := filepath.Join(t.TempDir(), "data")
-	startAndStop(t, dataDir, nil)
+	startAndStop(t, dataDir, map[string]string{"TDEEMON_BACKUP_KEEP": "1"})
 
 	if info, err := os.Stat(dataDir); err != nil || !info.IsDir() {
 		t.Errorf("data directory was not created: %v", err)
@@ -96,18 +96,19 @@ func TestRunStartsAndStops(t *testing.T) {
 		t.Errorf("schema_migrations is missing, migrations did not run: %v", err)
 	}
 
-	// It took the daily snapshot before it served.
+	// Asked for them, it took the daily snapshot before it served.
 	if snaps, _ := filepath.Glob(filepath.Join(dataDir, "backups", "daily-*.db")); len(snaps) != 1 {
 		t.Errorf("daily snapshots = %v, want one", snaps)
 	}
 }
 
-// With TDEEMON_BACKUP_KEEP=0 the server takes no daily snapshot.
+// Unless TDEEMON_BACKUP_KEEP asks for them, the server takes no daily
+// snapshot: backing the volume up is the host's.
 func TestRunWithoutDailySnapshots(t *testing.T) {
 	t.Parallel()
 
 	dataDir := filepath.Join(t.TempDir(), "data")
-	logs := startAndStop(t, dataDir, map[string]string{"TDEEMON_BACKUP_KEEP": "0"})
+	logs := startAndStop(t, dataDir, nil)
 	if snaps, _ := filepath.Glob(filepath.Join(dataDir, "backups", "daily-*.db")); len(snaps) != 0 || strings.Contains(logs, "daily snapshot") {
 		t.Errorf("daily snapshots = %v, logs:\n%s", snaps, logs)
 	}

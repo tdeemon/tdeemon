@@ -15,8 +15,7 @@ import (
 // strongColumns are the columns of Strong's export ParseStrong needs: the
 // ones that name a workout and its sets. A column missing fails the whole
 // export, so a change of Strong's format shows as an error, not as wrong
-// days. The training module (P3) reads the sets from the latest export
-// kept (Archive.SaveLatest).
+// days.
 var strongColumns = []string{"Date", "Workout Name", "Duration", "Exercise Name", "Set Order", "Weight", "Reps", "Seconds"}
 
 // Workouts is what a Strong export gives tdeemon until the training
