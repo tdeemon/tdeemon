@@ -120,7 +120,8 @@ func checkCatalogRows(t *testing.T, db *DB) string {
 		(SELECT group_concat(name, ' ') FROM catalog_servings WHERE catalog_id = ?1)`, grape).Scan(&codes, &servings); err != nil {
 		t.Fatal(err)
 	}
-	if want := strings.Join(append(slices.Clone(anasCodes), "5060000000016"), " "); codes != want || servings != "grozd" {
+	// The newest ten: Ana's oldest goes.
+	if want := strings.Join(append(slices.Clone(anasCodes[1:]), "5060000000016"), " "); codes != want || servings != "grozd" {
 		t.Errorf("the grapes' barcodes %q and servings %q; want %q and Ivo's serving", codes, servings, want)
 	}
 	found, err := db.CatalogFood(t.Context(), id)
@@ -167,40 +168,24 @@ func checkCatalogSearch(t *testing.T, db *DB, grape string) {
 }
 
 // An undo of a save made before the catalog takes back what the
-// migration made of it: a correction's values, and a new food's row.
+// migration made of it: a correction's values, then a new food's row;
+// and a new food's of another's too leaves the row.
 func TestUndoOfASaveBeforeTheCatalog(t *testing.T) {
 	t.Parallel()
 
-	db := openEmpty(t)
-	if err := db.migrate(t.Context(), upTo(t, "0029_food_reference.sql"), discard()); err != nil {
-		t.Fatalf("migrate to 0029: %v", err)
-	}
-	seedCatalog(t, db)
-	if err := db.migrate(t.Context(), upTo(t, "0031_food_catalog_search.sql"), discard()); err != nil {
-		t.Fatalf("migrate to 0031: %v", err)
-	}
 	ivo := uuid.MustParse(catalogUsers["Ivo"])
 	apple := uuid.MustParse(catalogSeeds[2].id)
 	grapes := uuid.MustParse(catalogSeeds[1].id)
-	// The events of Ivo's saves before: the grapes new, the apple new at
-	// 50 kcal, and corrected since.
-	after, err := db.FoodByID(t.Context(), ivo, apple)
-	if err != nil {
-		t.Fatal(err)
-	}
-	before := after
-	before.Nutrients.Kcal = 50
-	newGrapes, err := db.FoodByID(t.Context(), ivo, grapes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i, ev := range []legacySave{
-		{grapes, nil, newGrapes, catalogSeeds[1].updated},
-		{apple, nil, before, "2026-10-01T08:00:00Z"},
-		{apple, before, after, catalogSeeds[2].updated},
-	} {
-		ev.record(t, db, ivo, i)
-	}
+	db := migratedCatalog(t, false, func(db *DB) {
+		// The events of Ivo's saves before: the grapes new, the apple new
+		// at 50 kcal, and corrected since.
+		after := foodAt(t, db, ivo, apple)
+		before := after
+		before.Nutrients.Kcal = 50
+		legacySaves(t, db, ivo, []legacySave{
+			{grapes, nil, foodAt(t, db, ivo, grapes)}, {apple, nil, before}, {apple, before, after},
+		})
+	})
 	actor := event.Actor{Kind: event.User, Client: "web"}
 	now := time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC)
 	if _, err := db.UndoLast(t.Context(), ivo, actor, now); err != nil {
@@ -226,34 +211,41 @@ func TestUndoOfASaveBeforeTheCatalog(t *testing.T) {
 }
 
 // legacySave is a food's save made before the catalog, of the food
-// entity, from before to after, at a time (2026-10-20 when "").
+// entity, from before to after.
 type legacySave struct {
 	entity        uuid.UUID
 	before, after any
-	at            string
 }
 
-// record writes ev as user's i-th event, as the store wrote one before
-// the catalog: with nothing in catalog_saves.
-func (ev legacySave) record(t *testing.T, db *DB, user uuid.UUID, i int) {
+// legacySaves writes saves as user's events, oldest first, as the store
+// wrote them before the catalog.
+func legacySaves(t *testing.T, db *DB, user uuid.UUID, saves []legacySave) {
 	t.Helper()
-	b, err := stateJSON(ev.before)
+	for i, ev := range saves {
+		b, err := stateJSON(ev.before)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a, err := stateJSON(ev.after)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.write.ExecContext(t.Context(), `INSERT INTO events (id, user_id, at, actor, client, operation, entity, before_state, after_state)
+			VALUES (?, ?, '2026-10-20T08:00:00Z', 'user', 'web', 'food.save', ?, ?, ?)`,
+			fmt.Sprintf("0199f0a0-0000-7000-8000-0000000000e%d", i), user.String(), ev.entity.String(), b, a); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// foodAt is user's food id.
+func foodAt(t *testing.T, db *DB, user, id uuid.UUID) food.Food {
+	t.Helper()
+	f, err := db.FoodByID(t.Context(), user, id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := stateJSON(ev.after)
-	if err != nil {
-		t.Fatal(err)
-	}
-	at := ev.at
-	if at == "" {
-		at = "2026-10-20T08:00:00Z"
-	}
-	if _, err := db.write.ExecContext(t.Context(), `INSERT INTO events (id, user_id, at, actor, client, operation, entity, before_state, after_state)
-		VALUES (?, ?, ?, 'user', 'web', 'food.save', ?, ?, ?)`, fmt.Sprintf("0199f0a0-0000-7000-8000-0000000000e%d", i), user.String(),
-		at, ev.entity.String(), b, a); err != nil {
-		t.Fatal(err)
-	}
+	return f
 }
 
 // findCatalogOf is Eva's FindCatalog of query, who has no foods.
@@ -267,8 +259,9 @@ func findCatalogOf(t *testing.T, db *DB, query string) []food.Food {
 }
 
 // migratedCatalog is a database of catalogSeeds migrated to the
-// catalog, the grapes' kcal Ana's and Ivo's alike when same.
-func migratedCatalog(t *testing.T, same bool) *DB {
+// catalog, the grapes' kcal Ana's and Ivo's alike when same, after
+// setup, before the migration.
+func migratedCatalog(t *testing.T, same bool, setup func(db *DB)) *DB {
 	t.Helper()
 	db := openEmpty(t)
 	if err := db.migrate(t.Context(), upTo(t, "0029_food_reference.sql"), discard()); err != nil {
@@ -280,6 +273,9 @@ func migratedCatalog(t *testing.T, same bool) *DB {
 			t.Fatal(err)
 		}
 	}
+	if setup != nil {
+		setup(db)
+	}
 	if err := db.migrate(t.Context(), upTo(t, "0031_food_catalog_search.sql"), discard()); err != nil {
 		t.Fatalf("migrate to 0031: %v", err)
 	}
@@ -288,20 +284,19 @@ func migratedCatalog(t *testing.T, same bool) *DB {
 
 // An undo of a save before the catalog leaves the row of another's food
 // saved after it, of the same values, which the migration made the row
-// of; and an undo of an estimate's save never touches the catalog.
+// of, even with them gone; and an undo of an estimate's save never
+// touches the catalog.
 func TestUndoBeforeTheCatalogLeavesOthersRows(t *testing.T) {
 	t.Parallel()
 
-	db := migratedCatalog(t, true)
 	ana := uuid.MustParse(catalogUsers["Ana"])
 	grapes := uuid.MustParse(catalogSeeds[0].id)
-	after, err := db.FoodByID(t.Context(), ana, grapes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	before := after
-	before.Nutrients.Kcal = 60
-	legacySave{grapes, before, after, catalogSeeds[0].updated}.record(t, db, ana, 0)
+	db := migratedCatalog(t, true, func(db *DB) {
+		after := foodAt(t, db, ana, grapes)
+		before := after
+		before.Nutrients.Kcal = 60
+		legacySaves(t, db, ana, []legacySave{{grapes, before, after}})
+	})
 	// Ivo, whose grapes the row is of, goes: the row stays his.
 	if _, err := db.DeleteUser(t.Context(), uuid.MustParse(catalogUsers["Ivo"])); err != nil {
 		t.Fatal(err)
@@ -337,16 +332,9 @@ func TestUndoBeforeTheCatalogLeavesOthersRows(t *testing.T) {
 func TestUndoOfALinkToARowGone(t *testing.T) {
 	t.Parallel()
 
-	db := migratedCatalog(t, false)
+	db := migratedCatalog(t, false, nil)
 	ivo := uuid.MustParse(catalogUsers["Ivo"])
-	apple, err := db.FoodByID(t.Context(), ivo, uuid.MustParse(catalogSeeds[2].id))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var row string
-	if err := db.write.QueryRowContext(t.Context(), "SELECT catalog_id FROM foods WHERE id = ?", apple.ID.String()).Scan(&row); err != nil {
-		t.Fatal(err)
-	}
+	apple := foodAt(t, db, ivo, uuid.MustParse(catalogSeeds[2].id))
 	actor := event.Actor{Kind: event.User, Client: "web"}
 	now := time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC)
 	apple.Name = "Jabuka zelena"
@@ -364,35 +352,35 @@ func TestUndoOfALinkToARowGone(t *testing.T) {
 	}
 	var link sql.NullString
 	if err := db.write.QueryRowContext(t.Context(), "SELECT catalog_id FROM foods WHERE id = ?", apple.ID.String()).Scan(&link); err != nil || link.Valid {
-		t.Errorf("the apple's link after the undo = %v, %v; want none (its row before went), not %s", link, err, row)
+		t.Errorf("the apple's link after the undo = %v, %v; want none (its row before went)", link, err)
 	}
 }
 
 // An undo of the save before the catalog that the migration made a row
-// of: a correction gives the row its values before and leaves another's
-// barcodes; a save that made a label's food of an estimate takes the row
-// along, and the food out of it.
+// of: a correction gives the row its values before, takes out the
+// barcode it brought, but one another's food has too, and leaves
+// another's barcodes; a save that made a label's food of an estimate
+// takes the row along, and the food out of it.
 func TestUndoBeforeTheCatalogOfTheRowsOwnSave(t *testing.T) {
 	t.Parallel()
 
-	db := migratedCatalog(t, false)
 	ivo := uuid.MustParse(catalogUsers["Ivo"])
 	grapes := uuid.MustParse(catalogSeeds[1].id)
-	after, err := db.FoodByID(t.Context(), ivo, grapes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	before := after
-	before.Nutrients.Kcal, before.Barcodes = 60, nil
-	legacySave{grapes, before, after, catalogSeeds[1].updated}.record(t, db, ivo, 0)
 	apple := uuid.MustParse(catalogSeeds[2].id)
-	label, err := db.FoodByID(t.Context(), ivo, apple)
-	if err != nil {
-		t.Fatal(err)
-	}
-	estimate := label
-	estimate.Source = food.Estimate
-	legacySave{apple, estimate, label, catalogSeeds[2].updated}.record(t, db, ivo, 1)
+	const shared = "4000000000105"
+	db := migratedCatalog(t, false, func(db *DB) {
+		if _, err := db.write.ExecContext(t.Context(), "INSERT INTO food_barcodes (food_id, user_id, code) VALUES (?, ?, ?), (?, ?, ?)",
+			catalogSeeds[0].id, catalogUsers["Ana"], shared, grapes.String(), ivo.String(), shared); err != nil {
+			t.Fatal(err)
+		}
+		after := foodAt(t, db, ivo, grapes)
+		before := after
+		before.Nutrients.Kcal, before.Barcodes = 60, nil
+		label := foodAt(t, db, ivo, apple)
+		estimate := label
+		estimate.Source = food.Estimate
+		legacySaves(t, db, ivo, []legacySave{{grapes, before, after}, {apple, estimate, label}})
+	})
 	actor := event.Actor{Kind: event.User, Client: "web"}
 	now := time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC)
 
@@ -414,7 +402,7 @@ func TestUndoBeforeTheCatalogOfTheRowsOwnSave(t *testing.T) {
 	if len(got) != 1 || got[0].Nutrients.Kcal != 60 {
 		t.Fatalf("the grapes after Ivo's undo = %+v; want 60 kcal", got)
 	}
-	if !slices.Contains(got[0].Barcodes, anasCodes[len(anasCodes)-1]) || slices.Contains(got[0].Barcodes, "5060000000016") {
-		t.Errorf("the grapes' barcodes = %v; want Ana's, and not Ivo's, which his correction brought", got[0].Barcodes)
+	if !slices.Contains(got[0].Barcodes, shared) || slices.Contains(got[0].Barcodes, "5060000000016") {
+		t.Errorf("the grapes' barcodes = %v; want Ana's %s, and not Ivo's own, which his correction brought", got[0].Barcodes, shared)
 	}
 }

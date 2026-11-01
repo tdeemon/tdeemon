@@ -31,7 +31,11 @@ CREATE TABLE catalog_foods (
     updated_at TEXT NOT NULL,
     -- One more with each save; an undo puts back the version before
     -- with the row, so a save's undo tells whether another came since.
-    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1)
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+    -- For a row this migration made, until a save of it: the event of
+    -- the save before the catalog it was made of, whose undo puts it
+    -- back (catalog_saves records the saves after).
+    legacy_save TEXT CHECK (legacy_save IS NULL OR length(legacy_save) = 36)
 ) STRICT;
 
 CREATE UNIQUE INDEX catalog_foods_name_brand ON catalog_foods (
@@ -118,7 +122,7 @@ WHERE d.n = 1;
 INSERT INTO catalog_foods (
     id, name, brand, name_key, brand_key, basis, kcal, protein, carbs, fat,
     fiber, saturated_fat, sugars, salt, polyols, alcohol, portion_g, source,
-    created_at, updated_at
+    created_at, updated_at, legacy_save
 )
 SELECT
     p.catalog_id,
@@ -140,7 +144,14 @@ SELECT
     f.portion_g,
     f.source,
     f.updated_at AS created_at,
-    f.updated_at
+    f.updated_at,
+    (
+        SELECT e.id FROM events AS e
+        WHERE
+            e.user_id = p.user_id AND e.entity = p.food_id
+            AND e.operation = 'food.save' AND e.undone_by IS NULL
+        ORDER BY e.id DESC LIMIT 1
+    ) AS legacy_save
 FROM catalog_pick AS p
 INNER JOIN foods AS f ON p.user_id = f.user_id AND p.food_id = f.id;
 
@@ -173,3 +184,17 @@ FROM food_barcodes AS b
 INNER JOIN foods AS f ON b.user_id = f.user_id AND b.food_id = f.id
 WHERE f.catalog_id IS NOT NULL
 ORDER BY f.updated_at, f.id, b.rowid;
+
+-- A row keeps the newest ten, as a food does.
+DELETE FROM catalog_barcodes
+WHERE rowid NOT IN (
+    SELECT ranked.r FROM (
+        SELECT
+            b.rowid AS r,
+            row_number() OVER (
+                PARTITION BY b.catalog_id ORDER BY b.rowid DESC
+            ) AS n
+        FROM catalog_barcodes AS b
+    ) AS ranked
+    WHERE ranked.n <= 10
+);

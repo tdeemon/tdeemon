@@ -75,7 +75,11 @@ CREATE TABLE catalog_foods (
     updated_at TEXT NOT NULL,
     -- One more with each save; an undo puts back the version before
     -- with the row, so a save's undo tells whether another came since.
-    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1)
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+    -- For a row this migration made, until a save of it: the event of
+    -- the save before the catalog it was made of, whose undo puts it
+    -- back (catalog_saves records the saves after).
+    legacy_save TEXT CHECK (legacy_save IS NULL OR length(legacy_save) = 36)
 ) STRICT;
 
 CREATE UNIQUE INDEX catalog_foods_name_brand ON catalog_foods (

@@ -136,16 +136,13 @@ func restoreCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.E
 }
 
 // restoreLegacyCatalog takes back what userID's save of food e, made
-// before the catalog, gave it through the migration, which made a row
-// of the food saved last, and of its time: the row of the name and brand
-// the save left, untouched since (its first version) and made of this
-// save (its time e's). A save that made the food, or made a food the
-// catalog does not take one it does, takes its row along when no other
-// food names it; any other gets the food's values before back, and its
-// barcodes, but those of the save's own, leaving another's; and the row
-// takes the time of the food's save before, whose undo it is then of.
-// Anything else stays, and a save of a food the catalog does not take
-// never changes it.
+// before the catalog, gave it through the migration: the row made of e
+// (legacy_save), untouched since. A save that made the food, or made a
+// food the catalog does not take one it does, takes its row along when
+// no other food names it; any other gets the food's values before back,
+// and its barcodes, but those of the save's own, which no other food of
+// the row has; and the row is then of the food's save before, whose
+// undo is the next. Anything else stays.
 func restoreLegacyCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Event, now time.Time) error {
 	id, before, after, err := legacyRow(ctx, tx, e)
 	if err != nil || id == "" {
@@ -166,12 +163,12 @@ func restoreLegacyCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e e
 	if err := writeCatalogFood(ctx, tx, catalogRow{id, true}, *before, 1, now); err != nil {
 		return err
 	}
-	if err := putBackLegacyCodes(ctx, tx, id, before.Barcodes, after.Barcodes); err != nil {
+	if err := putBackLegacyCodes(ctx, tx, userID, e.Entity, id, before.Barcodes, after.Barcodes); err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE catalog_foods SET updated_at = coalesce((SELECT max(at) FROM events
-		WHERE user_id = ?1 AND entity = ?2 AND operation = 'food.save' AND undone_by IS NULL AND id <> ?3 AND at <= ?4), updated_at)
-		WHERE id = ?5`, userID.String(), e.Entity, e.ID.String(), formatTime(e.At), id)
+	_, err = tx.ExecContext(ctx, `UPDATE catalog_foods SET legacy_save = (SELECT id FROM events
+		WHERE user_id = ?1 AND entity = ?2 AND operation = 'food.save' AND undone_by IS NULL AND id < ?3 ORDER BY id DESC LIMIT 1)
+		WHERE id = ?4`, userID.String(), e.Entity, e.ID.String(), id)
 	return err
 }
 
@@ -186,10 +183,8 @@ func legacyRow(ctx context.Context, tx *sql.Tx, e event.Event) (string, *food.Fo
 	if err := decode(e.After, &after); err != nil || !catalogued(after) {
 		return "", nil, after, err
 	}
-	// By the name and brand the save left, as the food may be gone.
 	var id string
-	err := tx.QueryRowContext(ctx, "SELECT id FROM catalog_foods WHERE name_key = ? AND brand_key = ? AND version = 1 AND updated_at = ?",
-		food.Key(after.Name), food.Key(after.Brand), formatTime(e.At)).Scan(&id)
+	err := tx.QueryRowContext(ctx, "SELECT id FROM catalog_foods WHERE legacy_save = ?", e.ID.String()).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil, after, nil
 	}
@@ -203,15 +198,20 @@ func legacyRow(ctx context.Context, tx *sql.Tx, e event.Event) (string, *food.Fo
 	return id, &before, after, nil
 }
 
-// putBackLegacyCodes takes the barcodes a save brought (in after, not
-// before) out of the row id, and gives it back those of before no other
-// row has, leaving another's.
-func putBackLegacyCodes(ctx context.Context, tx *sql.Tx, id string, before, after []string) error {
+// putBackLegacyCodes takes the barcodes userID's save of food foodID
+// brought (in after, not before) out of the row id, but those another
+// food of the row has, and gives it back those of before no other row
+// has.
+func putBackLegacyCodes(ctx context.Context, tx *sql.Tx, userID uuid.UUID, foodID, id string, before, after []string) error {
 	for _, code := range after {
-		if !slices.Contains(before, code) {
-			if _, err := tx.ExecContext(ctx, "DELETE FROM catalog_barcodes WHERE code = ? AND catalog_id = ?", code, id); err != nil {
-				return err
-			}
+		if slices.Contains(before, code) {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM catalog_barcodes WHERE code = ?1 AND catalog_id = ?2 AND NOT EXISTS (
+			SELECT 1 FROM food_barcodes AS b JOIN foods AS f ON f.user_id = b.user_id AND f.id = b.food_id
+			WHERE b.code = ?1 AND f.catalog_id = ?2 AND NOT (f.user_id = ?3 AND f.id = ?4))`,
+			code, id, userID.String(), foodID); err != nil {
+			return err
 		}
 	}
 	for _, code := range before {
@@ -305,7 +305,8 @@ func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Fo
 	if row.exists {
 		_, err = tx.ExecContext(ctx, `UPDATE catalog_foods SET name = ?, brand = ?, name_key = ?, brand_key = ?, basis = ?,
 			kcal = ?, protein = ?, carbs = ?, fat = ?, fiber = ?, saturated_fat = ?, sugars = ?, salt = ?, polyols = ?,
-			alcohol = ?, portion_g = ?, source = ?, updated_at = ?, version = ? WHERE id = ?`, append(values, row.id)...)
+			alcohol = ?, portion_g = ?, source = ?, updated_at = ?, version = ?, legacy_save = NULL WHERE id = ?`,
+			append(values, row.id)...)
 	} else {
 		_, err = tx.ExecContext(ctx, `INSERT INTO catalog_foods (name, brand, name_key, brand_key, basis, kcal, protein,
 			carbs, fat, fiber, saturated_fat, sugars, salt, polyols, alcohol, portion_g, source, updated_at, version, id,
