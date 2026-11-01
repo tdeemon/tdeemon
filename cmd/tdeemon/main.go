@@ -45,6 +45,7 @@ const usage = `Usage:
                                     notifications go to
   tdeemon user set-locale [flags]   set a user's language
   tdeemon user delete [flags]       delete a user and all their data
+  tdeemon user unlink [flags]       remove a user's single sign-on links
   tdeemon help                      show this help
 
 Flags of user create:
@@ -79,6 +80,12 @@ Flags of user delete:
   --email ADDRESS    the user's address (required)
   --yes              confirm: the user and all their data go, for good
                      (required). The instance's only admin cannot go
+
+Flags of user unlink:
+  --email ADDRESS    the user's address (required)
+  --issuer URL       the provider's issuer alone (default: every one);
+                     the next sign-in there links anew, by the verified
+                     email
 
 The user commands work on the database of a server that has started at
 least once, which creates and migrates it; the server may be running.

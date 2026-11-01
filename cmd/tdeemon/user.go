@@ -45,6 +45,8 @@ func userCommand(ctx context.Context, args []string, lookup config.LookupFunc, i
 		return setLocale(ctx, args[1:], lookup, out)
 	case "delete":
 		return deleteUser(ctx, args[1:], lookup, out)
+	case "unlink":
+		return unlinkUser(ctx, args[1:], lookup, out)
 	}
 	return fmt.Errorf("%w: user: unknown subcommand %q", errUsage, args[0])
 }
@@ -408,6 +410,65 @@ func deleteUser(ctx context.Context, args []string, lookup config.LookupFunc, ou
 		return err
 	}
 	_, err = fmt.Fprintf(out, "Deleted %s and all their data.\n", email)
+	return err
+}
+
+type unlinkFlags struct {
+	email, issuer string
+}
+
+func parseUnlinkFlags(args []string) (unlinkFlags, error) {
+	var f unlinkFlags
+	set := flag.NewFlagSet("user unlink", flag.ContinueOnError)
+	set.SetOutput(io.Discard) // exitCode prints the error and the usage.
+	set.StringVar(&f.email, "email", "", "")
+	set.StringVar(&f.issuer, "issuer", "", "")
+	if err := set.Parse(args); errors.Is(err, flag.ErrHelp) {
+		return f, err
+	} else if err != nil {
+		return f, fmt.Errorf("%w: user unlink: %w", errUsage, err)
+	}
+	if set.NArg() > 0 {
+		return f, fmt.Errorf("%w: user unlink: unexpected argument %q", errUsage, set.Arg(0))
+	}
+	if f.email == "" {
+		return f, fmt.Errorf("%w: user unlink: --email is required", errUsage)
+	}
+	return f, nil
+}
+
+// unlinkUser removes the single sign-on identities of the user with
+// --email, at --issuer alone when given: the way out when the provider's
+// account was made anew or its subject changed. Like createUser, it
+// never migrates.
+func unlinkUser(ctx context.Context, args []string, lookup config.LookupFunc, out io.Writer) error {
+	f, err := parseUnlinkFlags(args)
+	if errors.Is(err, flag.ErrHelp) {
+		_, err = io.WriteString(out, usage)
+		return err
+	} else if err != nil {
+		return err
+	}
+	cfg, err := config.Load(lookup)
+	if err != nil {
+		return fmt.Errorf("invalid configuration:\n%w", err)
+	}
+	email := user.NormalizeEmail(f.email)
+	var n int
+	err = withDatabase(ctx, cfg.DataDir, func(db *store.DB) error {
+		u, err := db.UserByEmail(ctx, email)
+		if errors.Is(err, store.ErrNotFound) {
+			return fmt.Errorf("no user with the address %q", email)
+		} else if err != nil {
+			return err
+		}
+		n, err = db.UnlinkIdentities(ctx, u.ID, f.issuer)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(out, "Unlinked %d single sign-on identities of %s.\n", n, email)
 	return err
 }
 
