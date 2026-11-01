@@ -114,3 +114,87 @@ func TestDeleteUser(t *testing.T) {
 		}
 	}
 }
+
+// A user the admin deactivates is out at once: their session ends, their
+// token is refused and their password signs nobody in, saying why only
+// to whoever knows it; their data stay. Activated again, the password
+// and the token work.
+func TestDeactivateUser(t *testing.T) {
+	t.Parallel()
+
+	in, admin := signedIn(t)
+	now := in.clock.Now()
+	ivo := user.User{
+		ID: uuid.NewV7(), Email: "ivo@example.com", Name: "Ivo", Role: user.RoleUser,
+		Locale: "en", TimeZone: "UTC", DayStartHour: 4, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := in.db.CreateUser(t.Context(), ivo, passwordHash(t)); err != nil {
+		t.Fatal(err)
+	}
+	ivoSession := sessionCookie(t, in.login(t, "ivo@example.com", password))
+	token := mcpToken(t, in, ivoSession, `"read"`)
+	path := "/api/v1/users/" + ivo.ID.String()
+	rec := in.do(t, http.MethodPatch, path, `{"active": false}`, []*http.Cookie{admin}, nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"disabled_at"`) {
+		t.Fatalf("deactivate: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := in.do(t, http.MethodGet, "/api/v1/auth/session", "", []*http.Cookie{ivoSession}, nil); rec.Code != http.StatusUnauthorized {
+		t.Errorf("ivo's session: %d, want 401", rec.Code)
+	}
+	if rec := in.do(t, http.MethodGet, "/api/v1/auth/whoami", "", nil, bearer(token)); rec.Code != http.StatusUnauthorized {
+		t.Errorf("ivo's token: %d, want 401", rec.Code)
+	}
+	if rec := in.login(t, "ivo@example.com", password); rec.Code != http.StatusForbidden {
+		t.Errorf("ivo's password: %d %s, want 403", rec.Code, rec.Body.String())
+	}
+	if rec := in.login(t, "ivo@example.com", "wrong password, surely"); rec.Code != http.StatusUnauthorized {
+		t.Errorf("a wrong password: %d, want 401: it says nothing of the account", rec.Code)
+	}
+	if active, _ := in.db.ActiveUsers(t.Context()); len(active) != 1 || active[0].ID != in.user.ID {
+		t.Errorf("active users = %v, want ana alone: the scheduler skips ivo", active)
+	}
+	if all, _ := in.db.Users(t.Context()); len(all) != 2 {
+		t.Errorf("users = %d, want both: ivo's account stays", len(all))
+	}
+	if rec := in.do(t, http.MethodPatch, path, `{"active": true}`, []*http.Cookie{admin}, nil); rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "disabled_at") {
+		t.Fatalf("activate: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := in.login(t, "ivo@example.com", password); rec.Code != http.StatusOK {
+		t.Errorf("ivo's password after: %d, want 200", rec.Code)
+	}
+	if rec := in.do(t, http.MethodGet, "/api/v1/auth/whoami", "", nil, bearer(token)); rec.Code != http.StatusOK {
+		t.Errorf("ivo's token after: %d, want 200", rec.Code)
+	}
+}
+
+// The instance keeps an active admin: its only one can be neither
+// deactivated, nor made a user, nor deleted, even beside a deactivated
+// admin; with another active admin, it can.
+func TestTheLastActiveAdminStays(t *testing.T) {
+	t.Parallel()
+
+	in, session := signedIn(t)
+	cookies := []*http.Cookie{session}
+	self := "/api/v1/users/" + in.user.ID.String()
+	zoe := in.addUser(t, user.RoleAdmin)
+	if rec := in.do(t, http.MethodPatch, "/api/v1/users/"+zoe.ID.String(), `{"active": false}`, cookies, nil); rec.Code != http.StatusOK {
+		t.Fatalf("deactivate zoe: %d %s", rec.Code, rec.Body.String())
+	}
+	for _, body := range []string{`{"active": false}`, `{"role": "user"}`} {
+		if rec := in.do(t, http.MethodPatch, self, body, cookies, nil); rec.Code != http.StatusConflict {
+			t.Errorf("%s of the only active admin: %d %s, want 409", body, rec.Code, rec.Body.String())
+		}
+	}
+	if rec := in.do(t, http.MethodDelete, self, "", cookies, nil); rec.Code != http.StatusConflict {
+		t.Errorf("delete the only active admin: %d %s, want 409", rec.Code, rec.Body.String())
+	}
+	if rec := in.do(t, http.MethodPatch, "/api/v1/users/"+zoe.ID.String(), `{"active": true}`, cookies, nil); rec.Code != http.StatusOK {
+		t.Fatalf("activate zoe: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := in.do(t, http.MethodPatch, self, `{"role": "user"}`, cookies, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"role":"user"`) {
+		t.Errorf("ana made a user beside zoe: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := in.do(t, http.MethodGet, "/api/v1/users", "", cookies, nil); rec.Code != http.StatusForbidden {
+		t.Errorf("ana lists the users as a user: %d, want 403", rec.Code)
+	}
+}

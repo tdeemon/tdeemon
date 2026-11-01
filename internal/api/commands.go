@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -57,6 +58,9 @@ func TelegramCommands(cfg Config, bot *telegram.Bot) func(context.Context, teleg
 			s.logger.Error("reading the users of a Telegram chat failed", "chat_id", m.ChatID, "error", err)
 			return
 		}
+		// A user the admin deactivated gets no answer; their chat still
+		// follows a group's move (followChat), for when they are back.
+		users = slices.DeleteFunc(users, func(u user.User) bool { return u.DisabledAt != nil })
 		if len(users) == 0 {
 			s.logger.Info("a message to the Telegram bot from a chat that is no user's", "chat_id", m.ChatID)
 			return

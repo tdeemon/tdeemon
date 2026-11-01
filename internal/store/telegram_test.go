@@ -8,7 +8,6 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/domain/day"
 	"github.com/zarnautovic/tdeemon/internal/domain/event"
 	"github.com/zarnautovic/tdeemon/internal/domain/metric"
-
 	"github.com/zarnautovic/tdeemon/internal/store/storetest"
 )
 

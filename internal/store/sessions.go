@@ -70,7 +70,7 @@ func (db *DB) SessionUser(ctx context.Context, id string, now time.Time) (Sessio
 	row := db.read.QueryRowContext(ctx, `
 		SELECT `+userColumnsOfU+`, s.created_at, s.last_seen_at, s.expires_at
 		FROM sessions AS s JOIN users AS u ON u.id = s.user_id
-		WHERE s.id = ? AND s.expires_at > ?`, id, formatTime(now))
+		WHERE s.id = ? AND s.expires_at > ? AND u.disabled_at IS NULL`, id, formatTime(now))
 	u, err := scanUser(row.Scan, &created, &lastSeen, &expires)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Session{}, user.User{}, ErrNotFound

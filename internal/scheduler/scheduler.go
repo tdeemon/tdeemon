@@ -84,7 +84,7 @@ func (s *Scheduler) now() time.Time {
 // that fails is logged and left due; the error returned is only the
 // store's, when it cannot list the users or read and record the runs.
 func (s *Scheduler) Tick(ctx context.Context) error {
-	users, err := s.DB.Users(ctx)
+	users, err := s.DB.ActiveUsers(ctx)
 	if err != nil {
 		return err
 	}

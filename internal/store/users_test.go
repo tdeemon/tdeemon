@@ -229,3 +229,30 @@ func TestSetLocale(t *testing.T) {
 		t.Errorf("no such user: %v", err)
 	}
 }
+
+// A session written while the user was deactivated (a sign-in checked as
+// the admin deactivated them) does not come back with the user: being
+// activated ends it, and the user signs in anew.
+func TestActivatingEndsSessionsWrittenWhileDeactivated(t *testing.T) {
+	t.Parallel()
+
+	db, _, ivo := withTwoUsers(t)
+	off, on := false, true
+	if _, err := db.ChangeUser(t.Context(), ivo, store.UserChange{Active: &off}, t0); err != nil {
+		t.Fatal(err)
+	}
+	s := store.Session{ID: strings.Repeat("a", 64), UserID: ivo, CreatedAt: t0, LastSeenAt: t0, ExpiresAt: t0.Add(time.Hour)}
+	if err := db.CreateSession(t.Context(), s); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := db.SessionUser(t.Context(), s.ID, t0); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("the session while deactivated: %v, want ErrNotFound", err)
+	}
+	u, err := db.ChangeUser(t.Context(), ivo, store.UserChange{Active: &on}, t0)
+	if err != nil || u.DisabledAt != nil {
+		t.Fatalf("activate: %+v, %v", u, err)
+	}
+	if _, _, err := db.SessionUser(t.Context(), s.ID, t0); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("the session after: %v, want ErrNotFound", err)
+	}
+}

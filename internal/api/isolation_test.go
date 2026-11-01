@@ -894,6 +894,47 @@ func isolateSavePush(t *testing.T, e isolationEnv) {
 	}
 }
 
+// withoutAccount returns e's owner values but those of the owner's users
+// row, which an admin's answer may show.
+func (e isolationEnv) withoutAccount(t *testing.T) []string {
+	t.Helper()
+	_, account := e.tableRows(t, userTable{"users", "id"}, e.owner.user.ID)
+	return slices.DeleteFunc(slices.Clone(e.ownerValues), func(v string) bool { return slices.Contains(account, v) })
+}
+
+// isolateListUsers is list-users' case: a user lists nobody; the admin
+// lists the accounts, which withoutAccount allows, and no data.
+func isolateListUsers(t *testing.T, e isolationEnv) {
+	t.Helper()
+	rec := e.in.do(t, http.MethodGet, "/api/v1/users", "", []*http.Cookie{e.other.session}, nil)
+	want := http.StatusOK
+	if e.other.user.Role != user.RoleAdmin {
+		want = http.StatusForbidden
+	}
+	if rec.Code != want {
+		t.Errorf("list the users: %d %s, want %d", rec.Code, rec.Body.String(), want)
+	}
+}
+
+// isolateChangeUser is change-user's case: a user changes nobody; the
+// admin changes the user named, a third one.
+func isolateChangeUser(t *testing.T, e isolationEnv) {
+	t.Helper()
+	session := []*http.Cookie{e.other.session}
+	if e.other.user.Role != user.RoleAdmin {
+		for _, id := range []uuid.UUID{e.owner.user.ID, e.other.user.ID} {
+			if rec := e.in.do(t, http.MethodPatch, "/api/v1/users/"+id.String(), `{"active": false}`, session, nil); rec.Code != http.StatusForbidden {
+				t.Errorf("a user deactivates %s: %d %s, want 403", id, rec.Code, rec.Body.String())
+			}
+		}
+		return
+	}
+	zoe := e.in.addUser(t, user.RoleUser)
+	if rec := e.in.do(t, http.MethodPatch, "/api/v1/users/"+zoe.ID.String(), `{"active": false, "role": "admin"}`, session, nil); rec.Code != http.StatusOK {
+		t.Errorf("the admin changes a third user: %d %s, want 200", rec.Code, rec.Body.String())
+	}
+}
+
 // isolateDeleteAccount is delete-account's case: the owner's address
 // deletes nothing; the other's own deletes them, and the owner stays. An
 // admin, the only one, gets another admin first.
@@ -1023,6 +1064,8 @@ func isolationCases() map[string]isolationCase {
 		"delete-push-subscription": isolateDeletePush,
 		"delete-account":           isolateDeleteAccount,
 		"export-account":           isolateExport,
+		"list-users":               isolateListUsers,
+		"change-user":              isolateChangeUser,
 		"delete-user":              isolateDeleteUser,
 		"test-push":                isolateTestPush,
 		"set-notes":                isolateSetNotes,
@@ -1120,8 +1163,10 @@ func isolationCases() map[string]isolationCase {
 	}
 }
 
-// adminOnly are the operations only the instance's admin may call.
-var adminOnly = map[string]bool{"delete-user": true}
+// adminOnly are the operations only the instance's admin may call. The
+// admin's answers to them may show the owner's account (its users row:
+// the address, the name, the id), never their data.
+var adminOnly = map[string]bool{"delete-user": true, "list-users": true, "change-user": true}
 
 func TestIsolation(t *testing.T) {
 	t.Parallel()
@@ -1137,6 +1182,9 @@ func TestIsolation(t *testing.T) {
 				t.Run(op, func(t *testing.T) {
 					t.Parallel()
 					e := newIsolationEnv(t, adminActs)
+					if adminActs && adminOnly[op] {
+						e.ownerValues = e.withoutAccount(t)
+					}
 					e.isolated(t, run, func() {
 						// A user reaches an admin's operation no further than
 						// its 403.

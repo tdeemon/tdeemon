@@ -182,6 +182,30 @@ func TestTelegramCommandsFollowASupergroup(t *testing.T) {
 	}
 }
 
+// A user the admin deactivated gets no answer in their group, the others
+// do; their chat still follows the group to its supergroup, for when
+// they are back.
+func TestTelegramCommandsSkipADeactivatedUser(t *testing.T) {
+	t.Parallel()
+
+	env := newCommandsEnv(t)
+	group, _ := env.db.TelegramChatUsers(t.Context(), -100123)
+	if len(group) != 2 {
+		t.Fatalf("the group's users = %v", group)
+	}
+	off := false
+	if _, err := env.db.ChangeUser(t.Context(), group[0].ID, store.UserChange{Active: &off}, env.now); err != nil {
+		t.Fatal(err)
+	}
+	if got := env.ask(-100123, "/help", 0); len(got) != 1 || !strings.HasPrefix(got[0].text, "Naredbe:\n/sazetak") {
+		t.Errorf("/help = %+v, want Mia's alone", got)
+	}
+	env.send(telegram.Update{ID: 1, ChatID: -100123, MigrateTo: -1001234567})
+	if us, _ := env.db.TelegramChatUsers(t.Context(), -1001234567); len(us) != 2 {
+		t.Errorf("the supergroup's users = %v, want both", us)
+	}
+}
+
 // A chat that is no user's gets nothing, and its id is logged for the
 // admin; a command older than 5 minutes gets nothing.
 func TestTelegramCommandsIgnored(t *testing.T) {

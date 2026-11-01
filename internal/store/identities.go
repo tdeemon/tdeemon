@@ -41,8 +41,9 @@ type Identity struct {
 // seen before leads to its user. A new one is linked to the user with
 // the same email, if the provider verified that email and the user has no
 // identity at this issuer yet; otherwise it returns ErrEmailNotLinkable,
-// ErrNoAccount, ErrEmailNotVerified or ErrAlreadyLinked. Nobody gets an account by signing in:
-// an admin creates users.
+// ErrNoAccount, ErrEmailNotVerified or ErrAlreadyLinked, and ErrDisabled
+// for a user the admin deactivated. Nobody gets an account by signing
+// in: an admin creates users.
 func (db *DB) SignInWithIdentity(ctx context.Context, id Identity, now time.Time) (user.User, error) {
 	var u user.User
 	err := db.WriteTx(ctx, func(tx *sql.Tx) error {
@@ -51,7 +52,7 @@ func (db *DB) SignInWithIdentity(ctx context.Context, id Identity, now time.Time
 			WHERE i.issuer = ? AND i.subject = ?`, id.Issuer, id.Subject)
 		var err error
 		if u, err = scanUser(row.Scan); err == nil {
-			return nil
+			return disabled(u)
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
@@ -78,16 +79,29 @@ func (db *DB) SignInWithIdentity(ctx context.Context, id Identity, now time.Time
 		if linked {
 			return ErrAlreadyLinked
 		}
+		if err := disabled(u); err != nil {
+			return err
+		}
 		_, err = tx.ExecContext(ctx, "INSERT INTO user_identities (issuer, subject, user_id, created_at) VALUES (?, ?, ?, ?)",
 			id.Issuer, id.Subject, u.ID.String(), formatTime(now))
 		return err
 	})
-	if errors.Is(err, ErrNoAccount) || errors.Is(err, ErrEmailNotLinkable) || errors.Is(err, ErrEmailNotVerified) ||
-		errors.Is(err, ErrAlreadyLinked) {
+	if isRefusal(err) {
 		return user.User{}, err
 	}
 	if err != nil {
 		return user.User{}, fmt.Errorf("sign in with an identity: %w", err)
 	}
 	return u, nil
+}
+
+// isRefusal reports whether err is SignInWithIdentity's refusal of a
+// sign-in, which it returns as it is.
+func isRefusal(err error) bool {
+	for _, r := range []error{ErrNoAccount, ErrEmailNotLinkable, ErrEmailNotVerified, ErrAlreadyLinked, ErrDisabled} {
+		if errors.Is(err, r) {
+			return true
+		}
+	}
+	return false
 }

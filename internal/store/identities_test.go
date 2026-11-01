@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/zarnautovic/tdeemon/internal/domain/user"
 	"github.com/zarnautovic/tdeemon/internal/store"
 	"github.com/zarnautovic/tdeemon/internal/store/storetest"
 )
@@ -132,5 +133,39 @@ func TestSignInWithIdentityFailsOnAClosedDatabase(t *testing.T) {
 	_, err := db.SignInWithIdentity(t.Context(), store.Identity{Issuer: issuer, Subject: "s1"}, t0)
 	if err == nil || errors.Is(err, store.ErrNoAccount) {
 		t.Errorf("SignInWithIdentity on a closed database = %v, want an error that is not ErrNoAccount", err)
+	}
+}
+
+// A user the admin deactivated signs in by no identity, linked before or
+// not, and a new one is not linked.
+func TestSignInWithIdentityDeactivated(t *testing.T) {
+	t.Parallel()
+
+	db := storetest.Open(t)
+	ana, ivo := newUser("ana@example.com"), newUser("ivo@example.com")
+	ana.Role, ivo.Role = user.RoleUser, user.RoleUser // so neither is the last admin
+	for _, u := range []user.User{ana, ivo} {
+		if err := db.CreateUser(t.Context(), u, ""); err != nil {
+			t.Fatalf("CreateUser: %v", err)
+		}
+	}
+	linked := store.Identity{Issuer: issuer, Subject: "s1", Email: "ana@example.com", EmailVerified: true}
+	if _, err := db.SignInWithIdentity(t.Context(), linked, t0); err != nil {
+		t.Fatal(err)
+	}
+	off := false
+	for _, u := range []user.User{ana, ivo} {
+		if _, err := db.ChangeUser(t.Context(), u.ID, store.UserChange{Active: &off}, t0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.SignInWithIdentity(t.Context(), linked, t0); !errors.Is(err, store.ErrDisabled) {
+		t.Errorf("by the linked identity: %v, want ErrDisabled", err)
+	}
+	if _, err := db.SignInWithIdentity(t.Context(), store.Identity{Issuer: issuer, Subject: "s2", Email: "ivo@example.com", EmailVerified: true}, t0); !errors.Is(err, store.ErrDisabled) {
+		t.Errorf("by a new identity: %v, want ErrDisabled", err)
+	}
+	if n := identityCount(t.Context(), t, db); n != 1 {
+		t.Errorf("identities = %d, want the one linked before", n)
 	}
 }

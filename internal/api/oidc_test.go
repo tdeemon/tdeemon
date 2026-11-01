@@ -23,6 +23,7 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/auth"
 	"github.com/zarnautovic/tdeemon/internal/config"
 	"github.com/zarnautovic/tdeemon/internal/domain/user"
+	"github.com/zarnautovic/tdeemon/internal/store"
 	"github.com/zarnautovic/tdeemon/internal/store/storetest"
 )
 
@@ -316,6 +317,26 @@ func TestOIDCSignInWithoutAnAccount(t *testing.T) {
 				t.Errorf("callback: %d %s, want 403 and no session", rec.Code, rec.Body.String())
 			}
 		})
+	}
+}
+
+// A user the admin deactivated signs in by single sign-on no more than
+// with a password.
+func TestOIDCSignInDeactivated(t *testing.T) {
+	t.Parallel()
+
+	p := newIDP(t)
+	in := newOIDCInstance(t, p)
+	in.addUser(t, user.RoleAdmin)
+	off := false
+	if _, err := in.db.ChangeUser(t.Context(), in.user.ID, store.UserChange{Active: &off}, in.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	flow, callback := in.begin(t, p, "")
+	rec := in.finish(t, callback, flow)
+	if rec.Code != http.StatusForbidden || cookieNamed(rec, "tdeemon_session") != nil ||
+		!strings.Contains(rec.Body.String(), "deactivated your account") {
+		t.Errorf("callback: %d %s, want 403 and no session", rec.Code, rec.Body.String())
 	}
 }
 

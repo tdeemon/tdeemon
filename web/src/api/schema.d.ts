@@ -988,6 +988,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the users
+         * @description Needs the admin's web session.
+         */
+        get: operations["list-users"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/{id}": {
         parameters: {
             query?: never;
@@ -1005,7 +1025,11 @@ export interface paths {
         delete: operations["delete-user"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Deactivate, activate or change the role of a user
+         * @description Needs the admin's web session. What the body has changes. A user deactivated cannot sign in, their sessions end and their API tokens are refused until they are active again; their data stay. The instance's only active admin can be neither deactivated nor made a user (409).
+         */
+        patch: operations["change-user"];
         trace?: never;
     };
 }
@@ -1017,6 +1041,32 @@ export interface components {
             client: string;
             /** @description The AI model that acted for the user. */
             model?: string;
+        };
+        AdminUserBody: {
+            /**
+             * Format: date-time
+             * @description When the user was added.
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description When the admin deactivated the user, who cannot sign in; absent for an active user.
+             */
+            disabled_at?: string;
+            /** @description The address the user signs in with, in lower case. */
+            email: string;
+            /**
+             * Format: uuid
+             * @description The user's ID.
+             */
+            id: string;
+            /** @description The name the app shows. */
+            name: string;
+            /**
+             * @description admin manages the instance and its users.
+             * @enum {string}
+             */
+            role: "admin" | "user";
         };
         ApplyBody: {
             /** @description Loosening a limit takes this: the user saw that the proposal allows a plan the limit refused. */
@@ -1103,6 +1153,15 @@ export interface components {
         ChangePlanBody: {
             phases?: components["schemas"]["PhaseChangeIn"][] | null;
             targets?: components["schemas"]["TargetChangeIn"][] | null;
+        };
+        ChangeUserInputBody: {
+            /** @description false deactivates the user: they cannot sign in, their sessions end and their API tokens are refused, and their data stay; true activates them again. */
+            active?: boolean;
+            /**
+             * @description admin manages the instance and its users.
+             * @enum {string}
+             */
+            role?: "admin" | "user";
         };
         ChangesBody: {
             /** @description The user's limits it changes, by name: a proposal with one applies only in the app. */
@@ -1822,6 +1881,10 @@ export interface components {
             };
             /** @description The limits a lower value loosens (floors, the fastest loss, the waits); a higher value loosens the others. */
             looser_below: string[];
+        };
+        ListUsersOutputBody: {
+            /** @description Every user of the instance, in the order they were added. */
+            users: components["schemas"]["AdminUserBody"][];
         };
         LogMealBody: {
             /** @description What the meal was, in the user's words. */
@@ -8428,6 +8491,72 @@ export interface operations {
             };
         };
     };
+    "list-users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListUsersOutputBody"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "delete-user": {
         parameters: {
             query?: never;
@@ -8475,6 +8604,131 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "change-user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeUserInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserBody"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Request Timeout */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
                 headers: {
                     [name: string]: unknown;
                 };

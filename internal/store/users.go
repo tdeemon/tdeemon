@@ -83,8 +83,9 @@ func (db *DB) UserCredentials(ctx context.Context, email string) (user.User, str
 // userColumns are the columns scanUser reads; userColumnsOfU the same,
 // for a query that calls the users table u.
 const (
-	userColumns    = "id, email, name, role, locale, timezone, day_start_hour, created_at, updated_at"
-	userColumnsOfU = "u.id, u.email, u.name, u.role, u.locale, u.timezone, u.day_start_hour, u.created_at, u.updated_at"
+	userColumns    = "id, email, name, role, locale, timezone, day_start_hour, created_at, updated_at, disabled_at"
+	userColumnsOfU = "u.id, u.email, u.name, u.role, u.locale, u.timezone, u.day_start_hour, u.created_at, u.updated_at, " +
+		"u.disabled_at"
 )
 
 // scanUser reads the columns of userColumns, then any extra ones into
@@ -94,8 +95,11 @@ func scanUser(scan func(dest ...any) error, extra ...any) (user.User, error) {
 		u                    user.User
 		id, role             string
 		createdAt, updatedAt string
+		disabledAt           sql.NullString
 	)
-	dest := append([]any{&id, &u.Email, &u.Name, &role, &u.Locale, &u.TimeZone, &u.DayStartHour, &createdAt, &updatedAt}, extra...)
+	dest := append([]any{
+		&id, &u.Email, &u.Name, &role, &u.Locale, &u.TimeZone, &u.DayStartHour, &createdAt, &updatedAt, &disabledAt,
+	}, extra...)
 	if err := scan(dest...); err != nil {
 		return user.User{}, err
 	}
@@ -109,6 +113,13 @@ func scanUser(scan func(dest ...any) error, extra ...any) (user.User, error) {
 	}
 	if u.UpdatedAt, err = parseTime(updatedAt); err != nil {
 		return user.User{}, err
+	}
+	if disabledAt.Valid {
+		t, err := parseTime(disabledAt.String)
+		if err != nil {
+			return user.User{}, err
+		}
+		u.DisabledAt = &t
 	}
 	return u, nil
 }
@@ -274,8 +285,8 @@ var ErrLastAdmin = errors.New("the instance's last admin")
 
 // DeleteUser deletes the user with id and all of their data, which every
 // table of a user's refers to with ON DELETE CASCADE, or returns
-// ErrNotFound; ErrLastAdmin for the instance's only admin, whom nobody
-// could replace. It returns the user deleted.
+// ErrNotFound; ErrLastAdmin for the instance's only active admin, whom
+// nobody could replace. It returns the user deleted.
 func (db *DB) DeleteUser(ctx context.Context, id uuid.UUID) (user.User, error) {
 	var u user.User
 	err := db.WriteTx(ctx, func(tx *sql.Tx) error {
@@ -286,15 +297,8 @@ func (db *DB) DeleteUser(ctx context.Context, id uuid.UUID) (user.User, error) {
 		} else if err != nil {
 			return fmt.Errorf("delete user: %w", err)
 		}
-		if u.Role == user.RoleAdmin {
-			var others bool
-			if err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM users WHERE role = ? AND id <> ?)",
-				string(user.RoleAdmin), id.String()).Scan(&others); err != nil {
-				return fmt.Errorf("delete user: %w", err)
-			}
-			if !others {
-				return ErrLastAdmin
-			}
+		if err := keepAnAdmin(ctx, tx, u); err != nil {
+			return fmt.Errorf("delete user: %w", err)
 		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id.String()); err != nil {
 			return fmt.Errorf("delete user: %w", err)
@@ -302,4 +306,106 @@ func (db *DB) DeleteUser(ctx context.Context, id uuid.UUID) (user.User, error) {
 		return nil
 	})
 	return u, err
+}
+
+// ErrDisabled reports a user the admin deactivated: they cannot sign in.
+var ErrDisabled = errors.New("the admin deactivated this account")
+
+// disabled returns ErrDisabled for a deactivated user.
+func disabled(u user.User) error {
+	if u.DisabledAt != nil {
+		return ErrDisabled
+	}
+	return nil
+}
+
+// keepAnAdmin returns ErrLastAdmin when u is an active admin and no other
+// active admin is left to manage the instance once u is not one.
+func keepAnAdmin(ctx context.Context, tx *sql.Tx, u user.User) error {
+	if u.Role != user.RoleAdmin || u.DisabledAt != nil {
+		return nil
+	}
+	var others bool
+	if err := tx.QueryRowContext(ctx,
+		"SELECT EXISTS (SELECT 1 FROM users WHERE role = ? AND disabled_at IS NULL AND id <> ?)",
+		string(user.RoleAdmin), u.ID.String()).Scan(&others); err != nil {
+		return err
+	}
+	if !others {
+		return ErrLastAdmin
+	}
+	return nil
+}
+
+// UserChange is the admin's change of a user: what is not nil changes.
+type UserChange struct {
+	// Active deactivates the user (false), who then cannot sign in and
+	// whose sessions end, or activates them again (true).
+	Active *bool
+	Role   *user.Role
+}
+
+// applyUserChange makes c to u, which it returns changed, but for the
+// row: it checks that an active admin stays, and ends the sessions of a
+// user it deactivates or activates. A session of a deactivated user is
+// refused, but a sign-in checked as the user was being deactivated can
+// still write one: activated again, they sign in anew.
+func applyUserChange(ctx context.Context, tx *sql.Tx, u user.User, c UserChange, now time.Time) (user.User, error) {
+	losesAdmin := (c.Active != nil && !*c.Active) || (c.Role != nil && *c.Role != user.RoleAdmin)
+	if losesAdmin {
+		if err := keepAnAdmin(ctx, tx, u); err != nil {
+			return u, err
+		}
+	}
+	if c.Role != nil {
+		u.Role = *c.Role
+	}
+	// Active changes when it asks for what the user is not.
+	if c.Active != nil && *c.Active == (u.DisabledAt != nil) {
+		u.DisabledAt = nil
+		if !*c.Active {
+			t := now.UTC().Truncate(time.Second)
+			u.DisabledAt = &t
+		}
+		if _, err := tx.ExecContext(ctx, "DELETE FROM sessions WHERE user_id = ?", u.ID.String()); err != nil {
+			return u, err
+		}
+	}
+	u.UpdatedAt = now
+	return u, nil
+}
+
+// ChangeUser makes c to the user with id and returns them as they are
+// now, or ErrNotFound; ErrLastAdmin when it would leave no active admin.
+func (db *DB) ChangeUser(ctx context.Context, id uuid.UUID, c UserChange, now time.Time) (user.User, error) {
+	if c.Role != nil && *c.Role != user.RoleAdmin && *c.Role != user.RoleUser {
+		return user.User{}, fmt.Errorf("change user: role %q: want %s or %s", *c.Role, user.RoleAdmin, user.RoleUser)
+	}
+	var u user.User
+	err := db.WriteTx(ctx, func(tx *sql.Tx) error {
+		var err error
+		u, err = scanUser(tx.QueryRowContext(ctx, "SELECT "+userColumns+" FROM users WHERE id = ?", id.String()).Scan)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		} else if err != nil {
+			return err
+		}
+		if u, err = applyUserChange(ctx, tx, u, c, now); err != nil {
+			return err
+		}
+		var disabledAt sql.NullString
+		if u.DisabledAt != nil {
+			disabledAt = sql.NullString{String: formatTime(*u.DisabledAt), Valid: true}
+		}
+		_, err = tx.ExecContext(ctx, "UPDATE users SET role = ?, disabled_at = ?, updated_at = ? WHERE id = ?",
+			string(u.Role), disabledAt, formatTime(now), id.String())
+		return err
+	})
+	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrLastAdmin) {
+		return user.User{}, err
+	}
+	if err != nil {
+		return user.User{}, fmt.Errorf("change user: %w", err)
+	}
+	return u, nil
 }
