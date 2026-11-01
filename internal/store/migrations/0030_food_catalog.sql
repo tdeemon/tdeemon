@@ -84,8 +84,9 @@ CREATE INDEX foods_catalog ON foods (catalog_id)
 WHERE catalog_id IS NOT NULL;
 
 -- The declared foods saved before it, in use: of the foods of one name
--- and brand, every user's, the one saved last, under a new UUIDv7 (its
--- time this one's, the rest random).
+-- and brand, every user's, the one saved last (in a second's tie, of
+-- the save written last), under a new UUIDv7 (its time this one's, the
+-- rest random).
 CREATE TEMP TABLE catalog_pick AS
 WITH declared AS (
     SELECT
@@ -95,7 +96,15 @@ WITH declared AS (
         f.brand_key,
         row_number() OVER (
             PARTITION BY f.name_key, f.brand_key
-            ORDER BY f.updated_at DESC, f.id DESC
+            ORDER BY
+                f.updated_at DESC,
+                (
+                    SELECT max(e.rowid) FROM events AS e
+                    WHERE
+                        e.user_id = f.user_id AND e.entity = f.id
+                        AND e.operation = 'food.save'
+                ) DESC NULLS LAST,
+                f.id DESC
         ) AS n
     FROM foods AS f
     WHERE f.archived = 0 AND f.source IN ('label', 'reference', 'off')
@@ -150,7 +159,7 @@ SELECT
         WHERE
             e.user_id = p.user_id AND e.entity = p.food_id
             AND e.operation = 'food.save' AND e.undone_by IS NULL
-        ORDER BY e.id DESC LIMIT 1
+        ORDER BY e.rowid DESC LIMIT 1
     ) AS legacy_save
 FROM catalog_pick AS p
 INNER JOIN foods AS f ON p.user_id = f.user_id AND p.food_id = f.id;

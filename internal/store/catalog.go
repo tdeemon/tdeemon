@@ -36,10 +36,12 @@ func catalogued(f food.Food) bool {
 }
 
 // catalogState is a catalog row as a save found it, for the save's
-// undo: its food and its version.
+// undo: its food, its version, and the save before the catalog it was
+// made of, if any (legacy_save).
 type catalogState struct {
-	Food    food.Food `json:"food"`
-	Version int64     `json:"version"`
+	Food       food.Food `json:"food"`
+	Version    int64     `json:"version"`
+	LegacySave string    `json:"legacy_save,omitempty"`
 }
 
 // syncCatalog puts userID's food f, as its save of event saved it, into
@@ -166,8 +168,10 @@ func restoreLegacyCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e e
 	if err := putBackLegacyCodes(ctx, tx, userID, e.Entity, id, before.Barcodes, after.Barcodes); err != nil {
 		return err
 	}
+	// In the order of the writes, as undo takes them.
 	_, err = tx.ExecContext(ctx, `UPDATE catalog_foods SET legacy_save = (SELECT id FROM events
-		WHERE user_id = ?1 AND entity = ?2 AND operation = 'food.save' AND undone_by IS NULL AND id < ?3 ORDER BY id DESC LIMIT 1)
+		WHERE user_id = ?1 AND entity = ?2 AND operation = 'food.save' AND undone_by IS NULL
+			AND rowid < (SELECT rowid FROM events WHERE user_id = ?1 AND id = ?3) ORDER BY rowid DESC LIMIT 1)
 		WHERE id = ?4`, userID.String(), e.Entity, e.ID.String(), id)
 	return err
 }
@@ -219,7 +223,7 @@ func putBackLegacyCodes(ctx context.Context, tx *sql.Tx, userID uuid.UUID, foodI
 			return err
 		}
 	}
-	return nil
+	return trimCatalogCodes(ctx, tx, id)
 }
 
 // putBackCatalogRow puts the catalog's row id back as before, as a save
@@ -246,7 +250,12 @@ func putBackCatalogRow(ctx context.Context, tx *sql.Tx, id string, before catalo
 			return err
 		}
 	}
-	return nil
+	var legacy any
+	if before.LegacySave != "" {
+		legacy = before.LegacySave
+	}
+	_, err := tx.ExecContext(ctx, "UPDATE catalog_foods SET legacy_save = ? WHERE id = ?", legacy, id)
+	return err
 }
 
 // catalogRow is the catalog's row a food goes into: its id, and whether
@@ -346,6 +355,12 @@ func writeCatalogCodes(ctx context.Context, tx *sql.Tx, id string, codes []strin
 			return err
 		}
 	}
+	return trimCatalogCodes(ctx, tx, id)
+}
+
+// trimCatalogCodes leaves the catalog's row id the newest
+// food.MaxBarcodes of its barcodes.
+func trimCatalogCodes(ctx context.Context, tx *sql.Tx, id string) error {
 	_, err := tx.ExecContext(ctx, `DELETE FROM catalog_barcodes WHERE catalog_id = ?1 AND rowid NOT IN (
 		SELECT rowid FROM catalog_barcodes WHERE catalog_id = ?1 ORDER BY rowid DESC LIMIT ?2)`, id, food.MaxBarcodes)
 	return err
@@ -364,7 +379,9 @@ func catalogStateInTx(ctx context.Context, tx *sql.Tx, id string) (catalogState,
 	if err := catalogChildren(ctx, tx, &st.Food); err != nil {
 		return catalogState{}, err
 	}
-	err = tx.QueryRowContext(ctx, "SELECT version FROM catalog_foods WHERE id = ?", id).Scan(&st.Version)
+	var legacy sql.NullString
+	err = tx.QueryRowContext(ctx, "SELECT version, legacy_save FROM catalog_foods WHERE id = ?", id).Scan(&st.Version, &legacy)
+	st.LegacySave = legacy.String
 	return st, err
 }
 

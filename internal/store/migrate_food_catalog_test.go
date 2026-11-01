@@ -168,8 +168,9 @@ func checkCatalogSearch(t *testing.T, db *DB, grape string) {
 }
 
 // An undo of a save made before the catalog takes back what the
-// migration made of it: a correction's values, then a new food's row;
-// and a new food's of another's too leaves the row.
+// migration made of it, a correction since undone or not: a
+// correction's values, then a new food's row; and a new food's of
+// another's too leaves the row.
 func TestUndoOfASaveBeforeTheCatalog(t *testing.T) {
 	t.Parallel()
 
@@ -188,6 +189,15 @@ func TestUndoOfASaveBeforeTheCatalog(t *testing.T) {
 	})
 	actor := event.Actor{Kind: event.User, Client: "web"}
 	now := time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC)
+	// A correction since, undone, leaves the row of the save before.
+	corrected := foodAt(t, db, ivo, apple)
+	corrected.Nutrients.Kcal = 55
+	if _, err := db.SaveFood(t.Context(), ivo, actor, corrected, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.UndoLast(t.Context(), ivo, actor, now); err != nil {
+		t.Fatalf("undo the correction since: %v", err)
+	}
 	if _, err := db.UndoLast(t.Context(), ivo, actor, now); err != nil {
 		t.Fatalf("undo the apple's correction: %v", err)
 	}
