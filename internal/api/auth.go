@@ -31,6 +31,9 @@ type sessions struct {
 	now    func() time.Time
 	// secure is true when the instance is served over HTTPS.
 	secure bool
+	// origin is the instance's public URL without a path, for the links
+	// it gives (an invite's).
+	origin string
 	// afterVerify, for tests, runs once a sign-in has checked the password
 	// and before it writes anything.
 	afterVerify func(context.Context)
@@ -53,6 +56,7 @@ type sessions struct {
 func newSessions(cfg Config) *sessions {
 	return &sessions{
 		db: cfg.DB, logger: cfg.Logger, now: cfg.Now, secure: cfg.BaseURL.Scheme == "https",
+		origin:          cfg.BaseURL.Scheme + "://" + cfg.BaseURL.Host,
 		verifyLogin:     auth.VerifyLogin,
 		signInByAddr:    newLimiter(signInFailures, signInWindow, cfg.Now),
 		signInByAccount: newLimiter(accountFailures, signInWindow, cfg.Now),

@@ -1,6 +1,52 @@
 {
   "components": {
     "schemas": {
+      "AcceptInviteInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "locale": {
+            "description": "The language of the app.",
+            "enum": [
+              "en",
+              "hr"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "description": "The name the app shows.",
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "password": {
+            "description": "The account's password: 15 to 256 characters.",
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "timezone": {
+            "description": "An IANA time zone, the browser's.",
+            "examples": [
+              "Europe/Zagreb"
+            ],
+            "maxLength": 64,
+            "type": "string"
+          },
+          "token": {
+            "description": "The token of the invite's link, after its #.",
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "name",
+          "password",
+          "timezone",
+          "locale"
+        ],
+        "type": "object"
+      },
       "ActorBody": {
         "additionalProperties": false,
         "properties": {
@@ -424,6 +470,40 @@
         },
         "type": "object"
       },
+      "CheckInviteInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "description": "The token of the invite's link, after its #.",
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      },
+      "CheckInviteOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "description": "The address the account will sign in with.",
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "When the link stops working.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "expires_at"
+        ],
+        "type": "object"
+      },
       "CoachingGuideBody": {
         "additionalProperties": false,
         "properties": {
@@ -444,6 +524,46 @@
           "session",
           "title",
           "guide"
+        ],
+        "type": "object"
+      },
+      "CreateInviteInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "description": "The address the new user will sign in with.",
+            "maxLength": 254,
+            "type": "string"
+          },
+          "role": {
+            "default": "user",
+            "description": "Their role; user unless set.",
+            "enum": [
+              "admin",
+              "user"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
+      "CreateInviteOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "invite": {
+            "$ref": "#/components/schemas/InviteBody"
+          },
+          "url": {
+            "description": "The link to send them, shown once: it makes one account for the address, until the invite expires.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "invite",
+          "url"
         ],
         "type": "object"
       },
@@ -1624,6 +1744,46 @@
         ],
         "type": "object"
       },
+      "InviteBody": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "description": "When it was made.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "description": "The address the account will sign in with.",
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "When its link stops working.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "The invite's ID, to revoke it by.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "role": {
+            "description": "The account's role.",
+            "enum": [
+              "admin",
+              "user"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role",
+          "created_at",
+          "expires_at"
+        ],
+        "type": "object"
+      },
       "ItemBody": {
         "additionalProperties": false,
         "properties": {
@@ -1951,6 +2111,22 @@
           "effective",
           "defaults",
           "looser_below"
+        ],
+        "type": "object"
+      },
+      "ListInvitesOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "invites": {
+            "description": "The invites you made that no account took yet, expired ones too, the newest first.",
+            "items": {
+              "$ref": "#/components/schemas/InviteBody"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "invites"
         ],
         "type": "object"
       },
@@ -8102,6 +8278,616 @@
         "summary": "Import the days of workouts from a Strong export",
         "tags": [
           "ingest"
+        ]
+      }
+    },
+    "/api/v1/invites": {
+      "get": {
+        "description": "Needs the admin's web session.",
+        "operationId": "list-invites",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListInvitesOutputBody"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "description": "no-store",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "List your invites",
+        "tags": [
+          "users"
+        ]
+      },
+      "post": {
+        "description": "Needs the admin's web session. Answers the link to send them, once: it makes one account for the address, with the role, in the next 7 days. A new invite of an address replaces yours before; an address a user has already, or another admin invited, is refused (409).",
+        "operationId": "create-invite",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInviteInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateInviteOutputBody"
+                }
+              }
+            },
+            "description": "Created",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "description": "no-store",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "408": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Request Timeout"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Invite a new user",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/invites/accept": {
+      "post": {
+        "description": "Needs nothing but the link's token: makes the account with the invite's address and role, the name, password, time zone and language given, and signs it in, as a sign-in does. The link then works no more. 404 for a link that does not work, 409 for an address a user has since.",
+        "operationId": "accept-invite",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInviteInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionBody"
+                }
+              }
+            },
+            "description": "Created",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "description": "no-store",
+                  "type": "string"
+                }
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "description": "The session cookie: __Host-tdeemon_session over HTTPS (tdeemon_session over plain HTTP), HttpOnly, SameSite=Lax, for the session's lifetime.",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "408": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Request Timeout"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Make your account by an invite",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/invites/check": {
+      "post": {
+        "description": "Needs nothing but the link's token: the address the account will have, and until when the link works; 404 for a link that does not work.",
+        "operationId": "check-invite",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckInviteInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckInviteOutputBody"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "description": "no-store",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "408": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Request Timeout"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Check an invite's link",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/invites/{id}": {
+      "delete": {
+        "description": "Needs the admin's web session; its link then makes nothing.",
+        "operationId": "delete-invite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Revoke an invite",
+        "tags": [
+          "users"
         ]
       }
     },

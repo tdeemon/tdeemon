@@ -230,6 +230,47 @@ func answerCases() map[string]answerCase {
 			in.do(t, http.MethodDelete, "/api/v1/users/"+in.user.ID.String(), "", cookies, nil)
 		},
 		"export-account": get("/api/v1/account/export"),
+		"create-invite": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			cookies := []*http.Cookie{session}
+			in.do(t, http.MethodPost, "/api/v1/invites", `{"email": "zoe@example.com", "role": "admin"}`, cookies, nil)
+			in.do(t, http.MethodPost, "/api/v1/invites", `{"email": "ana@example.com"}`, cookies, nil)
+			in.do(t, http.MethodPost, "/api/v1/invites", `{"email": "not an address"}`, cookies, nil)
+		},
+		"list-invites": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			in.do(t, http.MethodPost, "/api/v1/invites", `{"email": "zoe@example.com"}`, []*http.Cookie{session}, nil)
+			in.do(t, http.MethodGet, "/api/v1/invites", "", []*http.Cookie{session}, nil)
+		},
+		"delete-invite": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			cookies := []*http.Cookie{session}
+			rec := in.do(t, http.MethodPost, "/api/v1/invites", `{"email": "zoe@example.com"}`, cookies, nil)
+			var got struct {
+				Invite struct {
+					ID string `json:"id"`
+				} `json:"invite"`
+			}
+			_ = json.Unmarshal(rec.Body.Bytes(), &got)
+			in.do(t, http.MethodDelete, "/api/v1/invites/"+got.Invite.ID, "", cookies, nil)
+			in.do(t, http.MethodDelete, "/api/v1/invites/"+got.Invite.ID, "", cookies, nil)
+		},
+		"check-invite": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			token := in.invite(t, session, "zoe@example.com")
+			in.do(t, http.MethodPost, "/api/v1/invites/check", `{"token": "`+token+`"}`, nil, nil)
+			in.do(t, http.MethodPost, "/api/v1/invites/check", `{"token": "nothing"}`, nil, nil)
+		},
+		"accept-invite": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			token := in.invite(t, session, "zoe@example.com")
+			body := func(pw string) string {
+				return `{"token": "` + token + `", "name": "Zoe", "password": "` + pw + `", "timezone": "UTC", "locale": "en"}`
+			}
+			in.do(t, http.MethodPost, "/api/v1/invites/accept", body("short"), nil, nil)
+			in.do(t, http.MethodPost, "/api/v1/invites/accept", body(password), nil, nil)
+			in.do(t, http.MethodPost, "/api/v1/invites/accept", body(password), nil, nil)
+		},
 		"list-users": func(t *testing.T, in *instance, session *http.Cookie) {
 			t.Helper()
 			zoe := in.addUser(t, user.RoleUser)

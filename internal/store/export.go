@@ -27,6 +27,7 @@ var exportLeavesOut = map[string][]string{
 	"foods_fts":          nil,
 	"users":              {"password_hash"},
 	"api_tokens":         {"token_hash"},
+	"invites":            {"token_hash"},
 	"push_subscriptions": {"endpoint", "p256dh", "auth"},
 }
 

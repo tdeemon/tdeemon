@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"bytes"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -53,6 +54,8 @@ type party struct {
 	// push is their phone's push subscription, at pushEndpoint.
 	push         uuid.UUID
 	pushEndpoint string
+	// invite is an invite they made, as an admin would.
+	invite uuid.UUID
 }
 
 // tokenName is the name of the party's token, which only they may see.
@@ -109,6 +112,7 @@ func newIsolationEnv(t *testing.T, adminActs bool) isolationEnv {
 		saveIsolationMetrics(t, in.db, p.user, now)
 		p.applied, p.pending = saveIsolationPlan(t, in.db, p.user, now)
 		p.push, p.pushEndpoint = saveIsolationPush(t, in.db, p.user, now)
+		p.invite = saveIsolationInvite(t, in.db, p.user, now)
 		identity := store.Identity{Issuer: "https://idp.example", Subject: "subject-of-" + p.user.Name, Email: p.user.Email, EmailVerified: true}
 		if _, err := in.db.SignInWithIdentity(t.Context(), identity, now); err != nil {
 			t.Fatalf("link %s's identity: %v", p.user.Name, err)
@@ -201,6 +205,25 @@ func saveIsolationFoods(t *testing.T, db *store.DB, u user.User, now time.Time) 
 		t.Fatalf("archive %s's food: %v", u.Name, err)
 	}
 	return bread
+}
+
+// saveIsolationInvite gives u an invite of a friend of theirs, straight
+// in the table: the fixture needs one of each user's, admin or not, and
+// CreateInvite takes an admin's alone.
+func saveIsolationInvite(t *testing.T, db *store.DB, u user.User, now time.Time) uuid.UUID {
+	t.Helper()
+	id := uuid.NewV7()
+	_, hash := auth.NewSessionToken()
+	err := db.WriteTx(t.Context(), func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(t.Context(), "INSERT INTO invites (id, token_hash, user_id, email, role, created_at, expires_at) "+
+			"VALUES (?, ?, ?, ?, 'user', ?, ?)", id.String(), hash, u.ID.String(), strings.ToLower(u.Name)+".friend@example.com",
+			now.UTC().Format(time.RFC3339), now.Add(7*24*time.Hour).UTC().Format(time.RFC3339))
+		return err
+	})
+	if err != nil {
+		t.Fatalf("invite for %s: %v", u.Name, err)
+	}
+	return id
 }
 
 // saveIsolationRecipe gives u a recipe of bread, in portions.
@@ -935,6 +958,80 @@ func isolateChangeUser(t *testing.T, e isolationEnv) {
 	}
 }
 
+// asAdmin runs the request of an admin's operation with the other's
+// session: a user gets 403, and the admin wantAdmin.
+func asAdmin(t *testing.T, e isolationEnv, method, path, body string, wantAdmin int) {
+	t.Helper()
+	want := wantAdmin
+	if e.other.user.Role != user.RoleAdmin {
+		want = http.StatusForbidden
+	}
+	if rec := e.in.do(t, method, path, body, []*http.Cookie{e.other.session}, nil); rec.Code != want {
+		t.Errorf("%s %s: %d %s, want %d", method, path, rec.Code, rec.Body.String(), want)
+	}
+}
+
+// isolateCreateInvite is create-invite's case: the admin invites a new
+// address, but not one the owner invited, whose invite stays; a user
+// invites nobody.
+func isolateCreateInvite(t *testing.T, e isolationEnv) {
+	t.Helper()
+	asAdmin(t, e, http.MethodPost, "/api/v1/invites", `{"email": "`+strings.ToLower(e.owner.user.Name)+`.friend@example.com"}`,
+		http.StatusConflict)
+	asAdmin(t, e, http.MethodPost, "/api/v1/invites", `{"email": "zoe@example.com"}`, http.StatusCreated)
+}
+
+// isolateListInvites is list-invites' case: the admin lists the invites
+// they made, not the owner's.
+func isolateListInvites(t *testing.T, e isolationEnv) {
+	t.Helper()
+	asAdmin(t, e, http.MethodGet, "/api/v1/invites", "", http.StatusOK)
+}
+
+// isolateDeleteInvite is delete-invite's case: the owner's invite answers
+// the admin as one that does not exist; their own goes.
+func isolateDeleteInvite(t *testing.T, e isolationEnv) {
+	t.Helper()
+	asAdmin(t, e, http.MethodDelete, "/api/v1/invites/"+e.owner.invite.String(), "", http.StatusNotFound)
+	asAdmin(t, e, http.MethodDelete, "/api/v1/invites/"+e.other.invite.String(), "", http.StatusNoContent)
+}
+
+// inviteWithToken stores an invite of address by a third user, an admin,
+// and returns its link's token.
+func inviteWithToken(t *testing.T, e isolationEnv, address string) string {
+	t.Helper()
+	now := e.in.clock.Now()
+	token, hash := auth.NewSessionToken()
+	zoe := e.in.addUser(t, user.RoleAdmin)
+	inv := store.Invite{ID: uuid.NewV7(), By: zoe.ID, Email: address, Role: user.RoleUser, CreatedAt: now, ExpiresAt: now.Add(time.Hour)}
+	if err := e.in.db.CreateInvite(t.Context(), inv, hash); err != nil {
+		t.Fatal(err)
+	}
+	return token
+}
+
+// isolateCheckInvite is check-invite's case: a link's token says its own
+// invite's address.
+func isolateCheckInvite(t *testing.T, e isolationEnv) {
+	t.Helper()
+	token := inviteWithToken(t, e, "mia@example.com")
+	rec := e.in.do(t, http.MethodPost, "/api/v1/invites/check", `{"token": "`+token+`"}`, nil, nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "mia@example.com") {
+		t.Errorf("check: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// isolateAcceptInvite is accept-invite's case: a link makes its own
+// account, and touches no other.
+func isolateAcceptInvite(t *testing.T, e isolationEnv) {
+	t.Helper()
+	token := inviteWithToken(t, e, "mia@example.com")
+	body := `{"token": "` + token + `", "name": "Zoe", "password": "` + password + `", "timezone": "UTC", "locale": "en"}`
+	if rec := e.in.do(t, http.MethodPost, "/api/v1/invites/accept", body, nil, nil); rec.Code != http.StatusCreated {
+		t.Errorf("accept: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 // isolateDeleteAccount is delete-account's case: the owner's address
 // deletes nothing; the other's own deletes them, and the owner stays. An
 // admin, the only one, gets another admin first.
@@ -1065,6 +1162,11 @@ func isolationCases() map[string]isolationCase {
 		"delete-account":           isolateDeleteAccount,
 		"export-account":           isolateExport,
 		"list-users":               isolateListUsers,
+		"create-invite":            isolateCreateInvite,
+		"list-invites":             isolateListInvites,
+		"delete-invite":            isolateDeleteInvite,
+		"check-invite":             isolateCheckInvite,
+		"accept-invite":            isolateAcceptInvite,
 		"change-user":              isolateChangeUser,
 		"delete-user":              isolateDeleteUser,
 		"test-push":                isolateTestPush,
@@ -1166,7 +1268,10 @@ func isolationCases() map[string]isolationCase {
 // adminOnly are the operations only the instance's admin may call. The
 // admin's answers to them may show the owner's account (its users row:
 // the address, the name, the id), never their data.
-var adminOnly = map[string]bool{"delete-user": true, "list-users": true, "change-user": true}
+var adminOnly = map[string]bool{
+	"delete-user": true, "list-users": true, "change-user": true,
+	"create-invite": true, "list-invites": true, "delete-invite": true,
+}
 
 func TestIsolation(t *testing.T) {
 	t.Parallel()

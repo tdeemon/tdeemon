@@ -14,7 +14,8 @@ API. It is early: the skeleton, the database layer, users, sign-in
 meals, recipes, metrics and the plan (profile, phases, targets, limits) in the
 domain and the database with an event log and undo, the proposals of
 changes of the plan and their life in the domain and the database, the
-API for the admin's users (their list, a user deactivated, active again
+API for the admin's users (an invite's link that makes one account,
+their list, a user deactivated, active again
 or of another role, never the last active admin), an account's export
 (a ZIP of every table of the user's, in JSON and CSV, but the secrets)
 and its delete with all its data (by its user, the admin or the CLI,
