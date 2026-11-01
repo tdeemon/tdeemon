@@ -67,11 +67,14 @@ func (s *sessions) createInvite(ctx context.Context, in *createInviteInput) (*cr
 		CreatedAt: now, ExpiresAt: now.Add(inviteLifetime),
 	}
 	token, hash := auth.NewSessionToken()
-	if err := s.db.CreateInvite(ctx, inv, hash); errors.Is(err, store.ErrEmailTaken) {
+	switch err := s.db.CreateInvite(ctx, inv, hash); {
+	case errors.Is(err, store.ErrEmailTaken):
 		return nil, huma.Error409Conflict("a user has this address already")
-	} else if errors.Is(err, store.ErrInvitedByAnother) {
+	case errors.Is(err, store.ErrNotAdmin):
+		return nil, huma.Error403Forbidden("this needs the instance's admin")
+	case errors.Is(err, store.ErrInvitedByAnother):
 		return nil, huma.Error409Conflict("another admin invited this address; they can revoke their invite")
-	} else if err != nil {
+	case err != nil:
 		return nil, internalError("making the invite failed", err)
 	}
 	s.logger.InfoContext(ctx, "made an invite", "invite_id", inv.ID.String(), "by", p.User.ID.String())

@@ -25,6 +25,16 @@ type Invite struct {
 
 const inviteColumns = "id, user_id, email, role, created_at, expires_at"
 
+// validInvite selects the invite stored under a token hash that has not
+// expired by a time, and whose admin is still an active admin: an
+// admin's invites work no more than they do.
+const validInvite = `SELECT i.id, i.user_id, i.email, i.role, i.created_at, i.expires_at
+	FROM invites AS i JOIN users AS u ON u.id = i.user_id
+	WHERE i.token_hash = ? AND i.expires_at > ? AND u.role = 'admin' AND u.disabled_at IS NULL`
+
+// ErrNotAdmin reports an invite of a user who is no active admin.
+var ErrNotAdmin = errors.New("only an active admin invites")
+
 func scanInvite(scan func(dest ...any) error) (Invite, error) {
 	var (
 		inv                         Invite
@@ -55,16 +65,21 @@ var ErrInvitedByAnother = errors.New("another admin invited this address")
 
 // CreateInvite stores inv under tokenHash (auth.SessionID of the link's
 // token), replacing an invite of the same address by the same admin, or
-// returns ErrEmailTaken when a user has the address already, and
-// ErrInvitedByAnother when another admin's invite is for it.
+// returns ErrEmailTaken when a user has the address already,
+// ErrInvitedByAnother when another admin's invite is for it, and
+// ErrNotAdmin when inv.By is no active admin (any more).
 func (db *DB) CreateInvite(ctx context.Context, inv Invite, tokenHash string) error {
 	if inv.Role != user.RoleAdmin && inv.Role != user.RoleUser {
 		return fmt.Errorf("create invite: role %q: want %s or %s", inv.Role, user.RoleAdmin, user.RoleUser)
 	}
 	return db.WriteTx(ctx, func(tx *sql.Tx) error {
-		var taken bool
-		if err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM users WHERE email = ?)", inv.Email).Scan(&taken); err != nil {
+		var admin, taken bool
+		if err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM users WHERE id = ? AND role = 'admin' AND disabled_at IS NULL), "+
+			"EXISTS (SELECT 1 FROM users WHERE email = ?)", inv.By.String(), inv.Email).Scan(&admin, &taken); err != nil {
 			return fmt.Errorf("create invite: %w", err)
+		}
+		if !admin {
+			return ErrNotAdmin
 		}
 		if taken {
 			return ErrEmailTaken
@@ -134,10 +149,10 @@ func (db *DB) DeleteInvite(ctx context.Context, by, id uuid.UUID) (bool, error) 
 }
 
 // InviteByToken returns the invite stored under tokenHash, or
-// ErrNotFound when there is none or it has expired by now.
+// ErrNotFound when there is none, it has expired by now, or its admin is
+// one no more.
 func (db *DB) InviteByToken(ctx context.Context, tokenHash string, now time.Time) (Invite, error) {
-	row := db.read.QueryRowContext(ctx, "SELECT "+inviteColumns+" FROM invites WHERE token_hash = ? AND expires_at > ?",
-		tokenHash, formatTime(now))
+	row := db.read.QueryRowContext(ctx, validInvite, tokenHash, formatTime(now))
 	inv, err := scanInvite(row.Scan)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Invite{}, ErrNotFound
@@ -161,14 +176,13 @@ type Acceptance struct {
 // AcceptInvite makes a's user by the invite stored under tokenHash, with
 // the invite's address and role, links a's identity, starts a's session
 // and deletes the invite, all at once; ErrNotFound when the invite is
-// gone or has expired by now, ErrEmailTaken when a user has its address,
+// gone, has expired by now or its admin is one no more, ErrEmailTaken when a user has its address,
 // and ErrAlreadyLinked when the identity is another user's. It returns
 // the user made.
 func (db *DB) AcceptInvite(ctx context.Context, tokenHash string, a Acceptance, now time.Time) (user.User, error) {
 	u := a.User
 	err := db.WriteTx(ctx, func(tx *sql.Tx) error {
-		inv, err := scanInvite(tx.QueryRowContext(ctx, "SELECT "+inviteColumns+" FROM invites WHERE token_hash = ? AND expires_at > ?",
-			tokenHash, formatTime(now)).Scan)
+		inv, err := scanInvite(tx.QueryRowContext(ctx, validInvite, tokenHash, formatTime(now)).Scan)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		} else if err != nil {
