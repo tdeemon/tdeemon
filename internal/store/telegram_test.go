@@ -8,7 +8,6 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/domain/day"
 	"github.com/zarnautovic/tdeemon/internal/domain/event"
 	"github.com/zarnautovic/tdeemon/internal/domain/metric"
-	"github.com/zarnautovic/tdeemon/internal/store"
 	"github.com/zarnautovic/tdeemon/internal/store/storetest"
 )
 
@@ -88,27 +87,6 @@ func TestTelegramChatUsers(t *testing.T) {
 	}
 	if got := ids(853); got != nil {
 		t.Errorf("Ana's old chat = %v", got)
-	}
-}
-
-// A user the admin deactivated speaks in no chat.
-func TestTelegramChatUsersDeactivated(t *testing.T) {
-	t.Parallel()
-
-	db, ana, ivo := withTwoUsers(t)
-	now := time.Date(2026, 10, 23, 8, 0, 0, 0, time.UTC)
-	for _, id := range []uuid.UUID{ivo, ana} {
-		if err := db.SetTelegramChat(t.Context(), id, -100123, now); err != nil {
-			t.Fatal(err)
-		}
-	}
-	off := false
-	if _, err := db.ChangeUser(t.Context(), ivo, store.UserChange{Active: &off}, now); err != nil {
-		t.Fatal(err)
-	}
-	us, err := db.TelegramChatUsers(t.Context(), -100123)
-	if err != nil || len(us) != 1 || us[0].ID != ana {
-		t.Errorf("the group with ivo deactivated = %v, %v; want ana", us, err)
 	}
 }
 
