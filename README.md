@@ -171,9 +171,10 @@ only there.
 
 ## Users
 
-tdeemon has no sign-up page: an admin adds users with the binary itself.
-It works on the database of a server that has started at least once,
-which creates and migrates it, and the server may keep running:
+tdeemon has no sign-up page: the admin invites users, and adds the first
+admin with the binary itself. The binary works on the database of a
+server that has started at least once, which creates and migrates it,
+and the server may keep running:
 
 ```sh
 docker exec <container> /tdeemon user create --admin \
@@ -203,6 +204,13 @@ kubectl exec deploy/tdeemon -- /tdeemon user create --admin --email you@example.
   address in the body. The instance's only admin cannot be deleted.
   Snapshots of the database taken before keep the data until they go
   ([Data](#data)).
+- The admin invites a user by their address (`POST /api/v1/invites`,
+  as a user or an admin) and sends them the link it answers, once: it
+  makes one account for the address in the next 7 days, with the name,
+  password, time zone and language they give, and signs it in. A new
+  invite of an address replaces the one before, and the admin revokes
+  one (`DELETE /api/v1/invites/{id}`). The link's token is after its
+  `#`, so it reaches no server's log.
 - The admin lists the users (`GET /api/v1/users`) and changes one
   (`PATCH /api/v1/users/{id}`): `{"active": false}` deactivates them
   (they cannot sign in, their sessions end and their API tokens are
