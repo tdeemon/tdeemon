@@ -14,8 +14,9 @@ API. It is early: the skeleton, the database layer, users, sign-in
 meals, recipes, metrics and the plan (profile, phases, targets, limits) in the
 domain and the database with an event log and undo, the proposals of
 changes of the plan and their life in the domain and the database, the
-API for an account's delete with all its data (by its user, the admin or
-the CLI, never the last admin), the profile, the limits, the autopilot,
+API for an account's export (a ZIP of every table of the user's, in JSON
+and CSV, but the secrets) and its delete with all its data (by its user,
+the admin or the CLI, never the last admin), the profile, the limits, the autopilot,
 the settings, the notes for a coach,
 the devices subscribed to notifications by Web Push (the key, a
 subscription, their list, a delete and a test), the morning summary and

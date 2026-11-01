@@ -203,6 +203,10 @@ kubectl exec deploy/tdeemon -- /tdeemon user create --admin --email you@example.
   address in the body. The instance's only admin cannot be deleted.
   Snapshots of the database taken before keep the data until they go
   ([Data](#data)).
+- `GET /api/v1/account/export` gives a user all their data as a ZIP:
+  `tdeemon.json`, every table of theirs, and a CSV file of each, without
+  the secrets (hashes of the password, tokens and sessions; the
+  devices' push subscriptions).
 - The commands read the same `TDEEMON_*` variables as the server, and
   they refuse a database the server has not migrated to their version.
 

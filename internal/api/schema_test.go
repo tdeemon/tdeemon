@@ -114,6 +114,12 @@ func checkBody(tb testing.TB, op *huma.Operation, rec *httptest.ResponseRecorder
 		tb.Errorf("%s %d: Content-Type %s, which the document does not list", op.OperationID, rec.Code, ct)
 		return
 	}
+	if isFile(media) {
+		if rec.Body.Len() == 0 {
+			tb.Errorf("%s %d: an empty file", op.OperationID, rec.Code)
+		}
+		return
+	}
 	var v any
 	if err := json.Unmarshal(rec.Body.Bytes(), &v); err != nil {
 		tb.Errorf("%s %d: decode %s: %v", op.OperationID, rec.Code, rec.Body.String(), err)
@@ -223,6 +229,7 @@ func answerCases() map[string]answerCase {
 			in.do(t, http.MethodDelete, "/api/v1/users/"+zoe.ID.String(), "", cookies, nil)
 			in.do(t, http.MethodDelete, "/api/v1/users/"+in.user.ID.String(), "", cookies, nil)
 		},
+		"export-account": get("/api/v1/account/export"),
 		"delete-push-subscription": func(t *testing.T, in *instance, session *http.Cookie) {
 			t.Helper()
 			rec := in.do(t, http.MethodPut, "/api/v1/push/subscriptions", pushBody(t, "https://web.push.apple.com/answer"), []*http.Cookie{session}, nil)
@@ -638,6 +645,12 @@ func nullable(f reflect.StructField) string {
 	return ""
 }
 
+// isFile reports whether an answer's body is a file, such as an export's
+// ZIP, which the document says is binary: bytes, not JSON.
+func isFile(media *huma.MediaType) bool {
+	return media.Schema != nil && media.Schema.Type == "string" && media.Schema.Format == "binary"
+}
+
 // bodyType returns the Go type of an answer's body. A body is a struct,
 // which the document refers to: one that is not (a bare slice, whose
 // document huma lets be null) is an error.
@@ -662,6 +675,9 @@ func TestAnswersHoldNoNull(t *testing.T) {
 	for _, op := range document().ops {
 		for _, resp := range op.Responses {
 			for _, media := range resp.Content {
+				if isFile(media) {
+					continue // bytes, no fields
+				}
 				typ, err := bodyType(document().registry, media)
 				if err != nil {
 					t.Errorf("%s: %v", op.OperationID, err)
