@@ -4,7 +4,7 @@
 import { AxeBuilder } from '@axe-core/playwright'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
 
-import { openMeal, signIn } from './user.ts'
+import { invite, openMeal, signIn } from './user.ts'
 
 // The checks of every screen of the app, on a phone and a desktop, in
 // the light and the dark theme, in English and Croatian: axe finds
@@ -27,6 +27,8 @@ interface Made {
   foodId: string
   recipeId: string
   meal: string
+  // The token of an invite's link, of an address of the run's own.
+  invite: string
 }
 
 // idOf is the id of a food an answer holds, itself or as a recipe's.
@@ -91,7 +93,8 @@ async function make(page: Page, tag: string): Promise<Made> {
     },
   })
   expect(before.ok()).toBe(true)
-  return { foodId, recipeId, meal }
+  const link = await invite(page, `invited-${tag}@example.com`)
+  return { foodId, recipeId, meal, invite: new URL(link).hash.slice(1) }
 }
 
 // The day of the week whose sheet is checked.
@@ -340,6 +343,7 @@ const screens: Screen[] = [
     '/settings/account',
     '/settings/devices',
     '/settings/notifications',
+    '/settings/users',
   ].map((path) => ({
     name: path.slice(1).replace('/', '-'),
     open: async (page: Page) => {
@@ -347,6 +351,15 @@ const screens: Screen[] = [
       await settled(page)
     },
   })),
+  // The page an invite's link opens, which makes an account.
+  {
+    name: 'invite',
+    open: async (page, made) => {
+      await page.goto(`/invite#${made.invite}`)
+      await expect(page.getByLabel(/^(Password|Lozinka)$/)).toBeVisible()
+      await settled(page)
+    },
+  },
   // This morning's summary, from today's header.
   {
     name: 'morning-summary',

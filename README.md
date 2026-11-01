@@ -226,6 +226,10 @@ kubectl exec deploy/tdeemon -- /tdeemon user create --admin --email you@example.
   `tdeemon.json`, every table of theirs, and a CSV file of each, without
   the secrets (hashes of the password, tokens and sessions; the
   devices' push subscriptions).
+- In the web app, the admin invites, revokes and changes users in the
+  settings' Users, which shows the link once to copy; the link opens
+  the app's `/invite` page, which makes the account. A user exports
+  their data or deletes their account in the settings' Account.
 - The commands read the same `TDEEMON_*` variables as the server, and
   they refuse a database the server has not migrated to their version.
 

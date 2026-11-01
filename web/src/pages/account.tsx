@@ -3,11 +3,13 @@ import { useId } from 'react'
 
 import { sessionQuery } from '@/api/session'
 import { YouForm } from '@/components/settings/you-form'
+import { YourData } from '@/components/settings/your-data'
 import { SubPage } from '@/components/sub-page'
 import { useMessages } from '@/i18n/messages'
 
 // AccountPage changes the user's name, the app's language, their time
-// zone and the hour their day starts.
+// zone and the hour their day starts; under it, the user's data, to
+// export or delete with the account.
 export function AccountPage() {
   const t = useMessages()
   const id = useId()
@@ -17,7 +19,10 @@ export function AccountPage() {
     <SubPage title={t.settings.account} titleId={id} from="settings">
       {/* The sections have the session before they show. */}
       {session.data && (
-        <YouForm key={session.data.user.id} user={session.data.user} labelledBy={id} />
+        <>
+          <YouForm key={session.data.user.id} user={session.data.user} labelledBy={id} />
+          <YourData email={session.data.user.email} />
+        </>
       )}
     </SubPage>
   )

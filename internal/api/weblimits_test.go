@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/zarnautovic/tdeemon/internal/api"
+	"github.com/zarnautovic/tdeemon/internal/auth"
 	"github.com/zarnautovic/tdeemon/internal/domain/food"
 	"github.com/zarnautovic/tdeemon/internal/domain/meal"
 	"github.com/zarnautovic/tdeemon/internal/domain/metric"
@@ -56,8 +57,12 @@ type webLimits struct {
 		MaxHeightCm float64 `json:"maxHeightCm"`
 		MaxAge      int     `json:"maxAge"`
 	} `json:"profile"`
+	// User holds the longest name, and the shortest and longest password
+	// in characters (after NFKC), which an invite's form checks.
 	User struct {
-		MaxNameLen int `json:"maxNameLen"`
+		MaxNameLen     int `json:"maxNameLen"`
+		MinPasswordLen int `json:"minPasswordLen"`
+		MaxPasswordLen int `json:"maxPasswordLen"`
 	} `json:"user"`
 	// History is the first day a history can be of, the first day the
 	// day's page goes back to.
@@ -94,6 +99,7 @@ func newWebLimits() webLimits {
 	l.Recipe.LowYield, l.Recipe.HighYield = recipe.LowYield, recipe.HighYield
 	l.Profile.MinHeightCm, l.Profile.MaxHeightCm, l.Profile.MaxAge = profile.MinHeightCm, profile.MaxHeightCm, profile.MaxAge
 	l.User.MaxNameLen = user.MaxNameLen
+	l.User.MinPasswordLen, l.User.MaxPasswordLen = auth.MinPasswordLen, auth.MaxPasswordLen
 	l.History.Since = api.HistorySince.String()
 	l.Plan.MaxKcal, l.Plan.KcalPerKg = plan.MaxKcal, plan.KcalPerKg
 	return l
