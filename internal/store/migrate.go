@@ -495,7 +495,7 @@ func viewNames(ctx context.Context, tx *sql.Tx) (names []string, err error) {
 // readView selects no rows from the view, which fails when it refers to
 // something that no longer exists.
 func readView(ctx context.Context, tx *sql.Tx, name string) (err error) {
-	quoted := `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+	quoted := quoteIdent(name)
 	rows, err := tx.QueryContext(ctx, "SELECT * FROM "+quoted+" LIMIT 0") //nolint:gosec // G202: a view name from sqlite_schema, quoted as an identifier
 	if err != nil {
 		return err

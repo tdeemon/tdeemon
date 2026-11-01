@@ -1022,6 +1022,7 @@ func isolationCases() map[string]isolationCase {
 		"save-push-subscription":   isolateSavePush,
 		"delete-push-subscription": isolateDeletePush,
 		"delete-account":           isolateDeleteAccount,
+		"export-account":           isolateExport,
 		"delete-user":              isolateDeleteUser,
 		"test-push":                isolateTestPush,
 		"set-notes":                isolateSetNotes,
