@@ -52,7 +52,7 @@ type Config struct {
 	// Push (VAPID) key, and will encrypt stored secrets; sessions do not
 	// depend on it. Never log it.
 	SecretKey []byte
-	// DataDir holds the database, backups and upload archives.
+	// DataDir holds the database and its snapshots.
 	DataDir string
 	// BackupKeep is how many daily snapshots of the database are kept in
 	// DataDir/backups; 0 takes none.
@@ -206,9 +206,11 @@ func loadOpenFoodFactsURL(get func(name, fallback string) string) (string, error
 	return strings.TrimSuffix(raw, "/"), nil
 }
 
-// loadBackupKeep reads how many daily snapshots to keep, 7 unless set.
+// loadBackupKeep reads how many daily snapshots to keep, none unless
+// set: backing the volume up is the host's, and a snapshot is for a host
+// whose backup copies files while tdeemon runs.
 func loadBackupKeep(get func(name, fallback string) string) (int, error) {
-	raw := get("BACKUP_KEEP", "7")
+	raw := get("BACKUP_KEEP", "0")
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < 0 || n > MaxBackupKeep {
 		return 0, fmt.Errorf("%sBACKUP_KEEP %q: want a number of daily snapshots from 0 (none) to %d", Prefix, raw, MaxBackupKeep)

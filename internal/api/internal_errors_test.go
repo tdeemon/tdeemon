@@ -80,19 +80,6 @@ func route(t *testing.T, opID string) string {
 	return ""
 }
 
-// checkLogged fails unless the log has a record that is want but for its
-// error.
-func (in *instance) checkLogged(t *testing.T, want logRecord) {
-	t.Helper()
-	for _, r := range in.logRecords(t) {
-		want.Error = r.Error
-		if r == want {
-			return
-		}
-	}
-	t.Errorf("the log has no %+v:\n%s", want, in.logs.String())
-}
-
 // checkLoggedOnce fails unless the log has one record whose error says
 // secret, and it is want but for the error's text.
 func (in *instance) checkLoggedOnce(t *testing.T, secret string, want logRecord) {

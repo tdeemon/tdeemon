@@ -26,7 +26,6 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/auth"
 	"github.com/zarnautovic/tdeemon/internal/config"
 	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/ingest"
 	"github.com/zarnautovic/tdeemon/internal/off"
 	"github.com/zarnautovic/tdeemon/internal/push"
 	"github.com/zarnautovic/tdeemon/internal/store"
@@ -73,8 +72,6 @@ type Config struct {
 	// Limits are the instance's limits of a plan; limits.Instance() when
 	// zero.
 	Limits limits.Limits
-	// IngestArchive keeps the raw bodies of the ingest; none when nil.
-	IngestArchive *ingest.Archive
 	// OpenFoodFacts looks up a barcode none of a user's foods has; none
 	// when nil.
 	OpenFoodFacts *off.Client
