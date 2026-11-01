@@ -347,7 +347,9 @@ type UserChange struct {
 
 // applyUserChange makes c to u, which it returns changed, but for the
 // row: it checks that an active admin stays, and ends the sessions of a
-// user it deactivates.
+// user it deactivates or activates. A session of a deactivated user is
+// refused, but a sign-in checked as the user was being deactivated can
+// still write one: activated again, they sign in anew.
 func applyUserChange(ctx context.Context, tx *sql.Tx, u user.User, c UserChange, now time.Time) (user.User, error) {
 	losesAdmin := (c.Active != nil && !*c.Active) || (c.Role != nil && *c.Role != user.RoleAdmin)
 	if losesAdmin {
@@ -358,13 +360,13 @@ func applyUserChange(ctx context.Context, tx *sql.Tx, u user.User, c UserChange,
 	if c.Role != nil {
 		u.Role = *c.Role
 	}
-	switch {
-	case c.Active == nil:
-	case *c.Active:
+	// Active changes when it asks for what the user is not.
+	if c.Active != nil && *c.Active == (u.DisabledAt != nil) {
 		u.DisabledAt = nil
-	case u.DisabledAt == nil:
-		t := now.UTC().Truncate(time.Second)
-		u.DisabledAt = &t
+		if !*c.Active {
+			t := now.UTC().Truncate(time.Second)
+			u.DisabledAt = &t
+		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM sessions WHERE user_id = ?", u.ID.String()); err != nil {
 			return u, err
 		}
