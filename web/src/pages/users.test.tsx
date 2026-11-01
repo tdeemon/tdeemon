@@ -267,19 +267,52 @@ test('no invite waiting says so', async () => {
   expect(await (await invitesRegion()).findByText('No invite waits.')).toBeDefined()
 })
 
-test('a user is deactivated, activated and made an admin', async () => {
+test('a user is deactivated and made an admin after it asks, and activated at once', async () => {
   const { sent } = server()
   renderAt('/settings/users')
 
   const list = await accounts()
+  // Deactivating asks, says what it does, and Keep sends nothing.
   fireEvent.click(await list.findByRole('button', { name: 'Deactivate: Iva' }))
+  expect(
+    list.getByText(
+      'Deactivate Iva? They cannot sign in, their sessions end and their invites go. Their data stay.',
+    ),
+  ).toBeDefined()
+  expect(document.activeElement).toBe(list.getByRole('button', { name: 'Keep' }))
+  fireEvent.click(list.getByRole('button', { name: 'Keep' }))
+  expect(document.activeElement).toBe(list.getByRole('button', { name: 'Deactivate: Iva' }))
+  expect(sent[`PATCH /api/v1/users/${iva.id}`]).toBeUndefined()
+
+  fireEvent.click(list.getByRole('button', { name: 'Deactivate: Iva' }))
+  fireEvent.click(list.getByRole('button', { name: 'Deactivate' }))
   expect(await list.findByRole('button', { name: 'Activate: Iva' })).toBeDefined()
+
+  // Activating takes nothing away: it asks nothing.
   fireEvent.click(list.getByRole('button', { name: 'Activate: Marko' }))
   expect(await list.findByRole('button', { name: 'Deactivate: Marko' })).toBeDefined()
-  fireEvent.click(list.getByRole('button', { name: 'Make admin: Iva' }))
-  expect(await list.findByRole('button', { name: 'Make user: Iva' })).toBeDefined()
+  expect(list.queryByRole('button', { name: 'Keep' })).toBeNull()
 
-  expect(sent[`PATCH /api/v1/users/${iva.id}`]).toEqual([{ active: false }, { role: 'admin' }])
+  fireEvent.click(list.getByRole('button', { name: 'Make admin: Iva' }))
+  expect(
+    list.getByText('Make Iva an admin? They will manage this server and all its users.'),
+  ).toBeDefined()
+  fireEvent.click(list.getByRole('button', { name: 'Make admin' }))
+  expect(await list.findByRole('button', { name: 'Make user: Iva' })).toBeDefined()
+  expect(document.activeElement).toBe(list.getByRole('button', { name: 'Make user: Iva' }))
+
+  fireEvent.click(list.getByRole('button', { name: 'Make user: Iva' }))
+  expect(
+    list.getByText('Make Iva a user? They stop managing this server, and their invites go.'),
+  ).toBeDefined()
+  fireEvent.click(list.getByRole('button', { name: 'Make user' }))
+  expect(await list.findByRole('button', { name: 'Make admin: Iva' })).toBeDefined()
+
+  expect(sent[`PATCH /api/v1/users/${iva.id}`]).toEqual([
+    { active: false },
+    { role: 'admin' },
+    { role: 'user' },
+  ])
   expect(sent[`PATCH /api/v1/users/${marko.id}`]).toEqual([{ active: true }])
 })
 
@@ -317,11 +350,13 @@ test('a change that would leave no active admin says so on its card', async () =
 
   const list = await accounts()
   fireEvent.click(await list.findByRole('button', { name: 'Make user: Iva' }))
+  fireEvent.click(list.getByRole('button', { name: 'Make user' }))
   const card = element(list.getByText('Iva').closest('li'))
   expect((await within(card).findByRole('alert')).textContent).toBe(
     'This is the only active admin. Make another user an admin first.',
   )
 
+  fireEvent.click(list.getByRole('button', { name: 'Keep' }))
   fireEvent.click(list.getByRole('button', { name: 'Delete: Iva' }))
   expect(within(card).queryByRole('alert')).toBeNull()
   fireEvent.click(list.getByRole('button', { name: 'Delete for good' }))
@@ -346,4 +381,20 @@ test('users and invites that did not come say why, and come when asked again', a
   }
   expect(await (await accounts()).findByText('Ana')).toBeDefined()
   expect(await (await invitesRegion()).findByText('No invite waits.')).toBeDefined()
+})
+
+test('an address of letters a browser would refuse, such as č, is invited as typed', async () => {
+  const { sent } = server()
+  renderAt('/settings/users')
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Invite someone' }))
+  const sheet = within(await screen.findByRole('dialog'))
+  const field = sheet.getByLabelText('Email')
+  expect(field.getAttribute('type')).toBe('text')
+  expect(field.getAttribute('inputmode')).toBe('email')
+  fireEvent.change(field, { target: { value: 'čaba@primjer.hr' } })
+  fireEvent.click(sheet.getByRole('button', { name: 'Make the invite link' }))
+
+  expect(await sheet.findByText('http://localhost/invite#made-up-token')).toBeDefined()
+  expect(sent['POST /api/v1/invites']).toEqual([{ email: 'čaba@primjer.hr', role: 'user' }])
 })

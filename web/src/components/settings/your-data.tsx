@@ -107,7 +107,12 @@ export function YourData({ email }: { email: string }) {
               <span className={cn(fieldLabel, 'block')}>{d.email}</span>
               <input
                 ref={field}
-                type="email"
+                // Text, not email: a browser refuses an address of letters such as
+                // č, which the server takes.
+                type="text"
+                inputMode="email"
+                autoCapitalize="none"
+                spellCheck={false}
                 value={typed}
                 autoComplete="off"
                 aria-describedby={`${id}-type`}

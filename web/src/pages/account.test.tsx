@@ -14,12 +14,16 @@ afterEach(() => {
 
 // server is a signed-in server whose account is deleted by deleted, and
 // which is signed out once it is; it keeps the bodies of the deletes.
-function server(deleted: Handler = () => new Response(null, { status: 204 })) {
+function server(
+  deleted: Handler = () => new Response(null, { status: 204 }),
+  email = session().user.email,
+) {
   const sent: unknown[] = []
   let live = true
   fakeServer({
     ...signedIn(),
-    'GET /api/v1/auth/session': () => (live ? Response.json(session()) : problem(401)),
+    'GET /api/v1/auth/session': () =>
+      live ? Response.json({ ...session(), user: { ...session().user, email } }) : problem(401),
     'GET /api/v1/auth/methods': () => Response.json({ password: true }),
     'DELETE /api/v1/account': async (r) => {
       sent.push(await r.clone().json())
@@ -87,4 +91,20 @@ test.each([
 
   expect((await sheet.findByRole('alert')).textContent).toBe(said)
   expect(router.state.location.pathname).toBe('/settings/account')
+})
+
+test('an address of letters a browser would refuse, such as č, deletes the account', async () => {
+  const sent = server(undefined, 'čaba@primjer.hr')
+  renderAt('/settings/account')
+
+  fireEvent.click(await (await yourData()).findByRole('button', { name: 'Delete your account' }))
+  const sheet = within(await screen.findByRole('dialog'))
+  const field = sheet.getByLabelText('Your email address')
+  expect(field.getAttribute('type')).toBe('text')
+  expect(field.getAttribute('inputmode')).toBe('email')
+  fireEvent.change(field, { target: { value: 'čaba@primjer.hr' } })
+  fireEvent.click(sheet.getByRole('button', { name: 'Delete my account' }))
+
+  expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeDefined()
+  expect(sent).toEqual([{ email: 'čaba@primjer.hr' }])
 })

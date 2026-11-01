@@ -58,6 +58,20 @@ function server(over: Record<string, Handler> = {}) {
   return sent
 }
 
+// later is an answer a test gives when it likes.
+function later() {
+  let give: ((answer: Response) => void) | undefined
+  const promise = new Promise<Response>((resolve) => {
+    give = resolve
+  })
+  return {
+    promise,
+    resolve: (answer: Response) => {
+      give?.(answer)
+    },
+  }
+}
+
 async function fill(name: string, password: string) {
   fireEvent.change(await screen.findByLabelText('Name'), { target: { value: name } })
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: password } })
@@ -192,4 +206,57 @@ test('a link the provider cannot take says it does not work', async () => {
   expect((await screen.findByRole('alert')).textContent).toBe(
     'This invite does not work: it expired or was used. Ask for another.',
   )
+})
+
+test('while one way to make the account is on its way, neither is offered', async () => {
+  const assign = vi.fn<(url: string) => void>()
+  const { href, origin, pathname } = window.location
+  vi.stubGlobal('location', { href, origin, pathname, hash: '', search: '', assign })
+  // Neither answers until let go.
+  const accepted = later()
+  const started = later()
+  const calls = { accept: 0, sso: 0 }
+  server({
+    'GET /api/v1/auth/methods': () =>
+      Response.json({ password: true, oidc: { name: 'Authentik', login_url: '/x' } }),
+    'POST /api/v1/invites/accept': () => {
+      calls.accept++
+      return accepted.promise
+    },
+    'POST /api/v1/invites/sso': () => {
+      calls.sso++
+      return started.promise
+    },
+  })
+  renderAt(`/invite#${token}`)
+
+  // The password's way first: the provider's waits.
+  await fill('Iva', 'a long enough password')
+  const provider = screen.getByRole('button', { name: 'Continue with Authentik' })
+  await waitFor(() => {
+    expect(provider.hasAttribute('disabled')).toBe(true)
+  })
+  fireEvent.click(provider)
+  fireEvent.submit(screen.getByRole('button', { name: 'Making the account…' }))
+  accepted.resolve(problem(500))
+  expect((await screen.findByRole('alert')).textContent).toBe(
+    'Making the account failed. Try again.',
+  )
+  expect(provider.hasAttribute('disabled')).toBe(false)
+
+  // Then the provider's: the form waits, and stays so once it answered.
+  fireEvent.click(provider)
+  const submit = screen.getByRole('button', { name: 'Make the account' })
+  await waitFor(() => {
+    expect(submit.hasAttribute('disabled')).toBe(true)
+  })
+  started.resolve(Response.json({ url: 'https://id.example.com/authorize' }))
+  await waitFor(() => {
+    expect(assign).toHaveBeenCalledTimes(1)
+  })
+  expect(submit.hasAttribute('disabled')).toBe(true)
+  expect(provider.hasAttribute('disabled')).toBe(true)
+  fireEvent.submit(submit)
+  fireEvent.click(provider)
+  expect(calls).toEqual({ accept: 1, sso: 1 })
 })

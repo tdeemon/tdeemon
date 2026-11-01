@@ -1133,6 +1133,12 @@ export const hr: Messages = {
     makeUser: 'Postavi za korisnika',
     delete: 'Obriši',
     of: (action: string, name: string) => `${action}: ${name}`,
+    confirmDeactivate: (name: string) =>
+      `Deaktivirati korisnika ${name}? Ne može se prijaviti, sesije mu završavaju, a pozivnice nestaju. Podaci ostaju.`,
+    confirmMakeAdmin: (name: string) =>
+      `Postaviti korisnika ${name} za admina? Upravljat će ovim serverom i svim korisnicima.`,
+    confirmMakeUser: (name: string) =>
+      `Vratiti korisnika ${name} među obične korisnike? Više ne upravlja serverom, a pozivnice mu nestaju.`,
     confirmDelete: (name: string) =>
       `Zauvijek obrisati korisnika ${name} i sve njegove podatke? To se ne može poništiti.`,
     yesDelete: 'Obriši zauvijek',

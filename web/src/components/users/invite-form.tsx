@@ -73,7 +73,12 @@ export function InviteForm({
         <span className={cn(fieldLabel, 'block')}>{t.users.email}</span>
         <input
           ref={email}
-          type="email"
+          // Text, not email: a browser refuses an address of letters such as
+          // č, which the server takes.
+          type="text"
+          inputMode="email"
+          autoCapitalize="none"
+          spellCheck={false}
           value={address}
           required
           autoComplete="off"

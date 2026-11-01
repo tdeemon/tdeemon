@@ -90,8 +90,15 @@ export function InvitePage() {
     },
   })
 
+  // One way to make the account at a time: while either is on its way,
+  // and once one made it, neither is offered.
+  const busy = accept.isPending || accept.isSuccess || sso.isPending || sso.isSuccess
+
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (busy) {
+      return
+    }
     const length = passwordLength(password)
     const found = {
       ...(name.trim() === '' ? { name: t.settings.nameNeeded } : {}),
@@ -190,7 +197,7 @@ export function InvitePage() {
               {refusal(t, accept.error)}
             </p>
           )}
-          <Button type="submit" className="w-full" disabled={accept.isPending}>
+          <Button type="submit" className="w-full" disabled={busy}>
             {accept.isPending ? t.invite.submitting : t.invite.submit}
           </Button>
         </form>
@@ -200,7 +207,7 @@ export function InvitePage() {
             <Button
               variant="outline"
               className="w-full"
-              disabled={sso.isPending}
+              disabled={busy}
               onClick={() => {
                 sso.mutate({ body: { token, timezone: browserZone(), locale } })
               }}

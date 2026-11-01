@@ -15,6 +15,19 @@ import { problem } from '@/i18n/problem'
 
 const usersKey = ['get', '/api/v1/users']
 
+// Asking is a change of a user asked about before it is made: each but
+// an activation, which takes nothing away.
+interface Asking {
+  id: string
+  what: 'deactivate' | 'admin' | 'user' | 'delete'
+}
+
+// slot is the button that asks a change: making an admin and a user
+// share theirs.
+function slot(a: Asking): string {
+  return `${a.id}:${a.what === 'user' ? 'admin' : a.what}`
+}
+
 // why says why a user's account was not changed.
 function why(t: Messages, error: unknown): string {
   return statusOf(error) === 409 ? t.users.onlyAdmin : t.users.failed(problem(t, error))
@@ -22,9 +35,10 @@ function why(t: Messages, error: unknown): string {
 
 // Accounts are the instance's users, for its admin, a card each: the
 // name, the address, the role, and whether the account is deactivated.
-// Each but the admin's own is deactivated or activated, made an admin or
-// a user, or deleted with all its data, after it asks: the focus goes to
-// Keep, and back to Delete, or to the heading once the user is gone. A
+// Each but the admin's own is deactivated, made an admin or a user, or
+// deleted with all its data, after it asks (an activation at once): the
+// focus goes to Keep, and back to what asked, or to the heading once the
+// user is gone. A
 // change the server refuses, the only active admin's, says so on its
 // card.
 export function Accounts({ me }: { me: string }) {
@@ -32,10 +46,26 @@ export function Accounts({ me }: { me: string }) {
   const queryClient = useQueryClient()
   const list = $api.useQuery('get', '/api/v1/users')
   const heading = useRef<HTMLHeadingElement>(null)
+  // The buttons that ask, by the user and the change.
   const openers = useRef(new Map<string, HTMLButtonElement>())
-  const [asking, setAsking] = useState<string | undefined>(undefined)
+  const [asking, setAsking] = useState<Asking | undefined>(undefined)
   const asked = () => queryClient.invalidateQueries({ queryKey: usersKey })
-  const change = $api.useMutation('patch', '/api/v1/users/{id}', { onSuccess: asked })
+  // back closes the question, and gives the focus to what asked it.
+  const back = (a: Asking) => {
+    flushSync(() => {
+      setAsking(undefined)
+    })
+    ;(openers.current.get(slot(a)) ?? heading.current)?.focus()
+  }
+  const change = $api.useMutation('patch', '/api/v1/users/{id}', {
+    onSuccess: async (_, sent) => {
+      const a = asking
+      if (a?.id === sent.params.path.id) {
+        back(a)
+      }
+      await asked()
+    },
+  })
   const remove = $api.useMutation('delete', '/api/v1/users/{id}', {
     onSuccess: async () => {
       setAsking(undefined)
@@ -52,6 +82,42 @@ export function Accounts({ me }: { me: string }) {
   const reset = () => {
     change.reset()
     remove.reset()
+  }
+  // opener is a button's ref that keeps it among the openers.
+  const opener = (key: string) => (el: HTMLButtonElement | null) => {
+    if (el) {
+      openers.current.set(key, el)
+    }
+    return () => {
+      openers.current.delete(key)
+    }
+  }
+  const ask = (a: Asking) => {
+    reset()
+    setAsking(a)
+  }
+  // question is what an Ask says and answers of a change asked.
+  const question = (a: Asking, name: string) =>
+    ({
+      deactivate: { q: t.users.confirmDeactivate(name), yes: t.users.deactivate },
+      admin: { q: t.users.confirmMakeAdmin(name), yes: t.users.makeAdmin },
+      user: { q: t.users.confirmMakeUser(name), yes: t.users.makeUser },
+      delete: { q: t.users.confirmDelete(name), yes: t.users.yesDelete },
+    })[a.what]
+  const answer = (a: Asking) => {
+    const path = { params: { path: { id: a.id } } }
+    switch (a.what) {
+      case 'deactivate':
+        change.mutate({ ...path, body: { active: false } })
+        break
+      case 'admin':
+      case 'user':
+        change.mutate({ ...path, body: { role: a.what } })
+        break
+      case 'delete':
+        remove.mutate(path)
+        break
+    }
   }
 
   let body
@@ -84,21 +150,29 @@ export function Accounts({ me }: { me: string }) {
                   {yours && <Badge>{t.users.you}</Badge>}
                 </p>
               </div>
-              {!yours && asking !== u.id && (
+              {!yours && asking?.id !== u.id && (
                 <div className="flex flex-wrap gap-2">
                   <Button
+                    ref={opener(slot({ id: u.id, what: 'deactivate' }))}
                     variant="outline"
                     size="sm"
                     aria-label={t.users.of(active ? t.users.deactivate : t.users.activate, u.name)}
                     disabled={change.isPending}
+                    // Focused again as a change asked of it ends.
+                    focusableWhenDisabled
                     onClick={() => {
-                      reset()
-                      change.mutate({ params: { path: { id: u.id } }, body: { active: !active } })
+                      if (active) {
+                        ask({ id: u.id, what: 'deactivate' })
+                      } else {
+                        reset()
+                        change.mutate({ params: { path: { id: u.id } }, body: { active: true } })
+                      }
                     }}
                   >
                     {active ? t.users.deactivate : t.users.activate}
                   </Button>
                   <Button
+                    ref={opener(slot({ id: u.id, what: 'admin' }))}
                     variant="outline"
                     size="sm"
                     aria-label={t.users.of(
@@ -106,50 +180,38 @@ export function Accounts({ me }: { me: string }) {
                       u.name,
                     )}
                     disabled={change.isPending}
+                    // Focused again as a change asked of it ends.
+                    focusableWhenDisabled
                     onClick={() => {
-                      reset()
-                      change.mutate({
-                        params: { path: { id: u.id } },
-                        body: { role: u.role === 'admin' ? 'user' : 'admin' },
-                      })
+                      ask({ id: u.id, what: u.role === 'admin' ? 'user' : 'admin' })
                     }}
                   >
                     {u.role === 'admin' ? t.users.makeUser : t.users.makeAdmin}
                   </Button>
                   <Button
-                    ref={(el) => {
-                      if (el) {
-                        openers.current.set(u.id, el)
-                      }
-                      return () => {
-                        openers.current.delete(u.id)
-                      }
-                    }}
+                    ref={opener(slot({ id: u.id, what: 'delete' }))}
                     variant="destructive"
                     size="sm"
                     aria-label={t.users.of(t.users.delete, u.name)}
                     onClick={() => {
-                      reset()
-                      setAsking(u.id)
+                      ask({ id: u.id, what: 'delete' })
                     }}
                   >
                     {t.users.delete}
                   </Button>
                 </div>
               )}
-              {asking === u.id && (
+              {asking?.id === u.id && (
                 <Ask
-                  question={t.users.confirmDelete(u.name)}
-                  yes={t.users.yesDelete}
-                  pending={remove.isPending}
+                  key={asking.what}
+                  question={question(asking, u.name).q}
+                  yes={question(asking, u.name).yes}
+                  pending={change.isPending || remove.isPending}
                   onYes={() => {
-                    remove.mutate({ params: { path: { id: u.id } } })
+                    answer(asking)
                   }}
                   onKeep={() => {
-                    flushSync(() => {
-                      setAsking(undefined)
-                    })
-                    ;(openers.current.get(u.id) ?? heading.current)?.focus()
+                    back(asking)
                   }}
                 />
               )}

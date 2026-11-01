@@ -1282,6 +1282,12 @@ export const en = {
     delete: 'Delete',
     // The buttons' names, with whose account each changes.
     of: (action: string, name: string) => `${action}: ${name}`,
+    confirmDeactivate: (name: string) =>
+      `Deactivate ${name}? They cannot sign in, their sessions end and their invites go. Their data stay.`,
+    confirmMakeAdmin: (name: string) =>
+      `Make ${name} an admin? They will manage this server and all its users.`,
+    confirmMakeUser: (name: string) =>
+      `Make ${name} a user? They stop managing this server, and their invites go.`,
     confirmDelete: (name: string) =>
       `Delete ${name} and all their data for good? It cannot be undone.`,
     yesDelete: 'Delete for good',
