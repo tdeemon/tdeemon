@@ -50,8 +50,10 @@ func (s *sessions) deleteAccount(ctx context.Context, in *deleteAccountInput) (*
 	if user.NormalizeEmail(in.Body.Email) != p.User.Email {
 		return nil, huma.Error422UnprocessableEntity("the email address is not this account's")
 	}
-	if err := s.deleteUser(ctx, p, p.User.ID); err != nil {
-		return nil, err
+	// An account another delete took since the session was checked is
+	// gone as asked: no 404.
+	if err := s.deleteUser(ctx, p, p.User.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
+		return nil, deleteError(err)
 	}
 	return &deleteAccountOutput{SetCookie: s.clearedCookie(), CacheControl: "no-store"}, nil
 }
@@ -68,7 +70,7 @@ func (s *sessions) adminDeleteUser(ctx context.Context, in *userIDInput) (*struc
 		return nil, huma.Error422UnprocessableEntity("the id is not a UUID")
 	}
 	if err := s.deleteUser(ctx, p, id); err != nil {
-		return nil, err
+		return nil, deleteError(err)
 	}
 	return &struct{}{}, nil
 }
@@ -76,17 +78,22 @@ func (s *sessions) adminDeleteUser(ctx context.Context, in *userIDInput) (*struc
 // deleteUser deletes the user with id for p, and says so in the log by
 // their ids alone.
 func (s *sessions) deleteUser(ctx context.Context, p auth.Principal, id uuid.UUID) error {
-	_, err := s.db.DeleteUser(ctx, id)
+	if _, err := s.db.DeleteUser(ctx, id); err != nil {
+		return err
+	}
+	s.logger.InfoContext(ctx, "deleted an account", "user_id", id.String(), "by", p.User.ID.String())
+	return nil
+}
+
+// deleteError is the answer to a delete of a user that failed with err.
+func deleteError(err error) error {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return huma.Error404NotFound("no such user")
 	case errors.Is(err, store.ErrLastAdmin):
 		return huma.Error409Conflict("this is the instance's only admin: make another user an admin first")
-	case err != nil:
-		return internalError("deleting the account failed", err)
 	}
-	s.logger.InfoContext(ctx, "deleted an account", "user_id", id.String(), "by", p.User.ID.String())
-	return nil
+	return internalError("deleting the account failed", err)
 }
 
 func (s *sessions) registerAccounts(a huma.API) {
