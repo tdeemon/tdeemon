@@ -50,9 +50,13 @@ func scanInvite(scan func(dest ...any) error) (Invite, error) {
 	return inv, nil
 }
 
+// ErrInvitedByAnother reports an address another admin's invite is for.
+var ErrInvitedByAnother = errors.New("another admin invited this address")
+
 // CreateInvite stores inv under tokenHash (auth.SessionID of the link's
-// token), replacing an invite of the same address, or returns
-// ErrEmailTaken when a user has the address already.
+// token), replacing an invite of the same address by the same admin, or
+// returns ErrEmailTaken when a user has the address already, and
+// ErrInvitedByAnother when another admin's invite is for it.
 func (db *DB) CreateInvite(ctx context.Context, inv Invite, tokenHash string) error {
 	if inv.Role != user.RoleAdmin && inv.Role != user.RoleUser {
 		return fmt.Errorf("create invite: role %q: want %s or %s", inv.Role, user.RoleAdmin, user.RoleUser)
@@ -65,10 +69,19 @@ func (db *DB) CreateInvite(ctx context.Context, inv Invite, tokenHash string) er
 		if taken {
 			return ErrEmailTaken
 		}
+		var by string
+		err := tx.QueryRowContext(ctx, "SELECT user_id FROM invites WHERE email = ?", inv.Email).Scan(&by)
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+		case err != nil:
+			return fmt.Errorf("create invite: %w", err)
+		case by != inv.By.String():
+			return ErrInvitedByAnother
+		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM invites WHERE email = ?", inv.Email); err != nil {
 			return fmt.Errorf("create invite: %w", err)
 		}
-		_, err := tx.ExecContext(ctx, "INSERT INTO invites (id, token_hash, user_id, email, role, created_at, expires_at) "+
+		_, err = tx.ExecContext(ctx, "INSERT INTO invites (id, token_hash, user_id, email, role, created_at, expires_at) "+
 			"VALUES (?, ?, ?, ?, ?, ?, ?)", inv.ID.String(), tokenHash, inv.By.String(), inv.Email, string(inv.Role),
 			formatTime(inv.CreatedAt), formatTime(inv.ExpiresAt))
 		if err != nil {

@@ -208,8 +208,9 @@ kubectl exec deploy/tdeemon -- /tdeemon user create --admin --email you@example.
   as a user or an admin) and sends them the link it answers, once: it
   makes one account for the address in the next 7 days, with the name,
   password, time zone and language they give, and signs it in. A new
-  invite of an address replaces the one before, and the admin revokes
-  one (`DELETE /api/v1/invites/{id}`). The link's token is after its
+  invite of an address replaces the admin's own before (another admin's
+  is refused), and the admin revokes one (`DELETE
+  /api/v1/invites/{id}`). The link's token is after its
   `#`, so it reaches no server's log.
 - The admin lists the users (`GET /api/v1/users`) and changes one
   (`PATCH /api/v1/users/{id}`): `{"active": false}` deactivates them

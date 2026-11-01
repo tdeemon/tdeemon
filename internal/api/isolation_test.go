@@ -967,9 +967,12 @@ func asAdmin(t *testing.T, e isolationEnv, method, path, body string, wantAdmin 
 }
 
 // isolateCreateInvite is create-invite's case: the admin invites a new
-// address; a user invites nobody.
+// address, but not one the owner invited, whose invite stays; a user
+// invites nobody.
 func isolateCreateInvite(t *testing.T, e isolationEnv) {
 	t.Helper()
+	asAdmin(t, e, http.MethodPost, "/api/v1/invites", `{"email": "`+strings.ToLower(e.owner.user.Name)+`.friend@example.com"}`,
+		http.StatusConflict)
 	asAdmin(t, e, http.MethodPost, "/api/v1/invites", `{"email": "zoe@example.com"}`, http.StatusCreated)
 }
 

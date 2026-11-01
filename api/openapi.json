@@ -8361,7 +8361,7 @@
         ]
       },
       "post": {
-        "description": "Needs the admin's web session. Answers the link to send them, once: it makes one account for the address, with the role, in the next 7 days. A new invite of an address replaces the one before; an address a user has already is refused (409).",
+        "description": "Needs the admin's web session. Answers the link to send them, once: it makes one account for the address, with the role, in the next 7 days. A new invite of an address replaces yours before; an address a user has already, or another admin invited, is refused (409).",
         "operationId": "create-invite",
         "requestBody": {
           "content": {

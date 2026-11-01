@@ -69,6 +69,8 @@ func (s *sessions) createInvite(ctx context.Context, in *createInviteInput) (*cr
 	token, hash := auth.NewSessionToken()
 	if err := s.db.CreateInvite(ctx, inv, hash); errors.Is(err, store.ErrEmailTaken) {
 		return nil, huma.Error409Conflict("a user has this address already")
+	} else if errors.Is(err, store.ErrInvitedByAnother) {
+		return nil, huma.Error409Conflict("another admin invited this address; they can revoke their invite")
 	} else if err != nil {
 		return nil, internalError("making the invite failed", err)
 	}
@@ -224,8 +226,8 @@ func (s *sessions) registerInvites(a huma.API) {
 		Path:        Prefix + "/invites",
 		Summary:     "Invite a new user",
 		Description: "Needs the admin's web session. Answers the link to send them, once: it makes one account for the " +
-			"address, with the role, in the next 7 days. A new invite of an address replaces the one before; an address " +
-			"a user has already is refused (409).",
+			"address, with the role, in the next 7 days. A new invite of an address replaces yours before; an address " +
+			"a user has already, or another admin invited, is refused (409).",
 		Tags:          []string{"users"},
 		DefaultStatus: http.StatusCreated,
 		Errors:        append(admin, http.StatusConflict, http.StatusUnprocessableEntity),
