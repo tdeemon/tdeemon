@@ -252,6 +252,9 @@ func saveFoodInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Act
 	if err != nil {
 		return food.Food{}, uuid.Nil(), err
 	}
+	if err := syncCatalog(ctx, tx, userID, stored, now); err != nil {
+		return food.Food{}, uuid.Nil(), err
+	}
 	id, err := record(ctx, tx, userID, a, event.FoodSave, f.ID.String(), before, stored, now)
 	return stored, id, err
 }
@@ -782,8 +785,14 @@ func takeBackFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Eve
 		if used {
 			return setArchived(ctx, tx, userID, id, true, now)
 		}
-		_, err = tx.ExecContext(ctx, "DELETE FROM foods WHERE user_id = ? AND id = ?", userID.String(), id.String())
-		return err
+		row, err := foodCatalogID(ctx, tx, userID, id)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "DELETE FROM foods WHERE user_id = ? AND id = ?", userID.String(), id.String()); err != nil {
+			return err
+		}
+		return dropCatalogOrphan(ctx, tx, row)
 	}
 	var f food.Food
 	if err := decode(e.Before, &f); err != nil {
@@ -795,7 +804,11 @@ func takeBackFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Eve
 	if err := updateFood(ctx, tx, userID, f, food.Key(f.Name), food.Key(f.Brand), now); err != nil {
 		return err
 	}
-	return replaceFoodChildren(ctx, tx, userID, f)
+	if err := replaceFoodChildren(ctx, tx, userID, f); err != nil {
+		return err
+	}
+	// The food as it was is its latest save now.
+	return syncCatalog(ctx, tx, userID, f, now)
 }
 
 // checkFoodClash refuses to put food f back when another food has taken

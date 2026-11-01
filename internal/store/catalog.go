@@ -1,0 +1,277 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"time"
+	"uuid"
+
+	"github.com/zarnautovic/tdeemon/internal/domain/food"
+)
+
+// The catalog is the instance's foods, no user's: every user's declared
+// foods (a label's, Open Food Facts', a food table's) come to one row a
+// product, which every user's search finds. A row is kept in step with
+// the latest save of a user's food that names it (foods.catalog_id): the
+// last values win. A user's notes and aliases stay theirs, and a user's
+// deletion leaves the catalog.
+
+// catalogued reports whether f's values go into the catalog: a food in
+// use, of declared values.
+func catalogued(f food.Food) bool {
+	if f.Archived {
+		return false
+	}
+	switch f.Source {
+	case food.Label, food.Reference, food.OpenFoodFacts:
+		return true
+	case food.Estimate, food.User, food.Dish, food.Recipe:
+	}
+	return false
+}
+
+// syncCatalog puts userID's food f, as saved, into the catalog, unless
+// it is not catalogued, and links f to its row. The row is the
+// product of f's name and brand; else the row f names already, renamed
+// to f's; else the row of one of f's barcodes; else a new one. Its values
+// and servings become f's, and f's barcodes become its, taken from any
+// other row that had them.
+func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, now time.Time) error {
+	if !catalogued(f) {
+		return nil
+	}
+	nameKey, brandKey := food.Key(f.Name), food.Key(f.Brand)
+	target, err := catalogTarget(ctx, tx, userID, f, nameKey, brandKey)
+	if err != nil {
+		return err
+	}
+	if err := writeCatalogFood(ctx, tx, target, f, nameKey, brandKey, now); err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, "UPDATE foods SET catalog_id = ? WHERE user_id = ? AND id = ?",
+		target.id, userID.String(), f.ID.String())
+	return err
+}
+
+// catalogRow is the catalog's row a food goes into: its id, and whether
+// it is there yet.
+type catalogRow struct {
+	id     string
+	exists bool
+}
+
+// catalogTarget finds the row userID's food f goes into, as syncCatalog
+// says, or makes a new id for it.
+func catalogTarget(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, nameKey, brandKey string) (catalogRow, error) {
+	var id string
+	err := tx.QueryRowContext(ctx, "SELECT id FROM catalog_foods WHERE name_key = ? AND brand_key = ?", nameKey, brandKey).Scan(&id)
+	if err == nil {
+		return catalogRow{id, true}, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return catalogRow{}, err
+	}
+	err = tx.QueryRowContext(ctx, "SELECT c.id FROM foods AS f JOIN catalog_foods AS c ON c.id = f.catalog_id WHERE f.user_id = ? AND f.id = ?",
+		userID.String(), f.ID.String()).Scan(&id)
+	if err == nil {
+		return catalogRow{id, true}, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return catalogRow{}, err
+	}
+	for _, code := range f.Barcodes {
+		err := tx.QueryRowContext(ctx, "SELECT catalog_id FROM catalog_barcodes WHERE code = ?", code).Scan(&id)
+		if err == nil {
+			return catalogRow{id, true}, nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return catalogRow{}, err
+		}
+	}
+	return catalogRow{uuid.NewV7().String(), false}, nil
+}
+
+// writeCatalogFood writes f's name, values, servings and barcodes into
+// row, and its words into the search.
+func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Food, nameKey, brandKey string, now time.Time) error {
+	o := optionalNutrients(&f.Nutrients)
+	var portion any
+	if f.PortionGrams > 0 {
+		portion = f.PortionGrams
+	}
+	values := []any{
+		f.Name, f.Brand, nameKey, brandKey, string(f.Basis), f.Nutrients.Kcal, f.Nutrients.Protein, f.Nutrients.Carbs,
+		f.Nutrients.Fat, nullable(*o[0]), nullable(*o[1]), nullable(*o[2]), nullable(*o[3]), nullable(*o[4]),
+		nullable(*o[5]), portion, string(f.Source), formatTime(now),
+	}
+	var err error
+	if row.exists {
+		_, err = tx.ExecContext(ctx, `UPDATE catalog_foods SET name = ?, brand = ?, name_key = ?, brand_key = ?, basis = ?,
+			kcal = ?, protein = ?, carbs = ?, fat = ?, fiber = ?, saturated_fat = ?, sugars = ?, salt = ?, polyols = ?,
+			alcohol = ?, portion_g = ?, source = ?, updated_at = ? WHERE id = ?`, append(values, row.id)...)
+	} else {
+		_, err = tx.ExecContext(ctx, `INSERT INTO catalog_foods (name, brand, name_key, brand_key, basis, kcal, protein,
+			carbs, fat, fiber, saturated_fat, sugars, salt, polyols, alcohol, portion_g, source, updated_at, id, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append(values, row.id, formatTime(now))...)
+	}
+	if err != nil {
+		return err
+	}
+	for _, q := range []string{"DELETE FROM catalog_servings WHERE catalog_id = ?", "DELETE FROM catalog_fts WHERE catalog_id = ?"} {
+		if _, err := tx.ExecContext(ctx, q, row.id); err != nil {
+			return err
+		}
+	}
+	for _, s := range f.Servings {
+		if _, err := tx.ExecContext(ctx, "INSERT INTO catalog_servings (catalog_id, name, name_key, amount) VALUES (?, ?, ?, ?)",
+			row.id, s.Name, food.Key(s.Name), s.Amount); err != nil {
+			return err
+		}
+	}
+	for _, code := range f.Barcodes {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO catalog_barcodes (code, catalog_id) VALUES (?, ?)
+			ON CONFLICT (code) DO UPDATE SET catalog_id = excluded.catalog_id`, code, row.id); err != nil {
+			return err
+		}
+	}
+	_, err = tx.ExecContext(ctx, "INSERT INTO catalog_fts (catalog_id, name, brand) VALUES (?, ?, ?)",
+		row.id, searchText(f.Name), searchText(f.Brand))
+	return err
+}
+
+// dropCatalogOrphan deletes the catalog's row id when no food names it
+// any more: a food undone before anyone else had it takes its row along.
+func dropCatalogOrphan(ctx context.Context, tx *sql.Tx, id sql.NullString) error {
+	if !id.Valid {
+		return nil
+	}
+	_, err := tx.ExecContext(ctx, "DELETE FROM catalog_foods WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM foods WHERE catalog_id = ?1)",
+		id.String)
+	return err
+}
+
+// foodCatalogID returns the catalog's row userID's food id names, if any.
+func foodCatalogID(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID) (sql.NullString, error) {
+	var c sql.NullString
+	err := tx.QueryRowContext(ctx, "SELECT catalog_id FROM foods WHERE user_id = ? AND id = ?", userID.String(), id.String()).Scan(&c)
+	if errors.Is(err, sql.ErrNoRows) {
+		return sql.NullString{}, nil
+	}
+	return c, err
+}
+
+// catalogColumns are a catalog row's, in the shape of foodColumns: no
+// note, never archived.
+const catalogColumns = `c.id, c.name, c.brand, c.basis, c.kcal, c.protein, c.carbs, c.fat,
+	c.fiber, c.saturated_fat, c.sugars, c.salt, c.polyols, c.alcohol, c.portion_g, c.source, '', 0`
+
+// FindCatalog returns up to limit of the catalog's foods that match
+// query as FindFoods matches, but the ones userID has already: a food of
+// theirs, archived too, that names the row, or has its name and brand,
+// or one of its barcodes. Their IDs are the catalog's, no user's food's.
+// The order is FindFoods': the name's matches first, then the shorter
+// name.
+func (db *DB) FindCatalog(ctx context.Context, userID uuid.UUID, query string, limit int) ([]food.Food, error) {
+	match := ftsQuery(query)
+	if match == "" || limit <= 0 {
+		return nil, nil
+	}
+	limit = min(limit, MaxFoodResults)
+	var out []food.Food
+	err := db.readTx(ctx, func(tx *sql.Tx) error {
+		var err error
+		out, err = queryFoods(ctx, tx, `
+			SELECT `+catalogColumns+` FROM catalog_foods AS c
+			WHERE c.id IN (SELECT catalog_id FROM catalog_fts WHERE catalog_fts MATCH ?2)
+				AND NOT EXISTS (SELECT 1 FROM foods AS f WHERE f.user_id = ?1
+					AND (f.catalog_id = c.id OR (f.name_key = c.name_key AND f.brand_key = c.brand_key)))
+				AND NOT EXISTS (SELECT 1 FROM catalog_barcodes AS b
+					JOIN food_barcodes AS fb ON fb.code = b.code AND fb.user_id = ?1
+					WHERE b.catalog_id = c.id)
+			ORDER BY CASE WHEN c.id IN (SELECT catalog_id FROM catalog_fts WHERE catalog_fts MATCH ?3) THEN 0 ELSE 1 END,
+				length(c.name), c.name, c.brand
+			LIMIT ?4`, userID.String(), match, "{name} : ("+match+")", limit)
+		if err != nil {
+			return err
+		}
+		for i := range out {
+			if err := catalogChildren(ctx, tx, &out[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("find catalog: %w", err)
+	}
+	return out, nil
+}
+
+// CatalogFood returns the catalog's food with id, or ErrNotFound.
+func (db *DB) CatalogFood(ctx context.Context, id uuid.UUID) (food.Food, error) {
+	return db.catalogFood(ctx, "c.id = ?", id.String())
+}
+
+// CatalogFoodByBarcode returns the catalog's food of the barcode code,
+// in its canonical form (food.Barcode), or ErrNotFound.
+func (db *DB) CatalogFoodByBarcode(ctx context.Context, code string) (food.Food, error) {
+	return db.catalogFood(ctx, "c.id = (SELECT catalog_id FROM catalog_barcodes WHERE code = ?)", code)
+}
+
+func (db *DB) catalogFood(ctx context.Context, where, arg string) (food.Food, error) {
+	var f food.Food
+	err := db.readTx(ctx, func(tx *sql.Tx) error {
+		found, err := queryFoods(ctx, tx, "SELECT "+catalogColumns+" FROM catalog_foods AS c WHERE "+where, arg)
+		if err != nil {
+			return err
+		}
+		if len(found) == 0 {
+			return ErrNotFound
+		}
+		f = found[0]
+		return catalogChildren(ctx, tx, &f)
+	})
+	if errors.Is(err, ErrNotFound) {
+		return food.Food{}, err
+	}
+	if err != nil {
+		return food.Food{}, fmt.Errorf("catalog food: %w", err)
+	}
+	return f, nil
+}
+
+// catalogChildren reads the servings and barcodes of the catalog's food
+// f, in the order written.
+func catalogChildren(ctx context.Context, tx *sql.Tx, f *food.Food) error {
+	id := f.ID.String()
+	rows, err := tx.QueryContext(ctx, "SELECT name, amount FROM catalog_servings WHERE catalog_id = ? ORDER BY rowid", id)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var s food.Serving
+		if err := rows.Scan(&s.Name, &s.Amount); err != nil {
+			return err
+		}
+		f.Servings = append(f.Servings, s)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	brows, err := tx.QueryContext(ctx, "SELECT code FROM catalog_barcodes WHERE catalog_id = ? ORDER BY rowid", id)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = brows.Close() }()
+	for brows.Next() {
+		var code string
+		if err := brows.Scan(&code); err != nil {
+			return err
+		}
+		f.Barcodes = append(f.Barcodes, code)
+	}
+	return brows.Err()
+}

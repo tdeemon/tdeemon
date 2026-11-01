@@ -67,7 +67,7 @@ func TestMigrationOfTheReferenceSourceKeepsTheRows(t *testing.T) {
 }
 
 // seedBeforeReference makes, before 0029, a user's foods (an estimate
-// with an alias, a label's, a recipe's), a meal of their items and a
+// with an alias, a user's, a recipe's), a meal of their items and a
 // one-off estimate, and the recipe of an ingredient; it returns the user
 // and the foods' ids by name.
 func seedBeforeReference(t *testing.T, db *DB) (uuid.UUID, map[string]string) {
@@ -86,7 +86,7 @@ func seedBeforeReference(t *testing.T, db *DB) (uuid.UUID, map[string]string) {
 	ids := map[string]string{}
 	foods := []food.Food{
 		{Name: "Jabuka", Source: food.Estimate, Aliases: []string{"apple"}},
-		{Name: "Tuna u vlastitom soku", Brand: "Eva", Source: food.Label},
+		{Name: "Tuna u vlastitom soku", Brand: "Eva", Source: food.User},
 	}
 	for i := range foods {
 		f := &foods[i]

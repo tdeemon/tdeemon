@@ -415,8 +415,11 @@ func saveIsolationPlan(t *testing.T, db *store.DB, u user.User, now time.Time) (
 	return step.ID, waits.ID
 }
 
-// noOnesData are the tables that hold no user's data.
-var noOnesData = []string{"schema_migrations"}
+// noOnesData are the tables that hold no user's data: the migrations,
+// and the catalog, the instance's, which holds what a declared food's
+// save gives every user and nothing else of anyone's (store's
+// TestCatalogTakesDeclaredFoodsAlone).
+var noOnesData = []string{"schema_migrations", "catalog_foods", "catalog_barcodes", "catalog_servings", "catalog_fts"}
 
 // userTables lists users and every table with a user_id column, from the
 // schema itself. A table with neither fails the test: every table of a

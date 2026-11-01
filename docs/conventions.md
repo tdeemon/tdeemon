@@ -489,8 +489,10 @@ in `web/`.
     an API token's secret; by the provider's subject for OpenID Connect;
     by address for the sign-in and the admin's commands; by the
     Telegram chat for the bot's commands), and the only
-    other exception is housekeeping that shows or changes no one's data
-    (removing expired sessions);
+    other exceptions are housekeeping that shows or changes no one's data
+    (removing expired sessions) and the catalog, the instance's foods,
+    no user's, which a declared food's save writes and every user's
+    search reads (docs/DESIGN.md §4);
   - a handler takes the user from the request's principal
     (`auth.PrincipalFrom`), never from the path, the query or the body
     (the sign-in, which finds the user by the address it is given,

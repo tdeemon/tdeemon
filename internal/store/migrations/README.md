@@ -62,6 +62,11 @@ the `schema_migrations` table.
   (`food_servings` next to its `food_id`), with a composite foreign key
   to the parent's `(user_id, id)` so a child row cannot name another
   user's parent.
+- The catalog's tables (`catalog_foods` and its children, and
+  `catalog_fts`) are the instance's, no user's, and have no `user_id`:
+  they hold what a declared food's save gives every user, and nothing
+  else of anyone's (`TestCatalogTakesDeclaredFoodsAlone`). The
+  isolation test lists them as no one's data.
 - A full-text (FTS5) table has a `user_id` column too (`UNINDEXED`); the
   shadow tables SQLite keeps its index in (`<name>_data`, `_idx`,
   `_content`, `_docsize`, `_config`) are read only through it, and

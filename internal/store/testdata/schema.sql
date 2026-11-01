@@ -39,6 +39,76 @@ CREATE TABLE autopilot_reviews (
 CREATE INDEX autopilot_reviews_proposal ON autopilot_reviews (user_id, proposal_id)
 WHERE proposal_id IS NOT NULL;
 
+CREATE TABLE catalog_barcodes (
+    -- A barcode is one product's.
+    code TEXT PRIMARY KEY CHECK (
+        length(code) IN (8, 13, 14) AND code NOT GLOB '*[^0-9]*'
+    ),
+    catalog_id TEXT NOT NULL REFERENCES catalog_foods (id) ON DELETE CASCADE
+) STRICT;
+
+CREATE INDEX catalog_barcodes_food ON catalog_barcodes (catalog_id);
+
+CREATE TABLE catalog_foods (
+    -- A UUIDv7 the server makes, no user's food's.
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    name TEXT NOT NULL CHECK (name <> ''),
+    brand TEXT NOT NULL DEFAULT '',
+    -- As foods': the same name and brand are one product.
+    name_key TEXT NOT NULL CHECK (name_key <> ''),
+    brand_key TEXT NOT NULL DEFAULT '',
+    basis TEXT NOT NULL CHECK (basis IN ('100g', '100ml', 'portion')),
+    kcal REAL NOT NULL CHECK (kcal >= 0),
+    protein REAL NOT NULL CHECK (protein >= 0),
+    carbs REAL NOT NULL CHECK (carbs >= 0),
+    fat REAL NOT NULL CHECK (fat >= 0),
+    fiber REAL CHECK (fiber >= 0),
+    saturated_fat REAL CHECK (saturated_fat >= 0),
+    sugars REAL CHECK (sugars >= 0),
+    salt REAL CHECK (salt >= 0),
+    polyols REAL CHECK (polyols >= 0),
+    alcohol REAL CHECK (alcohol >= 0),
+    portion_g REAL CHECK (portion_g IS NULL OR (basis = 'portion' AND portion_g > 0)),
+    -- Only declared values: never an estimate, a user's word or a dish.
+    source TEXT NOT NULL CHECK (source IN ('label', 'reference', 'off')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+) STRICT;
+
+CREATE UNIQUE INDEX catalog_foods_name_brand ON catalog_foods (
+    name_key, brand_key
+);
+
+CREATE TRIGGER catalog_fts_delete AFTER DELETE ON catalog_foods
+BEGIN
+    DELETE FROM catalog_fts WHERE catalog_id = old.id;
+END;
+
+CREATE VIRTUAL TABLE catalog_fts USING fts5 (
+    catalog_id UNINDEXED,
+    name,
+    brand,
+    tokenize = 'unicode61 remove_diacritics 2'
+);
+
+CREATE TABLE 'catalog_fts_config'(k PRIMARY KEY, v) WITHOUT ROWID;
+
+CREATE TABLE 'catalog_fts_content'(id INTEGER PRIMARY KEY, c0, c1, c2);
+
+CREATE TABLE 'catalog_fts_data'(id INTEGER PRIMARY KEY, block BLOB);
+
+CREATE TABLE 'catalog_fts_docsize'(id INTEGER PRIMARY KEY, sz BLOB);
+
+CREATE TABLE 'catalog_fts_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID;
+
+CREATE TABLE catalog_servings (
+    catalog_id TEXT NOT NULL REFERENCES catalog_foods (id) ON DELETE CASCADE,
+    name TEXT NOT NULL CHECK (name <> ''),
+    name_key TEXT NOT NULL CHECK (name_key <> ''),
+    amount REAL NOT NULL CHECK (amount > 0),
+    PRIMARY KEY (catalog_id, name_key)
+) STRICT;
+
 CREATE TABLE days (
     user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     day TEXT NOT NULL CHECK (day GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
@@ -168,11 +238,16 @@ CREATE TABLE "foods" (
     note TEXT NOT NULL DEFAULT '',
     archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL, catalog_id TEXT REFERENCES catalog_foods (
+    id
+) ON DELETE SET NULL,
     -- The child tables' foreign keys name the user as well, so a child
     -- row can never belong to another user's food.
     PRIMARY KEY (user_id, id)
 ) STRICT;
+
+CREATE INDEX foods_catalog ON foods (catalog_id)
+WHERE catalog_id IS NOT NULL;
 
 CREATE UNIQUE INDEX foods_user_name_brand ON foods (user_id, name_key, brand_key);
 
