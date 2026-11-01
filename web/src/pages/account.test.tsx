@@ -108,3 +108,17 @@ test('an address of letters a browser would refuse, such as č, deletes the acco
   expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeDefined()
   expect(sent).toEqual([{ email: 'čaba@primjer.hr' }])
 })
+
+test('an address typed in decomposed letters is the same address', async () => {
+  const sent = server(undefined, 'čaba@primjer.hr')
+  renderAt('/settings/account')
+
+  fireEvent.click(await (await yourData()).findByRole('button', { name: 'Delete your account' }))
+  const sheet = within(await screen.findByRole('dialog'))
+  const decomposed = 'C\u030Caba@primjer.hr '
+  fireEvent.change(sheet.getByLabelText('Your email address'), { target: { value: decomposed } })
+  fireEvent.click(sheet.getByRole('button', { name: 'Delete my account' }))
+
+  expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeDefined()
+  expect(sent).toEqual([{ email: decomposed.trim() }])
+})

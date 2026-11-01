@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate } from '@tanstack/react-router'
-import { useId, useState, type SubmitEvent } from 'react'
+import { useEffect, useId, useState, type SubmitEvent } from 'react'
 
 import { $api } from '@/api/client'
 import { HttpError, NoAnswerError, statusOf } from '@/api/errors'
@@ -89,6 +89,20 @@ export function InvitePage() {
       window.location.assign(answer.url)
     },
   })
+  // Back from the provider's page through the browser's cache, the page
+  // is as it was left: the provider's way is offered again.
+  const resetSso = sso.reset
+  useEffect(() => {
+    const shown = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        resetSso()
+      }
+    }
+    window.addEventListener('pageshow', shown)
+    return () => {
+      window.removeEventListener('pageshow', shown)
+    }
+  }, [resetSso])
 
   // One way to make the account at a time: while either is on its way,
   // and once one made it, neither is offered.

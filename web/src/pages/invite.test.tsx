@@ -260,3 +260,32 @@ test('while one way to make the account is on its way, neither is offered', asyn
   fireEvent.click(provider)
   expect(calls).toEqual({ accept: 1, sso: 1 })
 })
+
+test("back from the provider's page through the browser's cache, both ways are offered again", async () => {
+  const assign = vi.fn<(url: string) => void>()
+  const { href, origin, pathname } = window.location
+  vi.stubGlobal('location', { href, origin, pathname, hash: '', search: '', assign })
+  server({
+    'GET /api/v1/auth/methods': () =>
+      Response.json({ password: true, oidc: { name: 'Authentik', login_url: '/x' } }),
+    'POST /api/v1/invites/sso': () => Response.json({ url: 'https://id.example.com/authorize' }),
+  })
+  renderAt(`/invite#${token}`)
+
+  const provider = await screen.findByRole('button', { name: 'Continue with Authentik' })
+  fireEvent.click(provider)
+  await waitFor(() => {
+    expect(assign).toHaveBeenCalledTimes(1)
+  })
+  const submit = screen.getByRole('button', { name: 'Make the account' })
+  expect(provider.hasAttribute('disabled')).toBe(true)
+
+  // A page shown anew is not one back from the cache.
+  window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false }))
+  expect(provider.hasAttribute('disabled')).toBe(true)
+  window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+  await waitFor(() => {
+    expect(provider.hasAttribute('disabled')).toBe(false)
+  })
+  expect(submit.hasAttribute('disabled')).toBe(false)
+})

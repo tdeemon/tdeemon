@@ -13,6 +13,12 @@ import { problem } from '@/i18n/problem'
 import { fieldLabel, inputClass } from '@/lib/styles'
 import { cn } from '@/lib/utils'
 
+// normalized is an address as the server compares it
+// (user.NormalizeEmail): trimmed, in lower case, in NFC.
+function normalized(email: string): string {
+  return email.trim().toLowerCase().normalize('NFC')
+}
+
 // why says why the account was not deleted.
 function why(t: Messages, error: unknown): string {
   const status = statusOf(error)
@@ -44,7 +50,7 @@ export function YourData({ email }: { email: string }) {
       await navigate({ to: '/login', replace: true })
     },
   })
-  const same = typed.trim().toLowerCase() === email.toLowerCase()
+  const same = normalized(typed) === normalized(email)
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
