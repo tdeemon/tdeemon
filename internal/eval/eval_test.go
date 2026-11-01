@@ -84,9 +84,15 @@ type expect struct {
 	// NoNewFoods says the case makes none.
 	NewFoods   []string `json:"new_foods,omitempty"`
 	NoNewFoods bool     `json:"no_new_foods,omitempty"`
-	Weight     float64  `json:"weight,omitempty"`
-	Mood       []int    `json:"mood,omitempty"`
-	Hunger     []int    `json:"hunger,omitempty"`
+	// NewSource is the source each food made in the case has: reference
+	// for a plain food, of a food table's values.
+	NewSource food.Source `json:"new_source,omitempty"`
+	// Estimates are today's items of the source estimate: 0 for plain
+	// foods, which a food table knows, 1 for a plate.
+	Estimates *int    `json:"estimates,omitempty"`
+	Weight    float64 `json:"weight,omitempty"`
+	Mood      []int   `json:"mood,omitempty"`
+	Hunger    []int   `json:"hunger,omitempty"`
 	// Answer are words the last answer holds: what it must have read.
 	Answer []string `json:"answer,omitempty"`
 	// Notes are words the notes for a coach hold after the case, in any
@@ -683,7 +689,27 @@ func check(t *testing.T, in instance, e expect, foodsBefore []string, turns []tu
 	}
 	checkCalls(t, in, e, turns)
 	checkFoods(t, in, e, foodsBefore)
+	checkSources(t, in, e, foodsBefore, today)
 	checkDay(t, in, e, today)
+}
+
+// checkSources holds the sources of the foods made in the case, and of
+// today's items, to e.
+func checkSources(t *testing.T, in instance, e expect, foodsBefore []string, today day.Date) {
+	t.Helper()
+	if e.NewSource != "" {
+		if n := count(t, in, `SELECT count(*) FROM foods WHERE user_id = ? AND source <> ?
+			AND name NOT IN (SELECT value FROM json_each(?))`, string(e.NewSource), jsonList(foodsBefore)); n > 0 {
+			t.Errorf("%d of the new foods are of another source than %s", n, e.NewSource)
+		}
+	}
+	if e.Estimates == nil {
+		return
+	}
+	if n := count(t, in, `SELECT count(*) FROM meal_items AS i JOIN meals AS m ON m.user_id = i.user_id AND m.id = i.meal_id
+		WHERE i.user_id = ? AND m.day = ? AND i.source = 'estimate'`, today.String()); n != *e.Estimates {
+		t.Errorf("%d of today's items are estimates, want %d", n, *e.Estimates)
+	}
 }
 
 // checkCalls holds the client's changes and the tools it called to e.
@@ -808,6 +834,15 @@ func checkDay(t *testing.T, in instance, e expect, today day.Date) {
 // within says whether v is in the range r of two, or r is not set.
 func within(v int, r []int) bool {
 	return len(r) != 2 || (v >= r[0] && v <= r[1])
+}
+
+// jsonList is a list as a JSON array, for json_each.
+func jsonList(list []string) string {
+	b, err := json.Marshal(list)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
 }
 
 func foodNames(t *testing.T, in instance) []string {

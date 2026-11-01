@@ -1672,7 +1672,7 @@ export interface components {
              * @description Where the values come from; dish is an earlier client's, for no new food; recipe a recipe's, which changes only with it.
              * @enum {string}
              */
-            source: "label" | "estimate" | "user" | "dish" | "off" | "recipe";
+            source: "label" | "estimate" | "reference" | "user" | "dish" | "off" | "recipe";
         };
         FoodFields: {
             /** @description Other names search finds. */
@@ -1701,7 +1701,7 @@ export interface components {
              * @description Where the values come from; dish is an earlier client's, for no new food; recipe a recipe's, which changes only with it.
              * @enum {string}
              */
-            source: "label" | "estimate" | "user" | "dish" | "off" | "recipe";
+            source: "label" | "estimate" | "reference" | "user" | "dish" | "off" | "recipe";
         };
         FoodListOutputBody: {
             foods: components["schemas"]["FoodBody"][];
@@ -1886,7 +1886,7 @@ export interface components {
             /** @description How much, as it was given. */
             quantity: components["schemas"]["QuantityBody"];
             /** @enum {string} */
-            source: "label" | "estimate" | "user" | "dish" | "off" | "recipe";
+            source: "label" | "estimate" | "reference" | "user" | "dish" | "off" | "recipe";
             /** @enum {string} */
             unit: "g" | "ml" | "portion";
         };
@@ -1954,7 +1954,7 @@ export interface components {
             /** @description How much, as it was given. */
             quantity: components["schemas"]["QuantityBody"];
             /** @enum {string} */
-            source: "label" | "estimate" | "user" | "dish" | "off" | "recipe";
+            source: "label" | "estimate" | "reference" | "user" | "dish" | "off" | "recipe";
             /** @enum {string} */
             unit: "g" | "ml" | "portion";
         };
@@ -3331,7 +3331,7 @@ export interface components {
              * @description Where the values come from; dish is an earlier client's, for no new food; recipe a recipe's, which changes only with it.
              * @enum {string}
              */
-            source: "label" | "estimate" | "user" | "dish" | "off" | "recipe";
+            source: "label" | "estimate" | "reference" | "user" | "dish" | "off" | "recipe";
         };
         UpsertRecipeInputBody: {
             /** @description Other names search finds. */
@@ -5062,7 +5062,7 @@ export interface operations {
                 /** @description The archived foods instead of the others. */
                 archived?: boolean;
                 /** @description The foods whose values come from it alone, such as the estimates to check or the recipes. */
-                source?: "label" | "estimate" | "user" | "dish" | "off" | "recipe";
+                source?: "label" | "estimate" | "reference" | "user" | "dish" | "off" | "recipe";
                 /** @description name: by name, then brand; use: the food a meal had last first, and those no meal had after the others, by name; frequent: the food the most of your latest 100 meals had first, then as use. */
                 order?: "name" | "use" | "frequent";
                 /** @description The most foods of the page. */

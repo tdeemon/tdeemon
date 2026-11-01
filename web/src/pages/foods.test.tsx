@@ -107,8 +107,12 @@ test('the foods in use are listed by name, a page at a time', async () => {
 
 test('by how many meals had them, the foods eaten this week come first', async () => {
   const yoghurt = food(2, { name: 'Greek yoghurt', last_use: lastUse(today), source: 'estimate' })
-  // A week ago to the day: earlier.
-  const rice = food(3, { name: 'Basmati rice', last_use: lastUse('2026-10-16') })
+  // A week ago to the day: earlier; of a food table's values, no estimate.
+  const rice = food(3, {
+    name: 'Basmati rice',
+    last_use: lastUse('2026-10-16'),
+    source: 'reference',
+  })
   const never = food(4, { name: 'Chia seeds' })
   const fetch = fakeServer({
     ...signedIn(),

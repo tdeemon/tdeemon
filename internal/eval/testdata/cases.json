@@ -57,6 +57,31 @@
       ],
       "not_tools": [
         "get_day"
+      ],
+      "new_source": "reference",
+      "estimates": 0
+    }
+  },
+  {
+    "name": "plain foods by count",
+    "lang": "en",
+    "say": [
+      "I had an apple and 2 boiled eggs."
+    ],
+    "expect": {
+      "meals": 1,
+      "items": 2,
+      "kcal": [
+        200,
+        300
+      ],
+      "new_foods": [
+        "apple"
+      ],
+      "new_source": "reference",
+      "estimates": 0,
+      "not_tools": [
+        "get_day"
       ]
     }
   },
@@ -76,7 +101,8 @@
       "no_new_foods": true,
       "not_tools": [
         "get_day"
-      ]
+      ],
+      "estimates": 1
     }
   },
   {
@@ -366,6 +392,31 @@
       ],
       "not_tools": [
         "get_day"
+      ],
+      "new_source": "reference",
+      "estimates": 0
+    }
+  },
+  {
+    "name": "obične namirnice brojem komada",
+    "lang": "hr",
+    "say": [
+      "Pojeo sam jabuku i 2 kuhana jaja."
+    ],
+    "expect": {
+      "meals": 1,
+      "items": 2,
+      "kcal": [
+        200,
+        300
+      ],
+      "new_foods": [
+        "jabuk"
+      ],
+      "new_source": "reference",
+      "estimates": 0,
+      "not_tools": [
+        "get_day"
       ]
     }
   },
@@ -385,7 +436,8 @@
       "no_new_foods": true,
       "not_tools": [
         "get_day"
-      ]
+      ],
+      "estimates": 1
     }
   },
   {

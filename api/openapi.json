@@ -1167,6 +1167,7 @@
             "enum": [
               "label",
               "estimate",
+              "reference",
               "user",
               "dish",
               "off",
@@ -1253,6 +1254,7 @@
             "enum": [
               "label",
               "estimate",
+              "reference",
               "user",
               "dish",
               "off",
@@ -1717,6 +1719,7 @@
             "enum": [
               "label",
               "estimate",
+              "reference",
               "user",
               "dish",
               "off",
@@ -1869,6 +1872,7 @@
             "enum": [
               "label",
               "estimate",
+              "reference",
               "user",
               "dish",
               "off",
@@ -4845,6 +4849,7 @@
             "enum": [
               "label",
               "estimate",
+              "reference",
               "user",
               "dish",
               "off",
@@ -7296,6 +7301,7 @@
               "enum": [
                 "label",
                 "estimate",
+                "reference",
                 "user",
                 "dish",
                 "off",

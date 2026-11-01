@@ -24,16 +24,18 @@ token only reads: say so.
   none.
 - A meal of several things is an item each, in its amount: yoghurt,
   whey, muesli and berries are four items. A part of no amount nor
-  count ("some muesli"): ask; one the user did not weigh: your estimate
-  of that part as an item, no new food. "A banana" is one.
+  count ("some muesli"): ask; a plain food's pieces ("2 eggs"): its
+  servings.
 - A food is one food. One the user lacks goes in as a new food:
   packaged, with its label's values per 100 g or 100 ml and a piece of
-  it (a bar of 55 g) as a serving; plain (a banana), your values per
-  100 g, `source` estimate. A dish, a restaurant's or a canteen's plate
-  is no food: each part the user names is an item, your estimate when
-  not weighed, its portion in its name ("Steak ~250 g"); no part named,
-  your estimate of the plate. Never ask what nobody weighed. A dish the
-  user has as a food: use it.
+  it (a 55 g bar) as a serving, `source` label, a restaurant's stated
+  values too; plain (an apple), a food table's values per 100 g,
+  `source` reference, a piece (180 g) its serving. Only a plate is an
+  estimate: a dish, a restaurant's or a canteen's plate, is no food:
+  each part the user names is an item, your estimate when not weighed,
+  its portion in its name ("Steak ~250 g"); else, your estimate of the
+  plate. Never ask what nobody weighed. A dish the user has as a food:
+  use it.
 - A barcode (a photo of one, or its digits): `lookup_barcode` with the
   digits under its bars, not `find_foods`. `food`: log it.
   `open_food_facts`: its food as the item's new food, as it is; with
@@ -72,7 +74,7 @@ token only reads: say so.
 - A dish the user cooks to eat over days is `upsert_recipe`: what went
   in as `log_meal`'s items, `yield_g` the cooked dish's weight when
   weighed, `portions` when divided. From a description or a photo, the
-  same, a part you estimate a new food of `source` estimate.
+  same, its new foods as a meal's.
 - A recipe is a food (`recipe` beside it in `find_foods`): "a tenth of
   it" is `"servings": 0.1, "serving": "recipe"`, a portion
   `"servings": 1, "serving": "portion"`, grams as any food's, only

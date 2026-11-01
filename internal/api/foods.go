@@ -81,7 +81,7 @@ type FoodFields struct {
 	// and its 422 says them, as MCP sends a model the schema with each
 	// request, within a budget (TestMCPFitsItsBudget).
 	Barcodes []string `json:"barcodes,omitempty" nullable:"false" doc:"EAN-13, EAN-8 or UPC-A, each of one food."`
-	Source   string   `json:"source" enum:"label,estimate,user,dish,off,recipe" doc:"Where the values come from; dish is an earlier client's, for no new food; recipe a recipe's, which changes only with it."`
+	Source   string   `json:"source" enum:"label,estimate,reference,user,dish,off,recipe" doc:"Where the values come from; dish is an earlier client's, for no new food; recipe a recipe's, which changes only with it."`
 	Note     string   `json:"note,omitempty" maxLength:"2000"`
 }
 
@@ -209,7 +209,7 @@ func newLastUseBody(u store.LastUse) *lastUseBody {
 // values store.FoodOrder's.
 type listFoodsInput struct {
 	Archived bool   `query:"archived" doc:"The archived foods instead of the others."`
-	Source   string `query:"source" enum:"label,estimate,user,dish,off,recipe" doc:"The foods whose values come from it alone, such as the estimates to check or the recipes."`
+	Source   string `query:"source" enum:"label,estimate,reference,user,dish,off,recipe" doc:"The foods whose values come from it alone, such as the estimates to check or the recipes."`
 	Order    string `query:"order" enum:"name,use,frequent" default:"name" doc:"name: by name, then brand; use: the food a meal had last first, and those no meal had after the others, by name; frequent: the food the most of your latest 100 meals had first, then as use."`
 	Limit    int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The most foods of the page."`
 	Offset   int    `query:"offset" default:"0" minimum:"0" maximum:"1000000" doc:"How many foods of the list come before the page."`
