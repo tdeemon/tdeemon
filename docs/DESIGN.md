@@ -1417,7 +1417,7 @@ Done at the cut-over, on 2026-10-29.
 2. **New inputs for what the predecessor took in:** Health Auto Export
    directly (§9), the agent through `/mcp`, and Strong's CSV export
    (§9), whose days of workouts make the training days until P3 reads
-   its sets from the latest export kept.
+   its sets.
 3. **Cut-over:**
    - the agent switches to `/mcp`, and its health skill shrinks to a few
      lines;
