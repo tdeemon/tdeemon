@@ -303,7 +303,8 @@ test("a desktop's day is in two columns, its meals a table with their total, the
     boxOf(page.getByRole('heading', { level: 1 })),
     boxOf(back),
     boxOf(page.getByRole('link', { name: 'The day before' })),
-    boxOf(page.getByRole('region', { name: 'This week' })),
+    // On a Monday the day before is in the week before: That week.
+    boxOf(page.getByRole('region', { name: /^(This|That) week$/ })),
   ])
   expect(date.x).toBeGreaterThan(before.x + before.width)
   expect(date.x - (before.x + before.width)).toBeLessThan(60)
