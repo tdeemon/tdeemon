@@ -95,6 +95,12 @@ type Item struct {
 	// by it, not by FoodID, so a retry is known however the food is
 	// stored, renamed or corrected since.
 	SentFood string
+	// FoodUser is, for a shared recipe's ingredient alone, the user whose
+	// food FoodID is when it is not the recipe's user's: another member
+	// of the share. uuid.Nil otherwise; a meal never sets it, and it is
+	// left out of the JSON then, as the events recorded before it have
+	// it.
+	FoodUser uuid.UUID `json:",omitzero"`
 }
 
 // FromFood returns the item for quantity q of food f.

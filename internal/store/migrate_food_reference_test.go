@@ -42,6 +42,10 @@ func TestMigrationOfTheReferenceSourceKeepsTheRows(t *testing.T) {
 	if after := sourcesDump(t, db); after != before {
 		t.Errorf("the rows after the migration:\n%s\nwant\n%s", after, before)
 	}
+	// Every migration since too: the search runs on the newest schema.
+	if err := db.migrate(t.Context(), upTo(t, "9999"), discard()); err != nil {
+		t.Fatalf("migrate from 0029: %v", err)
+	}
 	if found, err := db.FindFoods(t.Context(), user, "appl", 10); err != nil || len(found) != 1 || found[0].Name != "Jabuka" {
 		t.Errorf(`FindFoods("appl") = %v, %v; want Jabuka by its alias`, found, err)
 	}

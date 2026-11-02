@@ -81,6 +81,9 @@ const (
 	UndoUnreadable UndoReason = "its state cannot be read"
 	// UndoStuck: the state before breaks a rule of a table now.
 	UndoStuck UndoReason = "it cannot be put back"
+	// UndoShared: taking it back would take a shared recipe from its
+	// other members.
+	UndoShared UndoReason = "the recipe is shared with others"
 	// UndoPassedOver: the same undo, sent before, passed over the change
 	// for one of the reasons above.
 	UndoPassedOver UndoReason = "this undo passed over it before"
@@ -596,6 +599,8 @@ func stateNow(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Event) 
 		return foodStateNow(ctx, tx, userID, e)
 	case event.RecipeSave:
 		return recipeStateNow(ctx, tx, userID, e)
+	case event.RecipeShare, event.RecipeUnshare:
+		return shareStateNow(ctx, tx, e)
 	case event.MealCreate, event.MealReplace, event.MealDelete:
 		id, err := entityID(e)
 		if err != nil {
@@ -636,6 +641,10 @@ func takeBack(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Event, 
 		return takeBackFood(ctx, tx, userID, e, now)
 	case event.RecipeSave:
 		return takeBackRecipe(ctx, tx, userID, e, now)
+	case event.RecipeShare:
+		return takeBackShare(ctx, tx, e, now)
+	case event.RecipeUnshare:
+		return takeBackUnshare(ctx, tx, userID, e, now)
 	case event.MealCreate, event.MealReplace, event.MealDelete:
 		return takeBackMeal(ctx, tx, userID, e, now)
 	case event.DayExclude, event.DayInclude:

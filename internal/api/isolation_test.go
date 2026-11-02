@@ -109,6 +109,19 @@ func newIsolationEnv(t *testing.T, adminActs bool) isolationEnv {
 		p.bread = saveIsolationFoods(t, in.db, p.user, now)
 		saveIsolationCatalog(t, in.db, p.user, now)
 		saveIsolationRecipe(t, in.db, p.user, p.bread, now)
+		// The owner (Ana, or Ivo when the admin acts) shares a recipe of
+		// theirs with the other: their recipes of it are of the owner's
+		// food, so the other's deletion takes nothing of the owner's (a
+		// deletion of the one who shared gives the other their foods,
+		// which TestDeletedMembersIngredientsStay holds to). Before the
+		// changes that follow, so no case's undo takes it.
+		if (p == &ana) != adminActs {
+			with := ivo
+			if adminActs {
+				with = ana.user
+			}
+			saveIsolationShare(t, in.db, p.user, with, p.bread, now)
+		}
 		p.meal = saveIsolationMeals(t, in.db, p.user, p.bread, now)
 		saveIsolationMetrics(t, in.db, p.user, now)
 		p.applied, p.pending = saveIsolationPlan(t, in.db, p.user, now)
@@ -254,6 +267,27 @@ func saveIsolationRecipe(t *testing.T, db *store.DB, u user.User, bread food.Foo
 	}
 	if _, err := db.SaveRecipe(t.Context(), u.ID, isolationActor, pudding, nil, now); err != nil {
 		t.Fatalf("save %s's recipe: %v", u.Name, err)
+	}
+}
+
+// saveIsolationShare gives u a stew of bread, shared with with: a
+// recipe each of them has, of u's food (story 403), the one exception to
+// the isolation of a user's data, in recipe_shares and recipe_items.
+func saveIsolationShare(t *testing.T, db *store.DB, u, with user.User, bread food.Food, now time.Time) {
+	t.Helper()
+	crumbs, err := meal.FromFood(bread, meal.Quantity{Amount: 200, Unit: "g"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stew := recipe.Recipe{
+		Food:  food.Food{ID: uuid.NewV7(), Name: "Shared bread stew"},
+		Items: []meal.Item{crumbs}, Yield: 600,
+	}
+	if _, err := db.SaveRecipe(t.Context(), u.ID, isolationActor, stew, nil, now); err != nil {
+		t.Fatalf("save %s's shared recipe: %v", u.Name, err)
+	}
+	if err := db.ShareRecipe(t.Context(), u.ID, isolationActor, stew.Food.ID, with.ID, now); err != nil {
+		t.Fatalf("share %s's recipe: %v", u.Name, err)
 	}
 }
 

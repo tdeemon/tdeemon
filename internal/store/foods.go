@@ -297,6 +297,13 @@ func saveNewFoods(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Act
 		if err != nil {
 			return newFoods{}, err
 		}
+		// A recipe the user left has the name: no new food of it, and no
+		// pick of the recipe.
+		if left, err := withdrawn(ctx, tx, userID, target); err != nil {
+			return newFoods{}, err
+		} else if exists && left {
+			return newFoods{}, conflict(ctx, tx, userID, ErrNameTaken, target.String(), "")
+		}
 		var write uuid.UUID
 		if exists {
 			had, brought, err := keptFood(ctx, tx, userID, a, target, now)
@@ -387,7 +394,7 @@ func (db *DB) FoodByKey(ctx context.Context, userID uuid.UUID, name, brand strin
 		if err != nil {
 			return fmt.Errorf("food id %q: %w", id, err)
 		}
-		f, err = foodInTx(ctx, tx, userID, fid)
+		f, err = pickedFood(ctx, tx, userID, fid)
 		return err
 	})
 	if errors.Is(err, ErrNotFound) {
@@ -621,7 +628,7 @@ func (db *DB) FoodByBarcode(ctx context.Context, userID uuid.UUID, code string) 
 		if err != nil {
 			return fmt.Errorf("food id %q: %w", id, err)
 		}
-		f, err = foodInTx(ctx, tx, userID, fid)
+		f, err = pickedFood(ctx, tx, userID, fid)
 		return err
 	})
 	if errors.Is(err, ErrNotFound) {
@@ -634,12 +641,12 @@ func (db *DB) FoodByBarcode(ctx context.Context, userID uuid.UUID, code string) 
 }
 
 // FoodByID returns userID's food with id, archived or not, or
-// ErrNotFound.
+// ErrNotFound: for a recipe they left the share of too.
 func (db *DB) FoodByID(ctx context.Context, userID, id uuid.UUID) (food.Food, error) {
 	var f food.Food
 	err := db.readTx(ctx, func(tx *sql.Tx) error {
 		var err error
-		f, err = foodInTx(ctx, tx, userID, id)
+		f, err = pickedFood(ctx, tx, userID, id)
 		return err
 	})
 	if errors.Is(err, ErrNotFound) {
@@ -649,6 +656,19 @@ func (db *DB) FoodByID(ctx context.Context, userID, id uuid.UUID) (food.Food, er
 		return food.Food{}, fmt.Errorf("food: %w", err)
 	}
 	return f, nil
+}
+
+// pickedFood is foodInTx of a food userID may pick: a recipe they left
+// the share of is ErrNotFound.
+func pickedFood(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID) (food.Food, error) {
+	left, err := withdrawn(ctx, tx, userID, id)
+	if err != nil {
+		return food.Food{}, err
+	}
+	if left {
+		return food.Food{}, ErrNotFound
+	}
+	return foodInTx(ctx, tx, userID, id)
 }
 
 // foodInTx reads userID's food id with its children in tx, or returns
@@ -889,7 +909,7 @@ func (db *DB) findFoods(ctx context.Context, userID uuid.UUID, query string, lim
 		var err error
 		out, err = queryFoods(ctx, tx, `
 			SELECT `+foodColumns+` FROM foods AS f
-			WHERE f.user_id = ? AND f.archived = ?
+			WHERE f.user_id = ? AND f.archived = ? AND `+notWithdrawn+`
 				AND f.id IN (SELECT food_id FROM foods_fts WHERE foods_fts MATCH ? AND user_id = ?)
 			ORDER BY CASE
 					WHEN f.id IN (SELECT food_id FROM foods_fts WHERE foods_fts MATCH ? AND user_id = ?) THEN 0
@@ -961,14 +981,14 @@ func (db *DB) ListFoods(ctx context.Context, userID uuid.UUID, archived bool, so
 	var out []food.Food
 	var total int
 	err := db.readTx(ctx, func(tx *sql.Tx) error {
-		if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM foods WHERE user_id = ? AND archived = ? AND (? = '' OR source = ?)",
+		if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM foods AS f WHERE f.user_id = ? AND f.archived = ? AND (? = '' OR f.source = ?) AND "+notWithdrawn,
 			uid, archived, source, source).Scan(&total); err != nil {
 			return err
 		}
 		var err error
 		out, err = queryFoods(ctx, tx, `
 			SELECT `+foodColumns+` FROM foods AS f
-			WHERE f.user_id = ? AND f.archived = ? AND (? = '' OR f.source = ?)
+			WHERE f.user_id = ? AND f.archived = ? AND (? = '' OR f.source = ?) AND `+notWithdrawn+`
 			ORDER BY `+by+`
 			LIMIT ? OFFSET ?`, uid, archived, source, source, limit, offset)
 		if err != nil {

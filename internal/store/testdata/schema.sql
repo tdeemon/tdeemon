@@ -152,9 +152,11 @@ CREATE TABLE "events" (
         'day.exclude', 'day.include', 'metrics.merge', 'metric.set', 'metric.delete', 'undo',
         'profile.set', 'phase.set', 'phase.delete', 'target.set', 'target.delete',
         'day.training', 'plan.weekdays', 'limits.set', 'notes.set', 'workouts.set',
-        'day.checkin', 'proposal.create', 'proposal.status', 'autopilot.set', 'autopilot.review'
+        'day.checkin', 'proposal.create', 'proposal.status', 'autopilot.set', 'autopilot.review',
+        'recipe.share', 'recipe.unshare'
     )),
-    -- What changed: a food's (a recipe's too), a meal's or a proposal's
+    -- What changed: a food's (a recipe's too, which a share or its stop
+    -- names by the user's own recipe), a meal's or a proposal's
     -- id, a day, a day and a metric, a phase's start, a target's first
     -- day, "profile", "plan", "limits", "notes", "autopilot", a review's
     -- day ("review/YYYY-MM-DD") or a source of workouts, or for an undo
@@ -521,7 +523,8 @@ CREATE TABLE "recipe_items" (
     user_id TEXT NOT NULL,
     -- The ingredient's place in the recipe, from 0.
     position INTEGER NOT NULL CHECK (position >= 0),
-    food_id TEXT NOT NULL,
+    food_user_id TEXT,
+    food_id TEXT,
     name TEXT NOT NULL CHECK (name <> ''),
     brand TEXT NOT NULL DEFAULT '',
     quantity_amount REAL NOT NULL DEFAULT 0 CHECK (quantity_amount >= 0),
@@ -544,14 +547,30 @@ CREATE TABLE "recipe_items" (
     source TEXT NOT NULL CHECK (
         source IN ('label', 'estimate', 'reference', 'user', 'dish', 'recipe', 'off')
     ),
-    note TEXT NOT NULL DEFAULT '', portion_grams REAL CHECK (portion_grams > 0),
+    note TEXT NOT NULL DEFAULT '',
+    portion_grams REAL CHECK (portion_grams > 0),
     PRIMARY KEY (user_id, recipe_id, position),
+    CHECK ((food_user_id IS NULL) = (food_id IS NULL)),
     FOREIGN KEY (user_id, recipe_id) REFERENCES recipes (user_id, food_id) ON DELETE CASCADE,
-    -- Foods are archived, never deleted, while a recipe uses them.
-    FOREIGN KEY (user_id, food_id) REFERENCES foods (user_id, id)
+    -- Foods are archived, never deleted, while a recipe uses them, but
+    -- for their owner's account's deletion.
+    FOREIGN KEY (food_user_id, food_id) REFERENCES foods (user_id, id) ON DELETE SET NULL
 ) STRICT;
 
-CREATE INDEX recipe_items_user_food ON recipe_items (user_id, food_id);
+CREATE INDEX recipe_items_food ON recipe_items (food_user_id, food_id);
+
+CREATE TABLE recipe_shares (
+    share_id TEXT NOT NULL CHECK (length(share_id) = 36),
+    seat INTEGER NOT NULL CHECK (seat >= 1),
+    user_id TEXT NOT NULL,
+    food_id TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+    left_at TEXT,
+    PRIMARY KEY (share_id, user_id),
+    UNIQUE (share_id, seat),
+    UNIQUE (user_id, food_id),
+    FOREIGN KEY (user_id, food_id) REFERENCES recipes (user_id, food_id) ON DELETE CASCADE
+) STRICT;
 
 CREATE TABLE recipes (
     food_id TEXT NOT NULL,
