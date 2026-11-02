@@ -446,7 +446,7 @@ func undoInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Actor, 
 	if of != nil && (e.Action != of.Action || e.Entity != of.Entity) {
 		return event.Event{}, nil, &NotLatestError{Latest: e}
 	}
-	if e.Action == event.HouseholdJoin || e.Action == event.HouseholdLeave {
+	if !undoable(e) {
 		// Refused, and never passed over: the changes before it are of
 		// foods from before the household.
 		return event.Event{}, &UndoConflictError{Event: e, Reason: UndoHousehold}, nil

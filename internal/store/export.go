@@ -31,10 +31,23 @@ var exportLeavesOut = map[string][]string{
 	"push_subscriptions": {"endpoint", "p256dh", "auth"},
 }
 
+// exportRowsOf selects a user's rows (?1, their id) of the tables whose
+// user_id column is not all of it: their own row of users; their
+// household's row, whose members are household_members' rows, each a
+// user's, of whom the export has the user's alone; and the invites into
+// a household they made, and those made to them, which name the other
+// user by their id alone. Every other table's are its rows of user_id.
+var exportRowsOf = map[string]string{
+	"users":             "id = ?1",
+	"households":        "id IN (SELECT household_id FROM household_members WHERE user_id = ?1)",
+	"household_invites": "user_id = ?1 OR invited_id = ?1",
+}
+
 // ExportUser returns all the data of the user with id, a table at a time,
 // in one read so the tables agree: the users row and the rows of every
 // table with a user_id column, which is every table of a user's data
-// (migrations/README.md), but for what exportLeavesOut leaves out. A
+// (migrations/README.md), their household and the invites made to them
+// too (exportRowsOf), but for what exportLeavesOut leaves out. A
 // table the user has no rows in is there, empty.
 func (db *DB) ExportUser(ctx context.Context, id uuid.UUID) ([]ExportTable, error) {
 	var out []ExportTable
@@ -58,12 +71,12 @@ func (db *DB) ExportUser(ctx context.Context, id uuid.UUID) ([]ExportTable, erro
 	return out, nil
 }
 
-// userTableNames lists users and the tables with a user_id column, by
-// name, but the tables exportLeavesOut leaves out whole.
+// userTableNames lists users, households and the tables with a user_id
+// column, by name, but the tables exportLeavesOut leaves out whole.
 func userTableNames(ctx context.Context, tx *sql.Tx) ([]string, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT m.name FROM sqlite_master AS m
-		WHERE m.type = 'table' AND (m.name = 'users'
+		WHERE m.type = 'table' AND (m.name IN ('users', 'households')
 			OR EXISTS (SELECT 1 FROM pragma_table_info(m.name) WHERE name = 'user_id'))
 		ORDER BY m.name`)
 	if err != nil {
@@ -99,11 +112,11 @@ func exportTable(ctx context.Context, tx *sql.Tx, name string, id uuid.UUID) (Ex
 			quoted = append(quoted, quoteIdent(c))
 		}
 	}
-	key := "user_id"
-	if name == "users" {
-		key = "id"
+	where, ok := exportRowsOf[name]
+	if !ok {
+		where = "user_id = ?1"
 	}
-	q := "SELECT " + strings.Join(quoted, ", ") + " FROM " + quoteIdent(name) + " WHERE " + key + " = ? ORDER BY rowid" //nolint:gosec // G202: names from sqlite_master, quoted as identifiers
+	q := "SELECT " + strings.Join(quoted, ", ") + " FROM " + quoteIdent(name) + " WHERE " + where + " ORDER BY rowid" //nolint:gosec // G202: names from sqlite_master, quoted as identifiers
 	rows, err := tx.QueryContext(ctx, q, id.String())
 	if err != nil {
 		return t, fmt.Errorf("%s: %w", name, err)

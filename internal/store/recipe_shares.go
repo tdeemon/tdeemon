@@ -152,12 +152,20 @@ var (
 // Household is the seats of the member's household that came or went
 // with them: a household has a recipe shared with one of its members, or
 // none of them.
+//
+// A share that gives members back a recipe they left keeps whose seat
+// it was, so its undo puts it back so: FromHousehold tells the member's
+// seat was their household's, which is the share's now, and Explicit the
+// seats of their household's that were explicit shares', which are the
+// household's now.
 type shareState struct {
-	Share     string `json:"share"`
-	Seat      int    `json:"seat"`
-	Left      bool   `json:"left,omitempty"`
-	Version   int64  `json:"version"`
-	Household []int  `json:"household,omitempty"`
+	Share         string `json:"share"`
+	Seat          int    `json:"seat"`
+	Left          bool   `json:"left,omitempty"`
+	Version       int64  `json:"version"`
+	Household     []int  `json:"household,omitempty"`
+	FromHousehold bool   `json:"from_household,omitempty"`
+	Explicit      []int  `json:"explicit,omitempty"`
 }
 
 // seatOf returns the member of share at seat, their recipe, or
@@ -370,26 +378,59 @@ func shareRecipeInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.
 	if err := giveRecipe(ctx, tx, r, userID, to, back, now); err != nil {
 		return err
 	}
+	fromHousehold := false
 	if back {
-		_, err = tx.ExecContext(ctx, "UPDATE food_shares SET left_at = NULL WHERE share_id = ? AND seat = ?", share, seat)
+		// Their seat is the share's now, though the household's before: a
+		// leave of the household keeps it.
+		if err := tx.QueryRowContext(ctx, "SELECT household FROM food_shares WHERE share_id = ? AND seat = ?", share, seat).
+			Scan(&fromHousehold); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, "UPDATE food_shares SET left_at = NULL, household = 0 WHERE share_id = ? AND seat = ?", share, seat)
 	} else {
 		seat, err = insertSeat(ctx, tx, share, withID, to.Food, false)
 	}
 	if err != nil {
 		return err
 	}
-	// The recipient's household has it too.
+	// The recipient's household has it too; the seats of it that were
+	// explicit, left, are the household's when it brings them back.
+	explicit, err := leftExplicitSeats(ctx, tx, share)
+	if err != nil {
+		return err
+	}
 	household, err := shareWithHousehold(ctx, tx, r, userID, to, share, now)
 	if err != nil {
 		return err
 	}
+	explicit = slices.DeleteFunc(explicit, func(seat int) bool { return !slices.Contains(household, seat) })
 	version, err := bumpShare(ctx, tx, share)
 	if err != nil {
 		return err
 	}
 	_, err = record(ctx, tx, userID, a, event.RecipeShare, foodID.String(), nil,
-		shareState{Share: share, Seat: seat, Version: version, Household: household}, now)
+		shareState{Share: share, Seat: seat, Version: version, Household: household, FromHousehold: fromHousehold, Explicit: explicit}, now)
 	return err
+}
+
+// leftExplicitSeats returns the seats of share of explicit shares' that
+// were left.
+func leftExplicitSeats(ctx context.Context, tx *sql.Tx, share string) ([]int, error) {
+	rows, err := tx.QueryContext(ctx, "SELECT seat FROM food_shares WHERE share_id = ? AND left_at IS NOT NULL AND household = 0 ORDER BY seat",
+		share)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []int
+	for rows.Next() {
+		var seat int
+		if err := rows.Scan(&seat); err != nil {
+			return nil, err
+		}
+		out = append(out, seat)
+	}
+	return out, rows.Err()
 }
 
 // shareWithHousehold gives each other member of the household of to, the
@@ -612,7 +653,7 @@ func shareStateNow(ctx context.Context, tx *sql.Tx, e event.Event) (any, error) 
 	if err != nil {
 		return nil, err
 	}
-	now := shareState{Share: s.Share, Seat: s.Seat, Left: left, Household: s.Household}
+	now := shareState{Share: s.Share, Seat: s.Seat, Left: left, Household: s.Household, FromHousehold: s.FromHousehold, Explicit: s.Explicit}
 	if now.Version, err = shareVersion(ctx, tx, s.Share); err != nil {
 		return nil, err
 	}
@@ -644,12 +685,33 @@ func takeBackShare(ctx context.Context, tx *sql.Tx, e event.Event, now time.Time
 			if _, err := leave(ctx, tx, s.Share, seat, now); err != nil {
 				return err
 			}
+			if err := restoreSeat(ctx, tx, s, i, seat); err != nil {
+				return err
+			}
 		} else if _, err := tx.ExecContext(ctx, "DELETE FROM foods WHERE user_id = ? AND id = ?", m.User.String(), m.Food.String()); err != nil {
 			return err
 		}
 	}
 	// The version before the share, which moved it on by one.
 	return setShareVersion(ctx, tx, s.Share, s.Version-1)
+}
+
+// restoreSeat puts seat, the i-th the share s gave a recipe (the member's
+// first, then their household's), back as it was before the share: their
+// household's, or an explicit share's.
+func restoreSeat(ctx context.Context, tx *sql.Tx, s shareState, i, seat int) error {
+	was := -1
+	switch {
+	case i == 0 && s.FromHousehold:
+		was = 1
+	case i > 0 && slices.Contains(s.Explicit, seat):
+		was = 0
+	}
+	if was < 0 {
+		return nil
+	}
+	_, err := tx.ExecContext(ctx, "UPDATE food_shares SET household = ? WHERE share_id = ? AND seat = ?", was, s.Share, seat)
+	return err
 }
 
 // takeBackUnshare gives the member the stop e took the recipe from their
