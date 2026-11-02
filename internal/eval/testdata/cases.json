@@ -822,5 +822,45 @@
         "get_day"
       ]
     }
+  },
+  {
+    "name": "a food of the catalog",
+    "lang": "en",
+    "seed_catalog": true,
+    "say": [
+      "I just ate a Brawn protein bar."
+    ],
+    "expect": {
+      "meals": 1,
+      "items": 1,
+      "kcal": [
+        200,
+        220
+      ],
+      "from_catalog": "protein",
+      "not_tools": [
+        "get_day"
+      ]
+    }
+  },
+  {
+    "name": "namirnica iz kataloga",
+    "lang": "hr",
+    "seed_catalog": true,
+    "say": [
+      "Upravo sam pojeo jedan Brawn proteinski bar."
+    ],
+    "expect": {
+      "meals": 1,
+      "items": 1,
+      "kcal": [
+        200,
+        220
+      ],
+      "from_catalog": "protein",
+      "not_tools": [
+        "get_day"
+      ]
+    }
   }
 ]
