@@ -613,3 +613,62 @@ func householdState(t *testing.T, db *store.DB, users ...uuid.UUID) string {
 	}
 	return b.String()
 }
+
+// eatSoup logs userID's meal of their soup.
+func eatSoup(t *testing.T, db *store.DB, userID uuid.UUID) {
+	t.Helper()
+	bowl, err := meal.FromFood(copyNamed(t, db, userID, "Soup"), meal.Quantity{Amount: 300, Unit: "g"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	createMeal(t, db, userID, meal.Meal{ID: uuid.NewV7(), EatenAt: t0, Day: day.DateOf(t0), Client: meal.ClientMCP, Items: []meal.Item{bowl}})
+}
+
+// A stop of a share with a household, from before a member left it, is
+// undone no more: it would give the one who left the recipe back with
+// the household's. They keep it as it was, left.
+func TestUndoAStopAfterALeave(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := kitchenOfTwo(t)
+	eva := addEva(t, db)
+	soup := soupOf(t, db, eva)
+	share(t, db, eva, soup.Food.ID, ana)
+	eatSoup(t, db, ivo)
+	ivos := copyNamed(t, db, ivo, "Soup")
+	if err := db.UnshareRecipe(t.Context(), eva, testActor, soup.Food.ID, seatOf(t, db, eva, soup.Food.ID, ana), t0); err != nil {
+		t.Fatal(err)
+	}
+	leave(t, db, ivo)
+	if _, err := db.UndoLast(t.Context(), eva, testActor, t0.Add(time.Minute)); !isConflict(err, store.UndoChanged) {
+		t.Errorf("Eva's undo of her stop after Ivo left = %v, want it changed since", err)
+	}
+	if !leftBy(t, db, ivo, ivos.ID) {
+		t.Error("Ivo's soup is no longer left: want it his, for his meals")
+	}
+}
+
+// An undo of a share again with a member who left it with their
+// household, and of the stop before it, puts each seat back as it was:
+// the member's the household's, which a leave takes, and the one it was
+// shared with before an explicit share's, which a leave keeps.
+func TestUndoAShareAgain(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := kitchenOfTwo(t)
+	eva := addEva(t, db)
+	soup := soupOf(t, db, eva)
+	share(t, db, eva, soup.Food.ID, ana)
+	eatSoup(t, db, ana)
+	eatSoup(t, db, ivo)
+	if err := db.UnshareRecipe(t.Context(), eva, testActor, soup.Food.ID, seatOf(t, db, eva, soup.Food.ID, ana), t0); err != nil {
+		t.Fatal(err)
+	}
+	share(t, db, eva, soup.Food.ID, ivo)
+	undoAt(t, db, eva, time.Minute)
+	undoAt(t, db, eva, 2*time.Minute)
+	leave(t, db, ivo)
+	if got := soupMembers(t, db, eva); !slices.Equal(got, sortedIDs([]uuid.UUID{eva, ana})) {
+		t.Errorf("Eva's soup's members = %v, want Eva and Ana: Ivo had it by the household", got)
+	}
+}
