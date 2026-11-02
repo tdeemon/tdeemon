@@ -420,6 +420,15 @@ func SentFood(f food.Food) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// SentCatalogFood returns the digest of the catalog's food id as a client
+// sent it for an item: the food it is copied as may change with the
+// catalog, the item sent does not. Its text begins unquoted, as no
+// SentFood's does.
+func SentCatalogFood(id uuid.UUID) string {
+	sum := sha256.Sum256([]byte("catalog " + id.String()))
+	return hex.EncodeToString(sum[:])
+}
+
 // SameAs reports whether it and other are what a client sent alike: the
 // same food (the user's, or a new one as sent) and quantity, or
 // estimate, and note, whatever their ids or a food corrected since. An op

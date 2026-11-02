@@ -28,7 +28,8 @@ type barcodeOutput struct {
 	Body         struct {
 		Barcode       string             `json:"barcode" doc:"The barcode as a food keeps it: a UPC-A as its EAN-13, a 0 before it."`
 		Food          *foodBody          `json:"food,omitempty" doc:"Your food of the barcode, archived too, with its last use."`
-		OpenFoodFacts *openFoodFactsBody `json:"open_food_facts,omitempty" doc:"Without a food of yours of the barcode, the product at Open Food Facts."`
+		Catalog       *catalogFoodBody   `json:"catalog,omitempty" doc:"Without a food of yours of the barcode, the catalog's food of it: a meal's item logs it by its catalog_id."`
+		OpenFoodFacts *openFoodFactsBody `json:"open_food_facts,omitempty" doc:"Without a food of yours nor the catalog's of the barcode, the product at Open Food Facts."`
 		NamedFood     *foodBody          `json:"named_food,omitempty" doc:"Your food of the product's name and brand, with its last use, whose barcodes lack the barcode yet: the product as a meal's new food is it, and adds the barcode to it."`
 	}
 }
@@ -39,10 +40,11 @@ type openFoodFactsBody struct {
 	URL  string     `json:"url" format:"uri" doc:"The product's page at Open Food Facts, whose data are open under the ODbL: say where they come from."`
 }
 
-// lookupBarcode finds what a barcode is: a food of the user's, or else a
-// product of Open Food Facts, made a new food for the user to see before
-// it is saved, with their food of its name and brand, which the product
-// is (a save of the product would correct it).
+// lookupBarcode finds what a barcode is: a food of the user's, or else
+// the catalog's food of it, or else a product of Open Food Facts, made a
+// new food for the user to see before it is saved; either of the last
+// two with the user's food of its name and brand, which the product is
+// (a save of the product would correct it).
 func (s *sessions) lookupBarcode(ctx context.Context, in *barcodeInput) (*barcodeOutput, error) {
 	p, err := requireUser(ctx)
 	if err != nil {
@@ -64,10 +66,34 @@ func (s *sessions) lookupBarcode(ctx context.Context, in *barcodeInput) (*barcod
 		return out, nil
 	case !errors.Is(err, store.ErrNotFound):
 		return nil, internalError("looking up the barcode failed", err)
+	}
+	switch c, err := s.db.CatalogFoodByBarcode(ctx, code); {
+	case err == nil:
+		b := newCatalogFoodBody(&c)
+		out.Body.Catalog = &b
+		if out.Body.NamedFood, err = s.namedFood(ctx, p.User.ID, c.Name, c.Brand); err != nil {
+			return nil, internalError("looking up the barcode failed", err)
+		}
+		return out, nil
+	case !errors.Is(err, store.ErrNotFound):
+		return nil, internalError("looking up the barcode failed", err)
 	case s.openFoodFacts == nil:
-		return nil, huma.Error404NotFound("no food of yours has the barcode")
+		return nil, huma.Error404NotFound("no food of yours nor the catalog's has the barcode")
 	}
 	return s.atOpenFoodFacts(ctx, p.User, code, out)
+}
+
+// namedFood is userID's food of name and brand, with its last use, or nil
+// when they have none.
+func (s *sessions) namedFood(ctx context.Context, userID uuid.UUID, name, brand string) (*foodBody, error) {
+	named, err := s.db.FoodByKey(ctx, userID, name, brand)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	}
+	return s.usedFoodBody(ctx, userID, &named)
 }
 
 // atOpenFoodFacts answers out with Open Food Facts' product of code, as
@@ -80,17 +106,12 @@ func (s *sessions) atOpenFoodFacts(ctx context.Context, u user.User, code string
 	product, err := s.openFoodFacts.Product(ctx, code, u.Locale)
 	switch {
 	case errors.Is(err, off.ErrNotFound):
-		return nil, huma.Error404NotFound("no food of yours has the barcode, nor has Open Food Facts a product of it")
+		return nil, huma.Error404NotFound("no food of yours nor the catalog's has the barcode, nor has Open Food Facts a product of it")
 	case err != nil:
-		return nil, huma.Error502BadGateway("no food of yours has the barcode, and Open Food Facts did not answer: try again, or make the food",
+		return nil, huma.Error502BadGateway("no food of yours nor the catalog's has the barcode, and Open Food Facts did not answer: try again, or make the food",
 			internalDetail(err))
 	}
-	switch named, err := s.db.FoodByKey(ctx, u.ID, product.Name, product.Brand); {
-	case err == nil:
-		if out.Body.NamedFood, err = s.usedFoodBody(ctx, u.ID, &named); err != nil {
-			return nil, internalError("looking up the barcode failed", err)
-		}
-	case !errors.Is(err, store.ErrNotFound):
+	if out.Body.NamedFood, err = s.namedFood(ctx, u.ID, product.Name, product.Brand); err != nil {
 		return nil, internalError("looking up the barcode failed", err)
 	}
 	serving, ok := servingNames[u.Locale]
@@ -103,7 +124,7 @@ func (s *sessions) atOpenFoodFacts(ctx context.Context, u user.User, code string
 		return out, nil
 	case errors.Is(err, off.ErrIncomplete):
 		return nil, huma.Error404NotFound(fmt.Sprintf(
-			"no food of yours has the barcode; Open Food Facts has the product (%q) without the values a food needs", product.Name))
+			"no food of yours nor the catalog's has the barcode; Open Food Facts has the product (%q) without the values a food needs", product.Name))
 	case err != nil:
 		return nil, internalError("looking up the barcode failed", err)
 	}

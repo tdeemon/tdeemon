@@ -181,6 +181,10 @@
             "description": "The barcode as a food keeps it: a UPC-A as its EAN-13, a 0 before it.",
             "type": "string"
           },
+          "catalog": {
+            "$ref": "#/components/schemas/CatalogFoodBody",
+            "description": "Without a food of yours of the barcode, the catalog's food of it: a meal's item logs it by its catalog_id."
+          },
           "food": {
             "$ref": "#/components/schemas/FoodBody",
             "description": "Your food of the barcode, archived too, with its last use."
@@ -191,11 +195,109 @@
           },
           "open_food_facts": {
             "$ref": "#/components/schemas/OpenFoodFactsBody",
-            "description": "Without a food of yours of the barcode, the product at Open Food Facts."
+            "description": "Without a food of yours nor the catalog's of the barcode, the product at Open Food Facts."
           }
         },
         "required": [
           "barcode"
+        ],
+        "type": "object"
+      },
+      "CatalogFoodBody": {
+        "additionalProperties": false,
+        "properties": {
+          "aliases": {
+            "description": "Other names search finds.",
+            "items": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "barcodes": {
+            "description": "EAN-13, EAN-8 or UPC-A, each of one food.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "basis": {
+            "description": "What the nutrients are for.",
+            "enum": [
+              "100g",
+              "100ml",
+              "portion"
+            ],
+            "type": "string"
+          },
+          "brand": {
+            "description": "The same name and brand are one food.",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "id": {
+            "description": "The catalog's id of it, no food of yours: an item's catalog_id.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "examples": [
+              "Greek yoghurt 2 %"
+            ],
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "nutrients": {
+            "$ref": "#/components/schemas/FoodNutrientsBody"
+          },
+          "portion_grams": {
+            "description": "For basis portion only: the grams of a portion, when known.",
+            "format": "double",
+            "minimum": 0,
+            "type": "number"
+          },
+          "queries": {
+            "description": "The queries of find_foods that found the food, of those it was sent.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "servings": {
+            "description": "Named amounts: a piece, a slice.",
+            "items": {
+              "$ref": "#/components/schemas/ServingBody"
+            },
+            "maxItems": 20,
+            "type": "array"
+          },
+          "source": {
+            "description": "Where the values come from; dish is an earlier client's, for no new food; recipe a recipe's, which changes only with it.",
+            "enum": [
+              "label",
+              "estimate",
+              "reference",
+              "user",
+              "dish",
+              "off",
+              "recipe"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "basis",
+          "nutrients",
+          "source"
         ],
         "type": "object"
       },
@@ -1376,6 +1478,13 @@
       "FoodsOutputBody": {
         "additionalProperties": false,
         "properties": {
+          "catalog": {
+            "description": "After your foods, the instance's catalog's foods that you have not: a meal's item logs one by its catalog_id, which makes it yours. Not of archived.",
+            "items": {
+              "$ref": "#/components/schemas/CatalogFoodBody"
+            },
+            "type": "array"
+          },
           "foods": {
             "items": {
               "$ref": "#/components/schemas/FoodBody"
@@ -1383,7 +1492,7 @@
             "type": "array"
           },
           "unfound": {
-            "description": "The queries that found no food: not to send again, though another form of their word may find it.",
+            "description": "The queries that found no food, yours nor the catalog's: not to send again, though another form of their word may find it.",
             "items": {
               "type": "string"
             },
@@ -1392,6 +1501,7 @@
         },
         "required": [
           "foods",
+          "catalog",
           "unfound"
         ],
         "type": "object"
@@ -1908,6 +2018,11 @@
             "format": "double",
             "minimum": 0,
             "type": "number"
+          },
+          "catalog_id": {
+            "description": "A food of the catalog, from find_foods' catalog: copied into the user's foods, as a new food is saved.",
+            "format": "uuid",
+            "type": "string"
           },
           "food": {
             "$ref": "#/components/schemas/FoodFields",
@@ -6196,7 +6311,7 @@
     },
     "/api/v1/barcodes/{code}": {
       "get": {
-        "description": "Your food of a barcode, archived too; without one, the product of Open Food Facts as a new food, not saved, with its page there, and your food of its name and brand (named_food) if you have one, which a save of the product would correct: the product as a meal's new food is that food, and adds the barcode to it. A barcode misread, its check digit wrong, is refused (422). One neither has is 404, which names the product when Open Food Facts has it without its values (with your food of its name, 200). Open Food Facts that does not answer is 502; 30 lookups there a minute, and more are 429.",
+        "description": "Your food of a barcode, archived too; without one, the catalog's food of it (catalog), logged by catalog_id; without either, the product of Open Food Facts as a new food, not saved, with its page there, and your food of its name and brand (named_food) if you have one, which a save of the product would correct: the product as a meal's new food is that food, and adds the barcode to it. A barcode misread, its check digit wrong, is refused (422). One neither has is 404, which names the product when Open Food Facts has it without its values (with your food of its name, 200). Open Food Facts that does not answer is 502; 30 lookups there a minute, and more are 429.",
         "operationId": "lookup-barcode",
         "parameters": [
           {
@@ -7010,7 +7125,7 @@
     },
     "/api/v1/foods": {
       "get": {
-        "description": "Your foods whose name, brand or an alias has words starting with each word of a query, in any case and without the diacritics: the name's matches first, then the shorter name. Send a meal's foods at once, one query each: each food says which queries found it. Each has how much a meal had of it last. Archived foods are left out, or alone found with archived.",
+        "description": "Your foods whose name, brand or an alias has words starting with each word of a query, in any case and without the diacritics: the name's matches first, then the shorter name. Send a meal's foods at once, one query each: each food says which queries found it. Each has how much a meal had of it last. Archived foods are left out, or alone found with archived. Within the limit after yours, the instance's catalog's foods you have not (catalog), a label's values every user's saves keep: an item's catalog_id logs one, which makes it yours.",
         "operationId": "find-foods",
         "parameters": [
           {
@@ -7037,13 +7152,13 @@
             }
           },
           {
-            "description": "The most foods of each query.",
+            "description": "The most foods of each query, yours and then the catalog's.",
             "explode": false,
             "in": "query",
             "name": "limit",
             "schema": {
               "default": 10,
-              "description": "The most foods of each query.",
+              "description": "The most foods of each query, yours and then the catalog's.",
               "format": "int64",
               "maximum": 50,
               "minimum": 1,
@@ -9639,7 +9754,7 @@
     },
     "/api/v1/meals": {
       "post": {
-        "description": "Logs a meal under the client's UUIDv7 (201); the same meal sent again under it is a retry (200), another a conflict (409). Without an id, from a client that cannot make one, the server makes it: that meal sent again is another (or a 409, when its items carry ids of their own), so after a timeout, look at get_day before sending it again. eaten_at left out is the id's time, so a retry has the same; a time still to come is refused (422). An item is a food of the user's by its food_id, or a new food, which is saved, each with an amount in the food's unit (g or ml; a food of the user's takes its own when left out), servings or portions; or an estimate, of a part nobody weighed or of a whole plate. The answer holds the meal with what each item brought, where its day stands (so no get_day around a log), and warnings: values that do not add up, or a meal that looks like one logged minutes before.",
+        "description": "Logs a meal under the client's UUIDv7 (201); the same meal sent again under it is a retry (200), another a conflict (409). Without an id, from a client that cannot make one, the server makes it: that meal sent again is another (or a 409, when its items carry ids of their own), so after a timeout, look at get_day before sending it again. eaten_at left out is the id's time, so a retry has the same; a time still to come is refused (422). An item is a food of the user's by its food_id, the catalog's by its catalog_id (copied into the user's foods), or a new food, which is saved, each with an amount in the food's unit (g or ml; a food of the user's takes its own when left out), servings or portions; or an estimate, of a part nobody weighed or of a whole plate. The answer holds the meal with what each item brought, where its day stands (so no get_day around a log), and warnings: values that do not add up, or a meal that looks like one logged minutes before.",
         "operationId": "log-meal",
         "requestBody": {
           "content": {

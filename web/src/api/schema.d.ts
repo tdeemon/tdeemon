@@ -177,7 +177,7 @@ export interface paths {
         };
         /**
          * Look up a barcode
-         * @description Your food of a barcode, archived too; without one, the product of Open Food Facts as a new food, not saved, with its page there, and your food of its name and brand (named_food) if you have one, which a save of the product would correct: the product as a meal's new food is that food, and adds the barcode to it. A barcode misread, its check digit wrong, is refused (422). One neither has is 404, which names the product when Open Food Facts has it without its values (with your food of its name, 200). Open Food Facts that does not answer is 502; 30 lookups there a minute, and more are 429.
+         * @description Your food of a barcode, archived too; without one, the catalog's food of it (catalog), logged by catalog_id; without either, the product of Open Food Facts as a new food, not saved, with its page there, and your food of its name and brand (named_food) if you have one, which a save of the product would correct: the product as a meal's new food is that food, and adds the barcode to it. A barcode misread, its check digit wrong, is refused (422). One neither has is 404, which names the product when Open Food Facts has it without its values (with your food of its name, 200). Open Food Facts that does not answer is 502; 30 lookups there a minute, and more are 429.
          */
         get: operations["lookup-barcode"];
         put?: never;
@@ -285,7 +285,7 @@ export interface paths {
         };
         /**
          * Find foods
-         * @description Your foods whose name, brand or an alias has words starting with each word of a query, in any case and without the diacritics: the name's matches first, then the shorter name. Send a meal's foods at once, one query each: each food says which queries found it. Each has how much a meal had of it last. Archived foods are left out, or alone found with archived.
+         * @description Your foods whose name, brand or an alias has words starting with each word of a query, in any case and without the diacritics: the name's matches first, then the shorter name. Send a meal's foods at once, one query each: each food says which queries found it. Each has how much a meal had of it last. Archived foods are left out, or alone found with archived. Within the limit after yours, the instance's catalog's foods you have not (catalog), a label's values every user's saves keep: an item's catalog_id logs one, which makes it yours.
          */
         get: operations["find-foods"];
         put?: never;
@@ -663,7 +663,7 @@ export interface paths {
         put?: never;
         /**
          * Log a meal
-         * @description Logs a meal under the client's UUIDv7 (201); the same meal sent again under it is a retry (200), another a conflict (409). Without an id, from a client that cannot make one, the server makes it: that meal sent again is another (or a 409, when its items carry ids of their own), so after a timeout, look at get_day before sending it again. eaten_at left out is the id's time, so a retry has the same; a time still to come is refused (422). An item is a food of the user's by its food_id, or a new food, which is saved, each with an amount in the food's unit (g or ml; a food of the user's takes its own when left out), servings or portions; or an estimate, of a part nobody weighed or of a whole plate. The answer holds the meal with what each item brought, where its day stands (so no get_day around a log), and warnings: values that do not add up, or a meal that looks like one logged minutes before.
+         * @description Logs a meal under the client's UUIDv7 (201); the same meal sent again under it is a retry (200), another a conflict (409). Without an id, from a client that cannot make one, the server makes it: that meal sent again is another (or a 409, when its items carry ids of their own), so after a timeout, look at get_day before sending it again. eaten_at left out is the id's time, so a retry has the same; a time still to come is refused (422). An item is a food of the user's by its food_id, the catalog's by its catalog_id (copied into the user's foods), or a new food, which is saved, each with an amount in the food's unit (g or ml; a food of the user's takes its own when left out), servings or portions; or an estimate, of a part nobody weighed or of a whole plate. The answer holds the meal with what each item brought, where its day stands (so no get_day around a log), and warnings: values that do not add up, or a meal that looks like one logged minutes before.
          */
         post: operations["log-meal"];
         delete?: never;
@@ -1227,12 +1227,50 @@ export interface components {
         BarcodeOutputBody: {
             /** @description The barcode as a food keeps it: a UPC-A as its EAN-13, a 0 before it. */
             barcode: string;
+            /** @description Without a food of yours of the barcode, the catalog's food of it: a meal's item logs it by its catalog_id. */
+            catalog?: components["schemas"]["CatalogFoodBody"];
             /** @description Your food of the barcode, archived too, with its last use. */
             food?: components["schemas"]["FoodBody"];
             /** @description Your food of the product's name and brand, with its last use, whose barcodes lack the barcode yet: the product as a meal's new food is it, and adds the barcode to it. */
             named_food?: components["schemas"]["FoodBody"];
-            /** @description Without a food of yours of the barcode, the product at Open Food Facts. */
+            /** @description Without a food of yours nor the catalog's of the barcode, the product at Open Food Facts. */
             open_food_facts?: components["schemas"]["OpenFoodFactsBody"];
+        };
+        CatalogFoodBody: {
+            /** @description Other names search finds. */
+            aliases?: string[];
+            /** @description EAN-13, EAN-8 or UPC-A, each of one food. */
+            barcodes?: string[];
+            /**
+             * @description What the nutrients are for.
+             * @enum {string}
+             */
+            basis: "100g" | "100ml" | "portion";
+            /** @description The same name and brand are one food. */
+            brand?: string;
+            /**
+             * Format: uuid
+             * @description The catalog's id of it, no food of yours: an item's catalog_id.
+             */
+            id: string;
+            /** @example Greek yoghurt 2 % */
+            name: string;
+            note?: string;
+            nutrients: components["schemas"]["FoodNutrientsBody"];
+            /**
+             * Format: double
+             * @description For basis portion only: the grams of a portion, when known.
+             */
+            portion_grams?: number;
+            /** @description The queries of find_foods that found the food, of those it was sent. */
+            queries?: string[];
+            /** @description Named amounts: a piece, a slice. */
+            servings?: components["schemas"]["ServingBody"][];
+            /**
+             * @description Where the values come from; dish is an earlier client's, for no new food; recipe a recipe's, which changes only with it.
+             * @enum {string}
+             */
+            source: "label" | "estimate" | "reference" | "user" | "dish" | "off" | "recipe";
         };
         ChangeBody: {
             /** @description What the change did: food.save, food.archive, recipe.save, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge, notes.set, or a change of the plan: profile.set, limits.set, phase.set, phase.delete, target.set, target.delete, plan.weekdays, proposal.create, proposal.status, autopilot.set (the autopilot's settings). */
@@ -1746,8 +1784,10 @@ export interface components {
             meals: number;
         };
         FoodsOutputBody: {
+            /** @description After your foods, the instance's catalog's foods that you have not: a meal's item logs one by its catalog_id, which makes it yours. Not of archived. */
+            catalog: components["schemas"]["CatalogFoodBody"][];
             foods: components["schemas"]["FoodBody"][];
-            /** @description The queries that found no food: not to send again, though another form of their word may find it. */
+            /** @description The queries that found no food, yours nor the catalog's: not to send again, though another form of their word may find it. */
             unfound: string[];
         };
         HistoryBody: {
@@ -1964,6 +2004,11 @@ export interface components {
              * @description How much of the food, in unit; none for an estimate.
              */
             amount?: number;
+            /**
+             * Format: uuid
+             * @description A food of the catalog, from find_foods' catalog: copied into the user's foods, as a new food is saved.
+             */
+            catalog_id?: string;
             /** @description A new food, saved; one of the name and brand of the user's food is that food, unchanged. */
             food?: components["schemas"]["FoodFields"];
             /**
@@ -4865,7 +4910,7 @@ export interface operations {
             query: {
                 /** @description The start of words of the name, brand or an alias, in any case, without diacritics; one a food. */
                 query: string[];
-                /** @description The most foods of each query. */
+                /** @description The most foods of each query, yours and then the catalog's. */
                 limit?: number;
                 /** @description The archived foods instead of the others. */
                 archived?: boolean;

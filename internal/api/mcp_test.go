@@ -262,11 +262,11 @@ func TestMCPSchemasCarryWhatAModelUses(t *testing.T) {
 // history and notes, then for an item's quantities and a search again,
 // then for the coach's plan, then for its proposals, then for the limits
 // they change, then for a food's barcodes and their lookup, then for
-// recipes, then for the coaching sessions' guide.
+// recipes, then for the coaching sessions' guide, then for the catalog.
 func TestMCPFitsItsBudget(t *testing.T) {
 	t.Parallel()
 
-	const budget = 24750
+	const budget = 25400
 	in, session := signedIn(t)
 	cs := mcpSession(t, in, mcpToken(t, in, session, `"tools"`))
 	res, err := cs.ListTools(t.Context(), nil)
@@ -512,8 +512,8 @@ func TestMCPInstructions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := len(got) + len(list); n > 29500 {
-		t.Errorf("the instructions and the tools are %d bytes, want at most 29500", n)
+	if n := len(got) + len(list); n > 30100 {
+		t.Errorf("the instructions and the tools are %d bytes, want at most 30100", n)
 	}
 	known := map[string]bool{}
 	for _, tl := range res.Tools {
