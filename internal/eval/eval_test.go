@@ -68,7 +68,10 @@ type evalCase struct {
 	Notes string `json:"notes,omitempty"`
 	// SeedHistory weighs the user and logs a meal on each of the 63
 	// days before today, so there is a history to look back over.
-	SeedHistory bool   `json:"seed_history,omitempty"`
+	SeedHistory bool `json:"seed_history,omitempty"`
+	// SeedCatalog gives another user a protein bar of a label's, which
+	// the catalog has, and the user has not.
+	SeedCatalog bool   `json:"seed_catalog,omitempty"`
 	Expect      expect `json:"expect"`
 }
 
@@ -115,6 +118,9 @@ type expect struct {
 	// UnchangedFoods says the foods the user starts with are as they
 	// were, but for barcodes added: a save of one whole keeps the rest.
 	UnchangedFoods bool `json:"unchanged_foods,omitempty"`
+	// FromCatalog is a word of the name of a food of the catalog's the
+	// case makes the user's: their copy of it, of its values.
+	FromCatalog string `json:"from_catalog,omitempty"`
 }
 
 // systemPrompt is all the client says of itself: the policy comes from
@@ -255,6 +261,9 @@ func newInstance(t *testing.T, c evalCase) instance {
 	if c.Notes != "" {
 		must(db.SetProfileNotes(ctx, u.ID, actor, c.Notes, now))
 	}
+	if c.SeedCatalog {
+		seedCatalog(t, db, lang, now)
+	}
 	if c.SeedHistory {
 		for i := 1; i <= 63; i++ {
 			d := today.AddDays(-i)
@@ -295,6 +304,31 @@ func newInstance(t *testing.T, c evalCase) instance {
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	return instance{db: db, user: u, cal: cal, url: srv.URL + api.MCPPath, token: token, foods: ids, seeded: seeded}
+}
+
+// catalogBars are the name of the protein bar another user has, and its
+// serving, in each language.
+var catalogBars = map[string][2]string{"en": {"Protein bar", "bar"}, "hr": {"Proteinski bar", "komad"}}
+
+// seedCatalog gives another user a protein bar of a label's, 380 kcal
+// per 100 g and a bar of 55 g, which the catalog takes.
+func seedCatalog(t *testing.T, db *store.DB, lang string, now time.Time) {
+	t.Helper()
+	other := user.User{
+		ID: uuid.NewV7(), Email: "other@example.com", Name: "Other", Role: user.RoleUser, Locale: lang,
+		TimeZone: "Europe/Zagreb", DayStartHour: 4, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.CreateUser(t.Context(), other, ""); err != nil {
+		t.Fatal(err)
+	}
+	bar := catalogBars[lang]
+	f := food.Food{
+		ID: uuid.NewV7(), Name: bar[0], Brand: "Brawn", Basis: food.Per100g, Source: food.Label,
+		Nutrients: food.Nutrients{Kcal: 380, Protein: 30, Carbs: 40, Fat: 11}, Servings: []food.Serving{{Name: bar[1], Amount: 55}},
+	}
+	if _, err := db.SaveFood(t.Context(), other.ID, actor, f, now); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // openFoodFacts is an Open Food Facts of two products: a kefir the user
@@ -689,6 +723,7 @@ func check(t *testing.T, in instance, e expect, foodsBefore []string, turns []tu
 	}
 	checkCalls(t, in, e, turns)
 	checkFoods(t, in, e, foodsBefore)
+	checkFromCatalog(t, in, e.FromCatalog)
 	checkSources(t, in, e, foodsBefore, today)
 	checkDay(t, in, e, today)
 }
@@ -788,6 +823,23 @@ func checkFoods(t *testing.T, in instance, e expect, foodsBefore []string) {
 		if err != nil || !reflect.DeepEqual(now, *was) {
 			t.Errorf("the food %q: %+v, %v; want it as it was, %+v", was.Name, now, err, *was)
 		}
+	}
+}
+
+// checkFromCatalog holds the user's food of word to be their copy of the
+// catalog's: of its values, and the catalog's search leaving it out. No
+// word checks nothing.
+func checkFromCatalog(t *testing.T, in instance, word string) {
+	t.Helper()
+	if word == "" {
+		return
+	}
+	found, err := in.db.FindFoods(t.Context(), in.user.ID, word, 10)
+	if err != nil || len(found) != 1 || found[0].Source != food.Label || found[0].Nutrients.Kcal != 380 {
+		t.Errorf("the user's foods of %q = %+v, %v; want the catalog's, copied", word, found, err)
+	}
+	if left, err := in.db.FindCatalog(t.Context(), in.user.ID, word, 10); err != nil || len(left) != 0 {
+		t.Errorf("the catalog's of %q for the user = %+v, %v; want none: the copy is theirs", word, left, err)
 	}
 }
 

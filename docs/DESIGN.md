@@ -511,11 +511,12 @@ server gives codes and names, and the app the words.
        cache. The first log after the cache has expired (five minutes
        with Anthropic's) pays for the tools and instructions once more.
      - **The tools and the instructions are a budget of their own**,
-       which every request carries, cached or not: ~9.1k tokens as the
-       eval measured them in October 2026, as a client that does not
-       cache pays it in full with each request (~10.5k until October
-       2026, ~6k then until the rules of a meal's parts, ~6.5k until the
-       coach's history and notes, ~7k until the coach's plan). So a tool's
+       which every request carries, cached or not: ~10k tokens as the
+       eval measured them in November 2026, with the catalog, as a
+       client that does not cache pays it in full with each request
+       (~10.5k until October 2026, ~6k then until the rules of a meal's
+       parts, ~6.5k until the coach's history and notes, ~7k until the
+       coach's plan, ~9.1k until the catalog). So a tool's
        schema carries what a model needs to call it, not the format of a
        number, examples or bounds, which the operation checks; a schema
        two tools take is said in full in its own tool's (a new food in
