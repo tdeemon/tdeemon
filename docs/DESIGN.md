@@ -99,7 +99,8 @@ store layer and covered by tests that run every query as the wrong user.
 | `food_aliases` | food_id, user_id, alias | "the dessert from last Sunday", "my bread" |
 | `food_barcodes` | food_id, user_id, code | the product's barcodes, one for each size of its package, a scan of one finding the food; a barcode leads to one food of the user's; an EAN-13, EAN-8 or GTIN-14 by its digits, checked by its check digit, a UPC-A kept as its EAN-13 (a 0 before it) and a GTIN-14 of a 0 first as that EAN-13, so any form a scan reads finds it |
 | `catalog_foods` / `catalog_servings` / `catalog_barcodes` | id, name, brand, basis, the nutrients, portion_g?, source (label/reference/off), created_at, updated_at; its servings; its barcodes, each one product's | the instance's catalog, no user's ("The catalog" below); a user's food names the row it went into, or came from, in `foods.catalog_id`; `catalog_saves` (user_id, event_id, the row as the save found it, the version it left) is what a user's save did to it, for its undo |
-| `recipes` / `recipe_items` | food_id (the recipe's food), yield_g?, portions?, pot_g?; its ingredients as a meal's items (food_id, quantity as given, amount + unit, the nutrients) | batch cooking: a recipe is a food of `source: recipe` whose values per 100 g of the cooked dish are worked out of its ingredients and the dish's weight ("Recipes" below) |
+| `recipes` / `recipe_items` | food_id (the recipe's food), yield_g?, portions?, pot_g?; its ingredients as a meal's items (food_user_id + food_id, the food's owner and id, quantity as given, amount + unit, the nutrients) | batch cooking: a recipe is a food of `source: recipe` whose values per 100 g of the cooked dish are worked out of its ingredients and the dish's weight ("Recipes" below) |
+| `recipe_shares` | share_id, seat, user_id + food_id (the member's recipe), version, left_at? | a recipe shared between users: each member's recipe of it, tied together ("Shared recipes" below) |
 | `meals` | id, user_id, day, eaten_at, description, client (mcp/chat/web/telegram/import), note, fingerprint | the fingerprint of the create, for idempotent retries (§9) |
 | `meal_items` | id, meal_id, user_id, food_id?, name, brand (the food's, apart from its name), quantity as given (amount with its unit g/ml or without it for the food's own, or servings × serving, the serving left out for the food's one, or portions), amount + unit (g/ml/portion), the nutrients, source, note | **snapshot at log time**; editing a food later does not silently rewrite history |
 | `metrics` | user_id, day, metric, value, source, updated_at | long format: weight, body_fat, lean_mass, steps, active_kcal, basal_kcal, sleep_h, rhr, hrv, vo2max, exercise_min |
@@ -228,6 +229,31 @@ share is chosen, not taken over. A share logged reads as the nearest
 fraction of a denominator up to 12 ("⅒ of the recipe"), else a
 number, and portions in the language's plural; a meal does not say
 whether its dish was weighed, so neither shows grams there.
+
+**Shared recipes.** A recipe can be shared with another user of the
+instance, by their address, from the web app (decided 2 November 2026,
+story 403): one recipe each member has, finds and logs as a food of
+their own, and any member changes, a change everyone's from then on;
+logged meals keep their values. Each member keeps a recipe of their
+own (their food, recipes row and ingredients), so a meal's item and a
+search stay theirs, and `recipe_shares` ties them into a share, each
+member at a seat, with a version a save, a share and a stop move on. A
+save writes the shared fields (the name, the ingredients, the dish's
+weight, the portions, the pot) into the others'; each keeps their own
+note, aliases and whether it is archived. An ingredient may be another
+member's food, read as they have it, and kept at the values the recipe
+has once they leave the share or archive it; another sees its name,
+brand, values and servings, never among their own foods, and may add
+it to them as a copy. Every member is equal: shares it on, stops it
+with anyone, leaves it (their meals stay, but they pick it no more,
+anywhere). No one accepts a share; a Web Push tells the recipient. An
+undo goes through its user's event log: a save's after another
+member's change is refused, a share's takes the recipe from that
+member alone, and a recipe's creation is not undone while it is
+shared. A member's deleted account leaves the recipe with the others,
+its ingredients of their foods copies of the others' own. MCP finds,
+logs and changes a shared recipe, never shares one. A household,
+sharing every recipe of two accounts, is for later.
 
 The same name and brand (compared without regard to case or runs of
 space) are the same food: saving it again (`upsert_food`) corrects it

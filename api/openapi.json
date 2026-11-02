@@ -1821,6 +1821,11 @@
             "$ref": "#/components/schemas/NutrientsBody",
             "description": "What it brought when the recipe was saved."
           },
+          "portion_grams": {
+            "description": "A portion's grams of its food, per portion, when it said them.",
+            "format": "double",
+            "type": "number"
+          },
           "quantity": {
             "$ref": "#/components/schemas/QuantityBody",
             "description": "How much, as it was given."

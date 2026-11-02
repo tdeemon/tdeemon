@@ -493,6 +493,19 @@ in `web/`.
     (removing expired sessions) and the catalog, the instance's foods,
     no user's, which a declared food's save writes and every user's
     search reads (docs/DESIGN.md §4);
+  - the one exception the users make themselves is a shared recipe
+    (docs/DESIGN.md §4, "Shared recipes"): a save of a member's recipe
+    writes the shared fields into the other members' (their rows, under
+    their `user_id`), and its ingredients may be another member's foods,
+    whose name, brand, values and servings, and nothing else of theirs,
+    the others see in it. A share and its stop name the member by their
+    seat in the share, never by a user's or a food's id; an ingredient of
+    another member's food keeps that food's id and its owner's, which the
+    recipe needs, so the member's recipe, its saves' events and their
+    export hold those two ids, and nothing else of the other's.
+    `newIsolationEnv` gives the owner a recipe shared with the other, and
+    `TestIsolation` holds the other's operations to changing nothing of
+    the owner's;
   - a handler takes the user from the request's principal
     (`auth.PrincipalFrom`), never from the path, the query or the body
     (the sign-in, which finds the user by the address it is given,

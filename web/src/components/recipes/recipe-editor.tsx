@@ -55,7 +55,7 @@ export function RecipeEditor({
 }) {
   const t = useMessages()
   const items = food?.recipe?.items ?? []
-  const foods = useIngredientFoods(items.map((i) => i.food_id))
+  const foods = useIngredientFoods(items)
 
   if (food === undefined) {
     return <Form onSaved={onSaved} start={[]} notes={new Map()} />

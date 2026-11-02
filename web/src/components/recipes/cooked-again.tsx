@@ -80,7 +80,7 @@ function Ingredients({ food, onDone }: { food: Food; onDone: () => void }) {
   const t = useMessages()
   const f = useFormat()
   const items = food.recipe?.items ?? []
-  const foods = useIngredientFoods(items.map((i) => i.food_id))
+  const foods = useIngredientFoods(items)
   if (foods.foods === undefined) {
     return (
       <div className="p-4">

@@ -13,7 +13,8 @@ API. It is early: the skeleton, the database layer, users, sign-in
 (password, sessions, OpenID Connect), API tokens with scopes, foods
 (and the instance's catalog of the declared ones, which every user's
 search finds after their own, and a meal copies),
-meals, recipes, metrics and the plan (profile, phases, targets, limits) in the
+meals, recipes (shared with other users too, by address), metrics and
+the plan (profile, phases, targets, limits) in the
 domain and the database with an event log and undo, the proposals of
 changes of the plan and their life in the domain and the database, the
 API for the admin's users (an invite's link that makes one account,
@@ -240,7 +241,9 @@ details.
   tokens or sessions stay closed to them.
 - **One user's data stays theirs.** A store method for a user's rows
   takes the user's ID and filters by it; a handler takes the user from
-  the request's principal. A new operation in the OpenAPI document adds
+  the request's principal. The one exception is a recipe its users
+  shared, which a member's save writes into the others' recipes, as
+  docs/conventions.md says. A new operation in the OpenAPI document adds
   its case to `isolationCases` in `internal/api/isolation_test.go`, or
   the test fails, and a new kind of data adds rows of it for both users
   to `newIsolationEnv`; a new tool adds its case to
