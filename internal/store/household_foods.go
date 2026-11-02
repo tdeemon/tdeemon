@@ -143,7 +143,8 @@ func householdCopies(ctx context.Context, tx *sql.Tx, share string, userID uuid.
 
 // spreadFood writes userID's food f, as saved, into each other member of
 // their household's copy (writeCopy), making the copies they lack (a
-// recipe's food of the recipe whole), and moves the group's version on.
+// recipe's food of the recipe whole), links them to the catalog's row of
+// userID's food, and moves the group's version on.
 // It returns the group: "" when userID is in no household.
 func spreadFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, now time.Time) (string, error) {
 	share, fresh, err := householdSeats(ctx, tx, userID, f, now)
@@ -173,6 +174,9 @@ func spreadFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, 
 		if err := writeCopy(ctx, tx, f, m, now); err != nil {
 			return "", err
 		}
+	}
+	if err := linkCopies(ctx, tx, userID, f.ID, copies); err != nil {
+		return "", err
 	}
 	if _, err := bumpShare(ctx, tx, share); err != nil {
 		return "", err

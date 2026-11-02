@@ -773,7 +773,10 @@ func adoptIngredients(ctx context.Context, tx *sql.Tx, userID uuid.UUID) error {
 		}
 		k := key{scope, a.Food, frozen}
 		var id uuid.UUID
-		if had, ok := made[k]; ok {
+		switch had, ok := made[k]; {
+		case ok && had.User == a.User:
+			id = had.Food
+		case ok:
 			if id, err = copyIn(ctx, tx, had.User, had.Food, a.User, now); err != nil {
 				return err
 			}

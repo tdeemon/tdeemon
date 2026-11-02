@@ -455,3 +455,43 @@ func TestHouseholdAdoptsAGoneUsersIngredients(t *testing.T) {
 		nothingOf(t, db, u, "Chicken breast (2)", "Kefir (2)")
 	}
 }
+
+// A user outside any household whose recipes have one food of a user
+// whose account goes gets one food of it, which each recipe names.
+func TestAdoptionOutsideAHouseholdIsOneFood(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	chicken := saveFood(t, db, ana, chickenBreast())
+	k := saveFood(t, db, ana, kefir())
+	curry := saveRecipe(t, db, ana, curryOf(t, chicken, k))
+	stew := curryOf(t, chicken, k)
+	stew.Food.Name, stew.Food.Aliases = "Stew", nil
+	stew = saveRecipe(t, db, ana, stew)
+	for _, r := range []recipe.Recipe{curry, stew} {
+		if err := db.ShareRecipe(t.Context(), ana, testActor, r.Food.ID, ivo, t0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.DeleteUser(t.Context(), ana); err != nil {
+		t.Fatal(err)
+	}
+	copyNamed(t, db, ivo, "Chicken breast")
+	nothingOf(t, db, ivo, "Chicken breast (2)", "Kefir (2)")
+}
+
+// A catalogued food of before the household, which a recipe brings the
+// household, is one product: each copy names its catalog row.
+func TestHouseholdIngredientOfBeforeKeepsItsRow(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	chicken := saveFood(t, db, ana, chickenBreast())
+	inHousehold(t, db, ana, ivo)
+	k := kefir()
+	saveRecipe(t, db, ana, curryOf(t, chicken, k), k)
+	ivos := copyNamed(t, db, ivo, chicken.Name)
+	if a, i := catalogLink(t, db, ana, chicken.ID), catalogLink(t, db, ivo, ivos.ID); a == "" || a != i {
+		t.Errorf("the chicken's rows: Ana's %q, Ivo's %q; want one", a, i)
+	}
+}
