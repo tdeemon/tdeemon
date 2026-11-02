@@ -10,7 +10,9 @@ same rules; the full versions are in
 tdeemon is a self-hosted nutrition tracker with an adaptive TDEE: one Go
 binary with SQLite and a React web app inside, an MCP server and a REST
 API. It is early: the skeleton, the database layer, users, sign-in
-(password, sessions, OpenID Connect), API tokens with scopes, foods,
+(password, sessions, OpenID Connect), API tokens with scopes, foods
+(and the instance's catalog of the declared ones, which every user's
+search finds after their own, and a meal copies),
 meals, recipes, metrics and the plan (profile, phases, targets, limits) in the
 domain and the database with an event log and undo, the proposals of
 changes of the plan and their life in the domain and the database, the
@@ -80,9 +82,10 @@ corrections in a sheet that
 says its total as it changes, an item's amount with its unit and its
 other ways in a menu, its day picked by name and its time on the
 language's clock, a meal repeated or deleted taken there, a meal logged by hand
-in a sheet of the foods found, eaten lately or most and the meals of
-before, those eaten at the meal of the day lately first and today's
-last, the meals of it as cards above the search, whose keyboard waits
+in a sheet of the foods found (the catalog's after them, marked), eaten
+lately or most and the meals of before, those eaten at the meal of the
+day lately first and today's last, the meals of it as cards above the
+search, whose keyboard waits
 on a phone for a tap, a new food, an estimate or a barcode (the
 camera's, or its digits typed) a step of its own with one button, or
 a weigh-in from its chip, a recipe found marked, in a portion, a share
@@ -168,9 +171,9 @@ both themes and languages, exist.
 | `internal/push` | Web Push: a message encrypted for a browser's subscription (RFC 8291) and signed by the instance's VAPID key, derived from the secret key, to the push services alone |
 | `internal/watchdog` | the alarms when a user's data stop coming: no metric for 26 h, an ingest token unused for 3 days; to each channel of the user's |
 | `internal/scheduler` | the jobs of each user's day (the autopilot's weekly review, the morning summary, the watchdog), each occurrence once in the usual case and at least once in any, recorded in the store; and the planner's statistics refreshed daily |
-| `internal/store` | SQLite access and the migrations in `migrations/` |
+| `internal/store` | SQLite access, the instance's catalog of declared foods among it, and the migrations in `migrations/` |
 | `internal/store/storetest` | a fresh, migrated database file for tests |
-| `internal/api` | the HTTP API (huma), whose spec is `api/openapi.json`: sign-in, sessions, API tokens, the profile and the limits of a plan, the user's own change of it, the settings, the devices' push subscriptions and a test push, the list of foods, a new food, a new recipe, a food's use, the recent meals and the recent changes (web session only), the imports (API token only), and the tools, a barcode's food (the user's, or Open Food Facts' product) among them, the history, the plan, its proposals, the notes and a coaching session's guide among them (`tools.go`, the registry; `mcp.go` serves it at `/mcp`) |
+| `internal/api` | the HTTP API (huma), whose spec is `api/openapi.json`: sign-in, sessions, API tokens, the profile and the limits of a plan, the user's own change of it, the settings, the devices' push subscriptions and a test push, the list of foods, a new food, a new recipe, a food's use, the recent meals and the recent changes (web session only), the imports (API token only), and the tools, a barcode's food (the user's, the catalog's, or Open Food Facts' product) among them, the history, the plan, its proposals, the notes and a coaching session's guide among them (`tools.go`, the registry; `mcp.go` serves it at `/mcp`) |
 | `internal/server` | the HTTP server and graceful shutdown |
 | `internal/webui` | serves the built web app (build tag `webui`) |
 | `web/` | the React app (Vite, TypeScript 7, TanStack, Tailwind); its text in each language is in `web/src/i18n`, its end-to-end tests in `web/e2e` |

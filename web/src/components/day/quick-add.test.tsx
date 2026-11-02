@@ -1554,3 +1554,81 @@ test('a code the server says is misread is read again; a lookup that fails may m
   expect(sheet.getByText(/^Nobody has 96385074 yet\./)).toBeDefined()
   expect(server.made).toEqual([])
 })
+
+// protein is a food of the instance's catalog, which another user entered.
+const protein = {
+  id: '0193c3a5-0000-7000-8000-0000000000c1',
+  name: 'Protein bar',
+  brand: 'Brawn',
+  basis: '100g',
+  nutrients: { kcal: 380, protein: 30, carbs: 40, fat: 11 },
+  servings: [{ name: 'bar', amount: 55 }],
+  barcodes: ['4006381333931'],
+  source: 'label',
+} as const
+
+test("a search finds the catalog's foods after the user's, marked, and one is logged by its catalog_id", async () => {
+  const server = logServer('2026-10-23', {
+    'GET /api/v1/foods': () => Response.json({ foods: [bread], catalog: [protein], unfound: [] }),
+  })
+  renderAt('/')
+
+  const sheet = await openSheet()
+  fireEvent.change(sheet.getByLabelText('Find a food or a meal'), { target: { value: 'b' } })
+  const found = await sheet.findByRole('button', { name: /^Protein bar/ })
+  expect(found.textContent).toContain('catalog')
+  expect(sheet.getByRole('button', { name: /^Rye bread/ }).textContent).not.toContain('catalog')
+  const rows = within(sheet.getByRole('list', { name: 'What there is to add' })).getAllByRole(
+    'listitem',
+  )
+  // After the user's bread.
+  expect(rows.findIndex((r) => r.textContent.includes('Protein bar'))).toBe(
+    rows.findIndex((r) => r.textContent.includes('Rye bread')) + 1,
+  )
+  fireEvent.click(sheet.getByRole('button', { name: 'Add: Protein bar · Brawn' }))
+  await waitFor(() => {
+    expect(basket(sheet)).toEqual(['Protein bar · 100 g · 380 kcal'])
+  })
+  fireEvent.click(sheet.getByRole('button', { name: /^Log 1 item/ }))
+
+  await screen.findByText(/^Logged:/)
+  expect(server.sent).toEqual([
+    expect.objectContaining({
+      items: [
+        { id: expect.any(String) as unknown, catalog_id: protein.id, amount: 100, unit: 'g' },
+      ],
+    }),
+  ])
+})
+
+test("a barcode of the catalog's food opens it for its amount, and is logged by its catalog_id", async () => {
+  const server = logServer('2026-10-23', {
+    'GET /api/v1/barcodes/4006381333931': () =>
+      Response.json({ barcode: '4006381333931', catalog: protein }),
+  })
+  renderAt('/')
+
+  const sheet = await openSheet()
+  await typeCode(sheet, '4006381333931')
+  expect(
+    await sheet.findByText('From the catalog: added, it is yours. · 380 kcal per 100 g'),
+  ).toBeDefined()
+  fireEvent.change(sheet.getByLabelText('Unit: Protein bar · Brawn'), {
+    target: { value: 'serving:bar' },
+  })
+  fireEvent.change(sheet.getByLabelText('Amount: Protein bar · Brawn'), { target: { value: '1' } })
+  fireEvent.click(sheet.getByRole('button', { name: /^Add: Protein bar/ }))
+  await waitFor(() => {
+    expect(basket(sheet)).toEqual(['Protein bar · 1 bar · 209 kcal'])
+  })
+  fireEvent.click(sheet.getByRole('button', { name: /^Log 1 item/ }))
+
+  await screen.findByText(/^Logged:/)
+  expect(server.sent).toEqual([
+    expect.objectContaining({
+      items: [
+        { id: expect.any(String) as unknown, catalog_id: protein.id, serving: 'bar', servings: 1 },
+      ],
+    }),
+  ])
+})

@@ -17,12 +17,22 @@ type LogMealBody = components['schemas']['LogMealBody']
 type Format = ReturnType<typeof useFormat>
 
 // An entry is an item of a meal being logged, as typed: a food of the
-// user's in an amount and a unit of it, or an estimate of a whole plate.
+// user's, or of the catalog (catalog), in an amount and a unit of it, or
+// an estimate of a whole plate. Logged, a food of the catalog is copied
+// into the user's foods.
 // Its key is the item's id too, so a meal sent again is the same. A
 // food's exact is the amount a unit chosen worked out, before it was
 // rounded to be shown, until the amount is typed: it is what is sent.
 export type Entry =
-  | { key: string; kind: 'food'; food: Food; amount: string; unit: string; exact?: number }
+  | {
+      key: string
+      kind: 'food'
+      food: Food
+      amount: string
+      unit: string
+      exact?: number
+      catalog?: true
+    }
   | {
       key: string
       kind: 'estimate'
@@ -386,7 +396,13 @@ export function entryItem(
     const n = entryAmount(entry, parse)
     return n === undefined
       ? { wrong: { kind: 'number' } }
-      : { item: { id: entry.key, food_id: entry.food.id, ...quantityIn(entry.unit, n) } }
+      : {
+          item: {
+            id: entry.key,
+            ...(entry.catalog ? { catalog_id: entry.food.id } : { food_id: entry.food.id }),
+            ...quantityIn(entry.unit, n),
+          },
+        }
   }
   const nutrients = entryValues(entry, parse)
   return nutrients === undefined

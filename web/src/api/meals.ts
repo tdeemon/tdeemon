@@ -26,7 +26,8 @@ function meals(queryClient: QueryClient) {
 
 // useLogMeal logs a meal of day date. Its answer has the day's totals but
 // not its meals, so the days are asked again, and the meals of before and
-// the foods by their use; the meal stands logged once they came. They are
+// the foods by their use, and the searches after a food of the catalog
+// was made the user's; the meal stands logged once they came. They are
 // when it failed too: without an answer it may have been logged all the
 // same, and the day shows whether it was. Each change here runs done once
 // the server took it, whether the page that made it is still shown or
@@ -38,7 +39,13 @@ export function useLogMeal(date: string, done?: (answer: MealAnswer) => void) {
     onSuccess: (answer) => {
       done?.(answer)
     },
-    onSettled: () => meals(queryClient),
+    onSettled: (_answer, _error, { body }) =>
+      Promise.all([
+        meals(queryClient),
+        ...(body.items.some((item) => item.catalog_id !== undefined)
+          ? [queryClient.invalidateQueries({ queryKey: ['get', '/api/v1/foods'] })]
+          : []),
+      ]),
   })
 }
 
@@ -46,8 +53,8 @@ export function useLogMeal(date: string, done?: (answer: MealAnswer) => void) {
 // answer has the day's totals but not its meals, so the days are asked
 // again, with the meals of before and the foods by their use; the change
 // stands done once they came. The days are for a meal no longer there
-// (404) too, deleted elsewhere. A change that saved a food asks the
-// foods' searches again too.
+// (404) too, deleted elsewhere. A change that saved a food, or made one
+// of the catalog the user's, asks the foods' searches again too.
 export function useUpdateMeal(date: string, done?: (answer: MealAnswer) => void) {
   const queryClient = useQueryClient()
   return $api.useMutation('patch', '/api/v1/meals/{id}', {
@@ -56,7 +63,7 @@ export function useUpdateMeal(date: string, done?: (answer: MealAnswer) => void)
       done?.(answer)
       return Promise.all([
         meals(queryClient),
-        ...(body.ops?.some((op) => op.item?.food !== undefined)
+        ...(body.ops?.some((op) => op.item?.food !== undefined || op.item?.catalog_id !== undefined)
           ? [queryClient.invalidateQueries({ queryKey: ['get', '/api/v1/foods'] })]
           : []),
       ])
