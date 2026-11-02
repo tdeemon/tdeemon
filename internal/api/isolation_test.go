@@ -89,6 +89,7 @@ func newIsolationEnv(t *testing.T, adminActs bool) isolationEnv {
 		t.Fatalf("CreateUser: %v", err)
 	}
 	ana, ivos := party{user: in.user}, party{user: ivo}
+	guest := newIsolationUser(t, in.db, "lea@example.com", "Lea", now)
 	for _, p := range []*party{&ana, &ivos} {
 		// A session straight in the store: no sign-in to spend a hash on.
 		token, id := auth.NewSessionToken()
@@ -127,6 +128,7 @@ func newIsolationEnv(t *testing.T, adminActs bool) isolationEnv {
 		p.applied, p.pending = saveIsolationPlan(t, in.db, p.user, now)
 		p.push, p.pushEndpoint = saveIsolationPush(t, in.db, p.user, now)
 		p.invite = saveIsolationInvite(t, in.db, p.user, now)
+		saveIsolationHousehold(t, in.db, p.user, guest, now)
 		identity := store.Identity{Issuer: "https://idp.example", Subject: "subject-of-" + p.user.Name, Email: p.user.Email, EmailVerified: true}
 		if _, err := in.db.SignInWithIdentity(t.Context(), identity, now); err != nil {
 			t.Fatalf("link %s's identity: %v", p.user.Name, err)
@@ -254,6 +256,48 @@ func saveIsolationInvite(t *testing.T, db *store.DB, u user.User, now time.Time)
 	return id
 }
 
+// saveIsolationHousehold puts u in a household of their own with a
+// third user, and gives u an invite into it waiting for guest, whom
+// both parties invite, so the guest is neither's alone: no household
+// between the two parties, whose foods would be shared.
+func saveIsolationHousehold(t *testing.T, db *store.DB, u user.User, guest uuid.UUID, now time.Time) {
+	t.Helper()
+	mate := newIsolationUser(t, db, strings.ToLower(u.Name)+".housemate@example.com", u.Name+"'s housemate", now)
+	at := now.UTC().Format(time.RFC3339)
+	household := uuid.NewV7().String()
+	err := db.WriteTx(t.Context(), func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(t.Context(), "INSERT INTO households (id, created_at) VALUES (?, ?)", household, at); err != nil {
+			return err
+		}
+		for _, m := range []uuid.UUID{u.ID, mate} {
+			if _, err := tx.ExecContext(t.Context(), "INSERT INTO household_members (user_id, household_id, joined_at) VALUES (?, ?, ?)",
+				m.String(), household, at); err != nil {
+				return err
+			}
+		}
+		_, err := tx.ExecContext(t.Context(), "INSERT INTO household_invites (id, user_id, invited_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+			uuid.NewV7().String(), u.ID.String(), guest.String(), at, now.Add(7*24*time.Hour).UTC().Format(time.RFC3339))
+		return err
+	})
+	if err != nil {
+		t.Fatalf("household of %s: %v", u.Name, err)
+	}
+}
+
+// newIsolationUser makes a third user, of neither party, and returns
+// their id.
+func newIsolationUser(t *testing.T, db *store.DB, email, name string, now time.Time) uuid.UUID {
+	t.Helper()
+	u := user.User{
+		ID: uuid.NewV7(), Email: email, Name: name, Role: user.RoleUser,
+		Locale: "en", TimeZone: "UTC", DayStartHour: 4, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.CreateUser(t.Context(), u, isolationHash); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	return u.ID
+}
+
 // saveIsolationRecipe gives u a recipe of bread, in portions.
 func saveIsolationRecipe(t *testing.T, db *store.DB, u user.User, bread food.Food, now time.Time) {
 	t.Helper()
@@ -272,7 +316,7 @@ func saveIsolationRecipe(t *testing.T, db *store.DB, u user.User, bread food.Foo
 
 // saveIsolationShare gives u a stew of bread, shared with with: a
 // recipe each of them has, of u's food (story 403), the one exception to
-// the isolation of a user's data, in recipe_shares and recipe_items.
+// the isolation of a user's data, in food_shares and recipe_items.
 func saveIsolationShare(t *testing.T, db *store.DB, u, with user.User, bread food.Food, now time.Time) {
 	t.Helper()
 	crumbs, err := meal.FromFood(bread, meal.Quantity{Amount: 200, Unit: "g"}, "")
@@ -465,10 +509,11 @@ func saveIsolationPlan(t *testing.T, db *store.DB, u user.User, now time.Time) (
 }
 
 // noOnesData are the tables that hold no user's data: the migrations,
-// and the catalog, the instance's, which holds what a declared food's
-// save gives every user and nothing else of anyone's (store's
-// TestCatalogTakesDeclaredFoodsAlone).
-var noOnesData = []string{"schema_migrations", "catalog_foods", "catalog_barcodes", "catalog_servings", "catalog_fts"}
+// the catalog, the instance's, which holds what a declared food's save
+// gives every user and nothing else of anyone's (store's
+// TestCatalogTakesDeclaredFoodsAlone), and the households, an id and a
+// time each, whose members are household_members' rows, each a user's.
+var noOnesData = []string{"schema_migrations", "catalog_foods", "catalog_barcodes", "catalog_servings", "catalog_fts", "households"}
 
 // userTables lists users and every table with a user_id column, from the
 // schema itself. A table with neither fails the test: every table of a

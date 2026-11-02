@@ -67,6 +67,10 @@ the `schema_migrations` table.
   they hold what a declared food's save gives every user, and nothing
   else of anyone's (`TestCatalogTakesDeclaredFoodsAlone`). The
   isolation test lists them as no one's data.
+- `households` has no `user_id` either: a row is a household's id and
+  when it was made, nothing of a member's; who is in it are
+  `household_members`' rows, each a user's. The isolation test lists it
+  as no one's data too.
 - A full-text (FTS5) table has a `user_id` column too (`UNINDEXED`); the
   shadow tables SQLite keeps its index in (`<name>_data`, `_idx`,
   `_content`, `_docsize`, `_config`) are read only through it, and

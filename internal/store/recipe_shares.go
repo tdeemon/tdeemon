@@ -17,14 +17,15 @@ import (
 
 // A shared recipe (story 403) is one recipe each of its members has:
 // every member keeps a recipe of their own (their food, recipes row and
-// ingredients), and recipe_shares ties those recipes into a group. A
-// save of one writes the shared fields into the others' (syncShared); a
-// member who left keeps their recipe for their meals, but picks it no
-// more (notWithdrawn).
+// ingredients), and food_shares ties those recipes into a group, in
+// seats of an explicit share (household 0; a household's seats tie any
+// food, story 408). A save of one writes the shared fields into the
+// others' (syncShared); a member who left keeps their recipe for their
+// meals, but picks it no more (notWithdrawn).
 
 // notWithdrawn holds a food f to be one its user may pick: none a user
 // left the share of. A meal of it reads all the same.
-const notWithdrawn = `NOT EXISTS (SELECT 1 FROM recipe_shares AS rs
+const notWithdrawn = `NOT EXISTS (SELECT 1 FROM food_shares AS rs
 	WHERE rs.user_id = f.user_id AND rs.food_id = f.id AND rs.left_at IS NOT NULL)`
 
 // RecipeMember is a member of a shared recipe: their seat in its share,
@@ -40,7 +41,7 @@ type RecipeMember struct {
 // share of.
 func withdrawn(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID) (bool, error) {
 	var left bool
-	err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM recipe_shares
+	err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM food_shares
 		WHERE user_id = ? AND food_id = ? AND left_at IS NOT NULL)`, userID.String(), id.String()).Scan(&left)
 	return left, err
 }
@@ -52,7 +53,7 @@ func shareOf(ctx context.Context, tx *sql.Tx, userID, foodID uuid.UUID) (string,
 	var share string
 	var version int64
 	var left sql.NullString
-	err := tx.QueryRowContext(ctx, "SELECT share_id, version, left_at FROM recipe_shares WHERE user_id = ? AND food_id = ?",
+	err := tx.QueryRowContext(ctx, "SELECT share_id, version, left_at FROM food_shares WHERE user_id = ? AND food_id = ?",
 		userID.String(), foodID.String()).Scan(&share, &version, &left)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -96,7 +97,7 @@ func (db *DB) RecipeMembers(ctx context.Context, userID, foodID uuid.UUID) ([]Re
 // shareMembers returns the live members of share, first among them
 // userID, and the others by name.
 func shareMembers(ctx context.Context, tx *sql.Tx, share string, first uuid.UUID) ([]RecipeMember, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT rs.seat, u.id, u.name, u.email FROM recipe_shares AS rs JOIN users AS u ON u.id = rs.user_id
+	rows, err := tx.QueryContext(ctx, `SELECT rs.seat, u.id, u.name, u.email FROM food_shares AS rs JOIN users AS u ON u.id = rs.user_id
 		WHERE rs.share_id = ? AND rs.left_at IS NULL ORDER BY u.id <> ?, u.name, u.id`, share, first.String())
 	if err != nil {
 		return nil, err
@@ -150,7 +151,7 @@ type shareState struct {
 func seatOf(ctx context.Context, tx *sql.Tx, share string, seat int) (shareMember, bool, error) {
 	var u, f string
 	var left sql.NullString
-	err := tx.QueryRowContext(ctx, "SELECT user_id, food_id, left_at FROM recipe_shares WHERE share_id = ? AND seat = ?",
+	err := tx.QueryRowContext(ctx, "SELECT user_id, food_id, left_at FROM food_shares WHERE share_id = ? AND seat = ?",
 		share, seat).Scan(&u, &f, &left)
 	if errors.Is(err, sql.ErrNoRows) {
 		return shareMember{}, false, ErrNotFound
@@ -171,9 +172,9 @@ func seatOf(ctx context.Context, tx *sql.Tx, share string, seat int) (shareMembe
 // row along).
 func insertSeat(ctx context.Context, tx *sql.Tx, share string, userID, foodID uuid.UUID) (int, error) {
 	var seat int
-	err := tx.QueryRowContext(ctx, `INSERT INTO recipe_shares (share_id, seat, user_id, food_id, version)
-		VALUES (?1, (SELECT max(coalesce(max(seat), 0), coalesce(max(version), 0)) + 1 FROM recipe_shares WHERE share_id = ?1), ?2, ?3,
-			(SELECT coalesce(max(version), 1) FROM recipe_shares WHERE share_id = ?1))
+	err := tx.QueryRowContext(ctx, `INSERT INTO food_shares (share_id, seat, user_id, food_id, version)
+		VALUES (?1, (SELECT max(coalesce(max(seat), 0), coalesce(max(version), 0)) + 1 FROM food_shares WHERE share_id = ?1), ?2, ?3,
+			(SELECT coalesce(max(version), 1) FROM food_shares WHERE share_id = ?1))
 		RETURNING seat`, share, userID.String(), foodID.String()).Scan(&seat)
 	return seat, err
 }
@@ -186,7 +187,7 @@ type shareMember struct {
 
 // liveMembers returns the live members of share but userID.
 func liveMembers(ctx context.Context, tx *sql.Tx, share string, but uuid.UUID) ([]shareMember, error) {
-	rows, err := tx.QueryContext(ctx, "SELECT user_id, food_id FROM recipe_shares WHERE share_id = ? AND left_at IS NULL AND user_id <> ?",
+	rows, err := tx.QueryContext(ctx, "SELECT user_id, food_id FROM food_shares WHERE share_id = ? AND left_at IS NULL AND user_id <> ?",
 		share, but.String())
 	if err != nil {
 		return nil, err
@@ -212,7 +213,7 @@ func liveMembers(ctx context.Context, tx *sql.Tx, share string, but uuid.UUID) (
 
 // bumpShare moves share's version on, in its live rows, and returns it.
 func bumpShare(ctx context.Context, tx *sql.Tx, share string) (int64, error) {
-	if _, err := tx.ExecContext(ctx, "UPDATE recipe_shares SET version = (SELECT max(version) FROM recipe_shares WHERE share_id = ?1) + 1 WHERE share_id = ?1 AND left_at IS NULL",
+	if _, err := tx.ExecContext(ctx, "UPDATE food_shares SET version = (SELECT max(version) FROM food_shares WHERE share_id = ?1) + 1 WHERE share_id = ?1 AND left_at IS NULL",
 		share); err != nil {
 		return 0, err
 	}
@@ -222,7 +223,7 @@ func bumpShare(ctx context.Context, tx *sql.Tx, share string) (int64, error) {
 // shareVersion is share's version: the highest of its rows'.
 func shareVersion(ctx context.Context, tx *sql.Tx, share string) (int64, error) {
 	var v sql.NullInt64
-	err := tx.QueryRowContext(ctx, "SELECT max(version) FROM recipe_shares WHERE share_id = ?", share).Scan(&v)
+	err := tx.QueryRowContext(ctx, "SELECT max(version) FROM food_shares WHERE share_id = ?", share).Scan(&v)
 	return v.Int64, err
 }
 
@@ -337,7 +338,7 @@ func shareRecipeInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.
 		return err
 	}
 	if back {
-		_, err = tx.ExecContext(ctx, "UPDATE recipe_shares SET left_at = NULL WHERE share_id = ? AND seat = ?", share, seat)
+		_, err = tx.ExecContext(ctx, "UPDATE food_shares SET left_at = NULL WHERE share_id = ? AND seat = ?", share, seat)
 	} else {
 		seat, err = insertSeat(ctx, tx, share, withID, to.Food)
 	}
@@ -411,7 +412,7 @@ func recipient(ctx context.Context, tx *sql.Tx, share string, withID uuid.UUID) 
 	var f string
 	var seat int
 	var left sql.NullString
-	err := tx.QueryRowContext(ctx, "SELECT food_id, seat, left_at FROM recipe_shares WHERE share_id = ? AND user_id = ?",
+	err := tx.QueryRowContext(ctx, "SELECT food_id, seat, left_at FROM food_shares WHERE share_id = ? AND user_id = ?",
 		share, withID.String()).Scan(&f, &seat, &left)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -469,7 +470,7 @@ func leave(ctx context.Context, tx *sql.Tx, share string, seat int, now time.Tim
 	if err != nil {
 		return shareState{}, err
 	}
-	_, err = tx.ExecContext(ctx, "UPDATE recipe_shares SET left_at = ? WHERE share_id = ? AND seat = ?",
+	_, err = tx.ExecContext(ctx, "UPDATE food_shares SET left_at = ? WHERE share_id = ? AND seat = ?",
 		formatTime(now), share, seat)
 	return shareState{Share: share, Seat: seat, Left: true, Version: version}, err
 }
@@ -533,7 +534,7 @@ func takeBackUnshare(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.
 	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, "UPDATE recipe_shares SET left_at = NULL WHERE share_id = ? AND seat = ?",
+	if _, err := tx.ExecContext(ctx, "UPDATE food_shares SET left_at = NULL WHERE share_id = ? AND seat = ?",
 		s.Share, s.Seat); err != nil {
 		return err
 	}
@@ -706,7 +707,7 @@ func sharedWithOthers(ctx context.Context, tx *sql.Tx, userID, foodID uuid.UUID)
 // withoutWithdrawn returns ms but the meals of a food of userID's that is
 // a recipe they left.
 func (db *DB) withoutWithdrawn(ctx context.Context, userID uuid.UUID, ms []meal.Meal) ([]meal.Meal, error) {
-	rows, err := db.read.QueryContext(ctx, "SELECT food_id FROM recipe_shares WHERE user_id = ? AND left_at IS NOT NULL", userID.String())
+	rows, err := db.read.QueryContext(ctx, "SELECT food_id FROM food_shares WHERE user_id = ? AND left_at IS NOT NULL", userID.String())
 	if err != nil {
 		return nil, err
 	}
@@ -776,7 +777,7 @@ func ingredientSource(ctx context.Context, tx *sql.Tx, userID uuid.UUID, share s
 // liveIn reports whether userID is a live member of share.
 func liveIn(ctx context.Context, tx *sql.Tx, share string, userID uuid.UUID) (bool, error) {
 	var live bool
-	err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM recipe_shares WHERE share_id = ? AND user_id = ? AND left_at IS NULL)",
+	err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM food_shares WHERE share_id = ? AND user_id = ? AND left_at IS NULL)",
 		share, userID.String()).Scan(&live)
 	return live, err
 }
@@ -872,7 +873,7 @@ func (db *DB) IngredientFoods(ctx context.Context, userID, id uuid.UUID) (map[in
 // past it comes back to it, so the change before, which left it, is the
 // latest again.
 func setShareVersion(ctx context.Context, tx *sql.Tx, share string, v int64) error {
-	_, err := tx.ExecContext(ctx, "UPDATE recipe_shares SET version = ?2 WHERE share_id = ?1 AND version > ?2", share, v)
+	_, err := tx.ExecContext(ctx, "UPDATE food_shares SET version = ?2 WHERE share_id = ?1 AND version > ?2", share, v)
 	return err
 }
 
@@ -932,8 +933,8 @@ func (db *DB) IngredientFood(ctx context.Context, userID, recipeID uuid.UUID, po
 // share opens. ErrNotFound when memberID is no live member of it.
 func (db *DB) MembersRecipe(ctx context.Context, userID, foodID, memberID uuid.UUID) (uuid.UUID, string, error) {
 	var id, name string
-	err := db.read.QueryRowContext(ctx, `SELECT f.id, f.name FROM recipe_shares AS mine
-		JOIN recipe_shares AS theirs ON theirs.share_id = mine.share_id AND theirs.user_id = ?3 AND theirs.left_at IS NULL
+	err := db.read.QueryRowContext(ctx, `SELECT f.id, f.name FROM food_shares AS mine
+		JOIN food_shares AS theirs ON theirs.share_id = mine.share_id AND theirs.user_id = ?3 AND theirs.left_at IS NULL
 		JOIN foods AS f ON f.user_id = theirs.user_id AND f.id = theirs.food_id
 		WHERE mine.user_id = ?1 AND mine.food_id = ?2 AND mine.left_at IS NULL`,
 		userID.String(), foodID.String(), memberID.String()).Scan(&id, &name)

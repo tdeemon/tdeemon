@@ -54,16 +54,20 @@ func TestMigrationOfRecipeShares(t *testing.T) {
 	if err := db.migrate(t.Context(), upTo(t, "0032_recipe_shares.sql"), discard()); err != nil {
 		t.Fatalf("migrate to 0032: %v", err)
 	}
-	r, err := db.RecipeByID(t.Context(), ana, sauce)
-	if err != nil || len(r.Items) != 1 || r.Items[0].FoodID != beef.ID || r.Items[0].FoodUser != uuid.Nil() || r.Items[0].Nutrients.Kcal != 1250 {
-		t.Fatalf("Ana's recipe after 0032 = %+v, %v; want her beef, hers, 1250 kcal", r, err)
-	}
 	var owner string
 	if err := db.write.QueryRowContext(t.Context(), "SELECT food_user_id FROM recipe_items WHERE recipe_id = ?", sauce.String()).Scan(&owner); err != nil || owner != ana.String() {
 		t.Errorf("the ingredient's owner = %q, %v; want Ana", owner, err)
 	}
 	must(`INSERT INTO events (id, user_id, at, actor, client, operation, entity) VALUES (?, ?, ?, 'user', 'web', 'recipe.share', ?)`,
 		uuid.NewV7().String(), ana.String(), formatTime(now), sauce.String())
+	// The store reads the share groups of 0033, food_shares.
+	if err := db.migrate(t.Context(), upTo(t, "0033_food_shares.sql"), discard()); err != nil {
+		t.Fatalf("migrate to 0033: %v", err)
+	}
+	r, err := db.RecipeByID(t.Context(), ana, sauce)
+	if err != nil || len(r.Items) != 1 || r.Items[0].FoodID != beef.ID || r.Items[0].FoodUser != uuid.Nil() || r.Items[0].Nutrients.Kcal != 1250 {
+		t.Fatalf("Ana's recipe after 0032 = %+v, %v; want her beef, hers, 1250 kcal", r, err)
+	}
 	ingredientOfAFoodGone(t, db, ana, ivo, beef.ID, now)
 }
 
