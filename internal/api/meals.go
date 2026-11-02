@@ -32,17 +32,18 @@ func clientOf(p auth.Principal) meal.Client {
 }
 
 // itemInput is one thing eaten, as a client gives it: a food of the
-// user's by its id, or a new food, with how much; or a one-off estimate
-// of a whole plate.
+// user's by its id, a food of the catalog by its id, or a new food, with
+// how much; or a one-off estimate of a whole plate.
 type itemInput struct {
-	ID       string      `json:"id,omitempty" format:"uuid" doc:"The item's id; made when left out."`
-	FoodID   string      `json:"food_id,omitempty" format:"uuid" doc:"A food of the user's, from find_foods."`
-	Food     *FoodFields `json:"food,omitempty" doc:"A new food, saved; one of the name and brand of the user's food is that food, unchanged."`
-	Amount   float64     `json:"amount,omitempty" minimum:"0" doc:"How much of the food, in unit; none for an estimate."`
-	Unit     string      `json:"unit,omitempty" enum:"g,ml" doc:"The amount's unit, g or ml (g of a portion of known weight); with an amount only. Left out for a food_id, the food's; a new food's amount, or one per portion, needs it."`
-	Servings float64     `json:"servings,omitempty" minimum:"0" doc:"How many of the food's serving."`
-	Serving  string      `json:"serving,omitempty" doc:"The serving's name, as the food names it; left out, the food's one, but a new food names it."`
-	Portions float64     `json:"portions,omitempty" minimum:"0" doc:"Portions of a food per portion."`
+	ID        string      `json:"id,omitempty" format:"uuid" doc:"The item's id; made when left out."`
+	FoodID    string      `json:"food_id,omitempty" format:"uuid" doc:"A food of the user's, from find_foods."`
+	CatalogID string      `json:"catalog_id,omitempty" format:"uuid" doc:"A food of the catalog, from find_foods' catalog: copied into the user's foods, as a new food is saved."`
+	Food      *FoodFields `json:"food,omitempty" doc:"A new food, saved; one of the name and brand of the user's food is that food, unchanged."`
+	Amount    float64     `json:"amount,omitempty" minimum:"0" doc:"How much of the food, in unit; none for an estimate."`
+	Unit      string      `json:"unit,omitempty" enum:"g,ml" doc:"The amount's unit, g or ml (g of a portion of known weight); with an amount only. Left out for a food_id, the food's; a new food's amount, or one per portion, needs it."`
+	Servings  float64     `json:"servings,omitempty" minimum:"0" doc:"How many of the food's serving."`
+	Serving   string      `json:"serving,omitempty" doc:"The serving's name, as the food names it; left out, the food's one, but a new food names it."`
+	Portions  float64     `json:"portions,omitempty" minimum:"0" doc:"Portions of a food per portion."`
 	// Name and Nutrients make an estimate.
 	Name      string             `json:"name,omitempty" maxLength:"200" doc:"A whole plate's estimate: its name, with nutrients."`
 	Nutrients *foodNutrientsBody `json:"nutrients,omitempty" doc:"The estimate's values, for the whole plate."`
@@ -50,7 +51,7 @@ type itemInput struct {
 }
 
 // errNotItem is the 422 of an item of no kind, or of two.
-var errNotItem = errors.New("an item is one of: a food_id with its quantity, a food with its quantity, or an estimate (name and nutrients)")
+var errNotItem = errors.New("an item is one of: a food_id, a catalog_id or a food, with its quantity, or an estimate (name and nutrients)")
 
 // sentItem is the item in as the client sent it, worked out without the
 // store: its kind checked, its food by id, its new food checked and told
@@ -100,6 +101,50 @@ func sentItem(in *itemInput) (meal.Item, *food.Food, []meal.Warning, error) {
 			return meal.Item{}, nil, nil, huma.Error422UnprocessableEntity("the item's id: " + err.Error())
 		}
 	}
+	return it, nf, warnings, nil
+}
+
+// sentOf is sentItem of in, but of an item of a food of the catalog: the
+// item of that food as a new food, as the catalog has it now, without
+// the barcodes the user's foods have (a code is one food's), and told by
+// the catalog's id (meal.SentCatalogFood). Logged, it is copied into the
+// user's foods, and the store links the copy to its row.
+func (s *sessions) sentOf(ctx context.Context, p auth.Principal, in *itemInput) (meal.Item, *food.Food, []meal.Warning, error) {
+	if in.CatalogID == "" {
+		return sentItem(in)
+	}
+	if in.FoodID != "" || in.Food != nil || in.Name != "" || in.Nutrients != nil {
+		return meal.Item{}, nil, nil, huma.Error422UnprocessableEntity(errNotItem.Error())
+	}
+	id, err := uuid.Parse(in.CatalogID)
+	if err != nil {
+		return meal.Item{}, nil, nil, huma.Error422UnprocessableEntity("no such food in the catalog: " + in.CatalogID)
+	}
+	f, err := s.db.CatalogFood(ctx, id)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return meal.Item{}, nil, nil, huma.Error422UnprocessableEntity("no such food in the catalog: " + in.CatalogID)
+	case err != nil:
+		return meal.Item{}, nil, nil, internalError("reading the catalog failed", err)
+	}
+	var codes []string
+	for _, code := range f.Barcodes {
+		switch _, err := s.db.FoodByBarcode(ctx, p.User.ID, code); {
+		case errors.Is(err, store.ErrNotFound):
+			codes = append(codes, code)
+		case err != nil:
+			return meal.Item{}, nil, nil, internalError("reading the catalog failed", err)
+		}
+	}
+	f.Barcodes = codes
+	fields := newFoodBody(&f).FoodFields
+	copied := *in
+	copied.CatalogID, copied.Food = "", &fields
+	it, nf, warnings, err := sentItem(&copied)
+	if err != nil {
+		return meal.Item{}, nil, nil, err
+	}
+	it.SentFood = meal.SentCatalogFood(id)
 	return it, nf, warnings, nil
 }
 
@@ -278,7 +323,7 @@ func (s *sessions) logMeal(ctx context.Context, in *logMealInput) (*mealOutput, 
 	if err != nil {
 		return nil, err
 	}
-	sent, foods, warnings, err := sentItems(in.Body.Items)
+	sent, foods, warnings, err := s.sentItems(ctx, p, in.Body.Items)
 	if err != nil {
 		return nil, err
 	}
@@ -352,14 +397,14 @@ func (s *sessions) newMeal(p auth.Principal, b *logMealBody, now time.Time) (mea
 	return m, cal, nil
 }
 
-// sentItems is sentItem of each of in: the items as sent, the new food of
-// each (nil for none), and their warnings.
-func sentItems(in []itemInput) ([]meal.Item, []*food.Food, []meal.Warning, error) {
+// sentItems is sentOf each of in: the items as sent, the new food of each
+// (nil for none), and their warnings.
+func (s *sessions) sentItems(ctx context.Context, p auth.Principal, in []itemInput) ([]meal.Item, []*food.Food, []meal.Warning, error) {
 	var items []meal.Item
 	var foods []*food.Food
 	var warnings []meal.Warning
 	for i := range in {
-		it, nf, ws, err := sentItem(&in[i])
+		it, nf, ws, err := s.sentOf(ctx, p, &in[i])
 		if err != nil {
 			return nil, nil, nil, itemError(i, err)
 		}
@@ -620,7 +665,7 @@ func (s *sessions) opItem(ctx context.Context, p auth.Principal, m *meal.Meal, o
 	if op.Item == nil {
 		return oi, nil, nil, nil
 	}
-	sent, nf, ws, err := sentItem(op.Item)
+	sent, nf, ws, err := s.sentOf(ctx, p, op.Item)
 	if err != nil {
 		return oi, nil, nil, err
 	}

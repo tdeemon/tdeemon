@@ -228,14 +228,14 @@ func (s *sessions) createRecipe(ctx context.Context, in *createRecipeInput) (*cr
 // ingredients as they are (the store works it out again in its save),
 // with the new foods it brings and warnings about it and their values.
 func (s *sessions) sentRecipe(ctx context.Context, p auth.Principal, b *RecipeFields) (recipe.Recipe, []food.Food, []meal.Warning, error) {
-	sent, foods, warnings, err := sentItems(b.Items)
+	sent, foods, warnings, err := s.sentItems(ctx, p, b.Items)
 	if err != nil {
 		return recipe.Recipe{}, nil, nil, err
 	}
 	for i := range sent {
 		if sent[i].FoodID == uuid.Nil() && foods[i] == nil {
 			return recipe.Recipe{}, nil, nil, itemError(i, huma.Error422UnprocessableEntity(
-				"an ingredient is a food, by food_id or a new one, with its quantity: no estimate"))
+				"an ingredient is a food, by food_id, catalog_id or a new one, with its quantity: no estimate"))
 		}
 	}
 	items, ws, err := s.items(ctx, p, sent, foods)

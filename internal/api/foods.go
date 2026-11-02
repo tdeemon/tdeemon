@@ -120,8 +120,45 @@ func newFoodBody(f *food.Food) foodBody {
 type foodsOutput struct {
 	CacheControl string `header:"Cache-Control"`
 	Body         struct {
-		Foods   []foodBody `json:"foods" nullable:"false"`
-		Unfound []string   `json:"unfound" nullable:"false" doc:"The queries that found no food: not to send again, though another form of their word may find it."`
+		Foods   []foodBody        `json:"foods" nullable:"false"`
+		Catalog []catalogFoodBody `json:"catalog" nullable:"false" doc:"After your foods, the instance's catalog's foods that you have not: a meal's item logs one by its catalog_id, which makes it yours. Not of archived."`
+		Unfound []string          `json:"unfound" nullable:"false" doc:"The queries that found no food, yours nor the catalog's: not to send again, though another form of their word may find it."`
+	}
+}
+
+// catalogFoodBody is a food of the instance's catalog: the declared
+// values of a product, which every user's saves keep, no user's own.
+type catalogFoodBody struct {
+	ID string `json:"id" format:"uuid" doc:"The catalog's id of it, no food of yours: an item's catalog_id."`
+	FoodFields
+	Queries []string `json:"queries,omitempty" nullable:"false" doc:"The queries of find_foods that found the food, of those it was sent."`
+}
+
+func newCatalogFoodBody(f *food.Food) catalogFoodBody {
+	return catalogFoodBody{ID: f.ID.String(), FoodFields: newFoodBody(f).FoodFields}
+}
+
+// foundCatalog is the catalog's foods a search found, each once, with the
+// queries that found it.
+type foundCatalog struct {
+	foods []catalogFoodBody
+	at    map[uuid.UUID]int
+}
+
+// add adds found, the catalog's foods query q found.
+func (c *foundCatalog) add(q string, found []food.Food) {
+	if c.at == nil {
+		c.at = map[uuid.UUID]int{}
+	}
+	for i := range found {
+		if j, ok := c.at[found[i].ID]; ok {
+			c.foods[j].Queries = append(c.foods[j].Queries, q)
+			continue
+		}
+		b := newCatalogFoodBody(&found[i])
+		b.Queries = []string{q}
+		c.at[found[i].ID] = len(c.foods)
+		c.foods = append(c.foods, b)
 	}
 }
 
@@ -129,7 +166,7 @@ type foodsOutput struct {
 // maximum store.MaxFoodResults.
 type findFoodsInput struct {
 	Query    []string `query:"query,explode" required:"true" nullable:"false" minItems:"1" maxItems:"20" minLength:"1" maxLength:"200" example:"greek yog" doc:"The start of words of the name, brand or an alias, in any case, without diacritics; one a food."`
-	Limit    int      `query:"limit" default:"10" minimum:"1" maximum:"50" doc:"The most foods of each query."`
+	Limit    int      `query:"limit" default:"10" minimum:"1" maximum:"50" doc:"The most foods of each query, yours and then the catalog's."`
 	Archived bool     `query:"archived" doc:"The archived foods instead of the others."`
 }
 
@@ -142,26 +179,24 @@ func (s *sessions) findFoods(ctx context.Context, in *findFoodsInput) (*foodsOut
 	// find, once, with both. A query sent twice, in any case, is one.
 	var foods []food.Food
 	var queries [][]string
+	var catalog foundCatalog
 	unfound := []string{}
 	at := map[uuid.UUID]int{}
 	asked := map[string]bool{}
-	find := s.db.FindFoods
-	if in.Archived {
-		find = s.db.FindArchivedFoods
-	}
 	for _, q := range in.Query {
 		key := strings.ToLower(strings.TrimSpace(q))
 		if asked[key] {
 			continue
 		}
 		asked[key] = true
-		found, err := find(ctx, p.User.ID, q, in.Limit)
+		found, fromCatalog, err := s.findFoodsOf(ctx, p, q, in)
 		if err != nil {
 			return nil, internalError("finding foods failed", err)
 		}
-		if len(found) == 0 && key != "" {
+		if len(found)+len(fromCatalog) == 0 && key != "" {
 			unfound = append(unfound, strings.TrimSpace(q))
 		}
+		catalog.add(q, fromCatalog)
 		for i := range found {
 			if j, ok := at[found[i].ID]; ok {
 				queries[j] = append(queries[j], q)
@@ -181,6 +216,7 @@ func (s *sessions) findFoods(ctx context.Context, in *findFoodsInput) (*foodsOut
 	}
 	out := &foodsOutput{CacheControl: "no-store"}
 	out.Body.Foods, out.Body.Unfound = make([]foodBody, 0, len(foods)), unfound
+	out.Body.Catalog = append(make([]catalogFoodBody, 0, len(catalog.foods)), catalog.foods...)
 	for i := range foods {
 		b := newFoodBody(&foods[i])
 		b.Queries = queries[i]
@@ -193,6 +229,22 @@ func (s *sessions) findFoods(ctx context.Context, in *findFoodsInput) (*foodsOut
 		return nil, internalError("finding foods failed", err)
 	}
 	return out, nil
+}
+
+// findFoodsOf is the user's foods query q finds, as in asks, and the
+// catalog's, which fill what the user's leave of the limit; none of the
+// archived.
+func (s *sessions) findFoodsOf(ctx context.Context, p auth.Principal, q string, in *findFoodsInput) ([]food.Food, []food.Food, error) {
+	if in.Archived {
+		found, err := s.db.FindArchivedFoods(ctx, p.User.ID, q, in.Limit)
+		return found, nil, err
+	}
+	found, err := s.db.FindFoods(ctx, p.User.ID, q, in.Limit)
+	if err != nil || len(found) >= in.Limit {
+		return found, nil, err
+	}
+	fromCatalog, err := s.db.FindCatalog(ctx, p.User.ID, q, in.Limit-len(found))
+	return found, fromCatalog, err
 }
 
 func newLastUseBody(u store.LastUse) *lastUseBody {

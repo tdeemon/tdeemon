@@ -497,9 +497,9 @@ func TestFindFoods(t *testing.T) {
 		 "nutrients": {"kcal": 259, "protein": 8.5, "carbs": 48, "fat": 3.3, "fiber": 6},
 		 "servings": [{"name": "slice", "amount": 40}], "aliases": ["Ana's loaf"], "barcodes": ["3850000000015"],
 		 "last_use": {"at": %[3]q, "day": "2026-10-21", "meal_id": "*", "quantity": {"servings": 2, "serving": "slice"}, "amount": 80, "unit": "g"}, "queries": ["rye"]}
-	], "unfound": []}`, roll.ID, bread.ID, now.Format(time.RFC3339), m.ID))
+	], "catalog": [], "unfound": []}`, roll.ID, bread.ID, now.Format(time.RFC3339), m.ID))
 	// By an alias; an archived food not at all; at most limit.
-	for query, want := range map[string]string{"loaf": `"name":"Ana's rye bread"`, "stew": `{"foods":[],"unfound":["stew"]}`} {
+	for query, want := range map[string]string{"loaf": `"name":"Ana's rye bread"`, "stew": `{"foods":[],"catalog":[],"unfound":["stew"]}`} {
 		if rec := in.do(t, http.MethodGet, "/api/v1/foods?query="+query, "", session, nil); !strings.Contains(rec.Body.String(), want) {
 			t.Errorf("query %s: %s, want %s", query, rec.Body.String(), want)
 		}
@@ -734,7 +734,7 @@ func TestUpsertFoodArchives(t *testing.T) {
 	if rec := in.do(t, http.MethodPost, "/api/v1/foods", body, session, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"archived":true`) {
 		t.Errorf("archiving: %d %s", rec.Code, rec.Body.String())
 	}
-	if rec := in.do(t, http.MethodGet, "/api/v1/foods?query=rye", "", session, nil); !strings.Contains(rec.Body.String(), `{"foods":[],"unfound":["rye"]}`) {
+	if rec := in.do(t, http.MethodGet, "/api/v1/foods?query=rye", "", session, nil); !strings.Contains(rec.Body.String(), `{"foods":[],"catalog":[],"unfound":["rye"]}`) {
 		t.Errorf("a search after: %s, want nothing", rec.Body.String())
 	}
 }

@@ -447,6 +447,21 @@ func TestFingerprintStays(t *testing.T) {
 
 // SentFood tells a new food by every field a client sends, and not by
 // its id.
+// A catalog's food sent is told by its id alone: another id is another
+// food, and no new food's digest is one.
+func TestSentCatalogFood(t *testing.T) {
+	t.Parallel()
+
+	id := uuid.MustParse("019a4000-0000-7000-8000-000000000001")
+	d := SentCatalogFood(id)
+	if !sentFoodForm.MatchString(d) {
+		t.Fatalf("SentCatalogFood = %q, want 64 hex digits", d)
+	}
+	if d != SentCatalogFood(id) || d == SentCatalogFood(uuid.NewV7()) || d == SentFood(egg()) {
+		t.Errorf("SentCatalogFood(%s) = %s: want the same of the id alone", id, d)
+	}
+}
+
 func TestSentFood(t *testing.T) {
 	t.Parallel()
 

@@ -14,7 +14,9 @@ token only reads: say so.
 - One `find_foods` for a meal, a `query` each: the start of the word as
   the user says it, its ending left off ("jaj" for "2 jaja", "egg" for
   "eggs"); for a user who writes in another language, the English start
-  too ("jaj" and "egg"). Use a found food by its `food_id`. A word it
+  too ("jaj" and "egg"). Use a found food by its `food_id`, one of
+  `catalog` (the instance's, after the user's) by its `catalog_id`,
+  which makes it theirs; with a new food's `amount`, its unit. A word it
   did not find: once more in another form (singular, no ending,
   English), never the same query again.
 - An item takes one quantity, of three: `"amount": 200, "unit": "g"`,
@@ -37,7 +39,8 @@ token only reads: say so.
   plate. Never ask what nobody weighed. A dish the user has as a food:
   use it.
 - A barcode (a photo of one, or its digits): `lookup_barcode` with the
-  digits under its bars, not `find_foods`. `food`: log it.
+  digits under its bars, not `find_foods`. `food`: log it; `catalog`:
+  by its `catalog_id`, as `open_food_facts` below.
   `open_food_facts`: its food as the item's new food, as it is; with
   `named_food` too, the same: it is the user's food then, and adds the
   barcode to it, no `upsert_food`.
