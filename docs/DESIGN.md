@@ -178,8 +178,10 @@ first and then the catalog's, but those they have already (a food that
 names the row, or has its name and brand, or a barcode of it).
 Logging one copies it into the user's foods, linked to the row, in the
 same change as the meal, so the meal names a food of the user's as
-ever and an undo takes back both; a correction of the row later
-changes no one's copy, as no correction of a food changes a meal.
+ever and an undo takes back both; the copy leaves the row as it is (a
+copy is no save of the product's), and its item is told by the row's
+id, so a retry is the same meal whatever the row became; a correction
+of the row later changes no one's copy, as no correction of a food changes a meal.
 
 **Recipes.** A recipe is a food of the user's (`source: recipe`, by
 weight), so search finds it and a meal logs it as any food; its values

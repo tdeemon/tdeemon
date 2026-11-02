@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"time"
 	"uuid"
@@ -60,6 +61,11 @@ func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food,
 	if err != nil {
 		return err
 	}
+	if f.CopyOf != uuid.Nil() {
+		if copied, err := linkCopy(ctx, tx, userID, f, saved, link); err != nil || copied {
+			return err
+		}
+	}
 	target, err := catalogTarget(ctx, tx, userID, f, nameKey, brandKey)
 	if err != nil {
 		return err
@@ -90,6 +96,32 @@ func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food,
 	_, err = tx.ExecContext(ctx, `INSERT INTO catalog_saves (user_id, event_id, catalog_id, version, before_state, link_before)
 		VALUES (?, ?, ?, ?, ?, ?)`, userID.String(), saved.String(), target.id, version, state, link)
 	return err
+}
+
+// copyVersion is the version a copy's save records (catalog_saves): no
+// row reaches it, so the copy's undo leaves the row as it is.
+const copyVersion = math.MaxInt64
+
+// linkCopy links userID's food f, a copy of the catalog's food f.CopyOf
+// saved by event saved, to that row, which it leaves as it is: the row
+// the user picked, though another save renamed or corrected it since
+// they read it. Its undo puts the link back alone: it records the
+// version no row reaches (copyVersion), so restoreCatalog leaves the row.
+// It reports false, doing nothing, when the row is gone: the copy goes
+// into the catalog as any save does.
+func linkCopy(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, saved uuid.UUID, link sql.NullString) (bool, error) {
+	id := f.CopyOf.String()
+	var there bool
+	if err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM catalog_foods WHERE id = ?)", id).Scan(&there); err != nil || !there {
+		return false, err
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE foods SET catalog_id = ? WHERE user_id = ? AND id = ?",
+		id, userID.String(), f.ID.String()); err != nil {
+		return false, err
+	}
+	_, err := tx.ExecContext(ctx, `INSERT INTO catalog_saves (user_id, event_id, catalog_id, version, before_state, link_before)
+		VALUES (?, ?, ?, ?, NULL, ?)`, userID.String(), saved.String(), id, copyVersion, link)
+	return err == nil, err
 }
 
 // restoreCatalog takes back what userID's save of food e did to the

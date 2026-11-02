@@ -240,3 +240,66 @@ func TestCatalogItems(t *testing.T) {
 		t.Errorf("Ana's catalog of protein after = %v, %v; want none: the copy is hers", rows, err)
 	}
 }
+
+// An item of the catalog is told by the row's id and its quantity as
+// sent: a retry after the row was renamed, of another basis, is the
+// same meal, and Ana's copy keeps what she logged, as the row keeps
+// Zoe's latest.
+func TestRetryOfACatalogItemAfterTheRowChanged(t *testing.T) {
+	t.Parallel()
+
+	e := newCatalogEnv(t)
+	id := meal.NewIDAt(e.now).String()
+	// A serving's unit said again, as a model may.
+	body := fmt.Sprintf(`{"id": %q, "items": [{"catalog_id": %q, "servings": 1, "serving": "bar", "unit": "g"}]}`, id, e.row)
+	if rec := e.in.do(t, http.MethodPost, "/api/v1/meals", body, e.session, nil); rec.Code != http.StatusCreated {
+		t.Fatalf("a meal of the catalog's bar: %d %s", rec.Code, rec.Body.String())
+	}
+	e.bar.Name, e.bar.Basis, e.bar.Nutrients.Kcal = "Protein drink", food.Per100ml, 70
+	if _, err := e.in.db.SaveFood(t.Context(), e.zoe.ID, isolationActor, e.bar, e.now); err != nil {
+		t.Fatal(err)
+	}
+	if rec := e.in.do(t, http.MethodPost, "/api/v1/meals", body, e.session, nil); rec.Code != http.StatusOK {
+		t.Errorf("the meal sent again: %d %s, want a retry", rec.Code, rec.Body.String())
+	}
+	if copied := e.copyOfTheBar(t); copied.Nutrients.Kcal != 380 {
+		t.Errorf("Ana's copy = %+v, want the bar as she logged it", copied)
+	}
+	row, err := e.in.db.CatalogFood(t.Context(), uuid.MustParse(e.row))
+	if err != nil || row.Name != "Protein drink" || row.Nutrients.Kcal != 70 {
+		t.Errorf("the row = %+v, %v; want Zoe's latest", row, err)
+	}
+}
+
+// A catalog's food Ana has a food of the name and brand of is her food:
+// the barcode it brings is added to hers, which is linked to the row,
+// and the row keeps Zoe's latest values, not Ana's.
+func TestACatalogItemOfAFoodTheUserHas(t *testing.T) {
+	t.Parallel()
+
+	e := newCatalogEnv(t)
+	mine := food.Food{
+		ID: uuid.NewV7(), Name: "Protein bar", Brand: "Brawn", Basis: food.Per100g, Source: food.Label,
+		Nutrients: food.Nutrients{Kcal: 400, Protein: 25, Carbs: 45, Fat: 13},
+	}
+	if _, err := e.in.db.SaveFood(t.Context(), e.in.user.ID, isolationActor, mine, e.now); err != nil {
+		t.Fatal(err)
+	}
+	// Zoe's correction after Ana's save: the latest.
+	e.bar.Nutrients.Protein = 31
+	if _, err := e.in.db.SaveFood(t.Context(), e.zoe.ID, isolationActor, e.bar, e.now); err != nil {
+		t.Fatal(err)
+	}
+	body := fmt.Sprintf(`{"items": [{"catalog_id": %q, "amount": 50, "unit": "g"}]}`, e.row)
+	rec := e.in.do(t, http.MethodPost, "/api/v1/meals", body, e.session, nil)
+	if rec.Code != http.StatusCreated || !strings.Contains(rec.Body.String(), `"food_id":"`+mine.ID.String()+`"`) ||
+		!strings.Contains(rec.Body.String(), `"kcal":200`) {
+		t.Fatalf("a meal of the catalog's bar: %d %s, want Ana's bar", rec.Code, rec.Body.String())
+	}
+	if had, err := e.in.db.FoodByID(t.Context(), e.in.user.ID, mine.ID); err != nil || strings.Join(had.Barcodes, " ") != barCode {
+		t.Errorf("Ana's bar after = %+v, %v; want the bar's code", had, err)
+	}
+	if row, err := e.in.db.CatalogFood(t.Context(), uuid.MustParse(e.row)); err != nil || row.Nutrients.Kcal != 380 {
+		t.Errorf("the row after = %+v, %v; want Zoe's 380 kcal", row, err)
+	}
+}

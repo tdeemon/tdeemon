@@ -104,12 +104,13 @@ func sentItem(in *itemInput) (meal.Item, *food.Food, []meal.Warning, error) {
 	return it, nf, warnings, nil
 }
 
-// sentOf is sentItem of in, but of an item of a food of the catalog: the
-// item of that food as a new food, as the catalog has it now, without
-// the barcodes the user's foods have (a code is one food's), and told by
-// the catalog's id (meal.SentCatalogFood). Logged, it is copied into the
-// user's foods, and the store links the copy to its row.
-func (s *sessions) sentOf(ctx context.Context, p auth.Principal, in *itemInput) (meal.Item, *food.Food, []meal.Warning, error) {
+// sentOf is sentItem of in, but of an item of a food of the catalog:
+// told by the catalog's id (meal.SentCatalogFood) and its quantity as
+// sent, without reading the catalog, so a retry is known whatever the
+// row became since. Its new food is a stand-in, of no values, which
+// item makes the copy of the row (catalogCopy). Its servings take no
+// unit: a serving's amount is in the food's.
+func (s *sessions) sentOf(in *itemInput) (meal.Item, *food.Food, []meal.Warning, error) {
 	if in.CatalogID == "" {
 		return sentItem(in)
 	}
@@ -120,32 +121,49 @@ func (s *sessions) sentOf(ctx context.Context, p auth.Principal, in *itemInput) 
 	if err != nil {
 		return meal.Item{}, nil, nil, huma.Error422UnprocessableEntity("no such food in the catalog: " + in.CatalogID)
 	}
-	f, err := s.db.CatalogFood(ctx, id)
+	q := meal.Quantity{Amount: in.Amount, Unit: in.Unit, Servings: in.Servings, Serving: in.Serving, Portions: in.Portions}
+	if strings.TrimSpace(q.Serving) == "" {
+		q.Serving = ""
+	}
+	if q.Servings > 0 && q.Amount == 0 {
+		q.Unit = ""
+	}
+	it := meal.Item{Quantity: q, Note: in.Note, SentFood: meal.SentCatalogFood(id)}
+	if in.ID != "" {
+		if it.ID, err = uuid.Parse(in.ID); err != nil {
+			return meal.Item{}, nil, nil, huma.Error422UnprocessableEntity("the item's id: " + err.Error())
+		}
+	}
+	return it, &food.Food{CopyOf: id}, nil, nil
+}
+
+// catalogCopy makes nf, the stand-in of the catalog's food nf.CopyOf, the
+// user's copy of it, a new food: the row's values now, without the
+// barcodes the user's foods have (a code is one food's). The store
+// links the copy to the row, which it leaves as it is.
+func (s *sessions) catalogCopy(ctx context.Context, p auth.Principal, nf *food.Food) error {
+	row, err := s.db.CatalogFood(ctx, nf.CopyOf)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		return meal.Item{}, nil, nil, huma.Error422UnprocessableEntity("no such food in the catalog: " + in.CatalogID)
+		return huma.Error422UnprocessableEntity("no such food in the catalog: " + nf.CopyOf.String())
 	case err != nil:
-		return meal.Item{}, nil, nil, internalError("reading the catalog failed", err)
+		return internalError("reading the catalog failed", err)
 	}
 	var codes []string
-	for _, code := range f.Barcodes {
+	for _, code := range row.Barcodes {
 		switch _, err := s.db.FoodByBarcode(ctx, p.User.ID, code); {
 		case errors.Is(err, store.ErrNotFound):
 			codes = append(codes, code)
 		case err != nil:
-			return meal.Item{}, nil, nil, internalError("reading the catalog failed", err)
+			return internalError("reading the catalog failed", err)
 		}
 	}
-	f.Barcodes = codes
-	fields := newFoodBody(&f).FoodFields
-	copied := *in
-	copied.CatalogID, copied.Food = "", &fields
-	it, nf, warnings, err := sentItem(&copied)
-	if err != nil {
-		return meal.Item{}, nil, nil, err
+	row.ID, row.Barcodes, row.CopyOf = uuid.NewV7(), codes, nf.CopyOf
+	if err := row.Validate(); err != nil {
+		return internalError("copying the catalog's food failed", err)
 	}
-	it.SentFood = meal.SentCatalogFood(id)
-	return it, nf, warnings, nil
+	*nf = row
+	return nil
 }
 
 // sentNewFood is it of the new food sent, told by meal.SentFood. Its
@@ -180,6 +198,21 @@ func newFoodQuantity(nf *food.Food, q meal.Quantity) error {
 	return nil
 }
 
+// checkNewFood makes nf, when it is the stand-in of a catalog's food,
+// the copy of it (catalogCopy), and checks quantity q of it
+// (newFoodQuantity); a nil nf is none to check.
+func (s *sessions) checkNewFood(ctx context.Context, p auth.Principal, nf *food.Food, q meal.Quantity) error {
+	if nf == nil {
+		return nil
+	}
+	if nf.CopyOf != uuid.Nil() && nf.Name == "" {
+		if err := s.catalogCopy(ctx, p, nf); err != nil {
+			return err
+		}
+	}
+	return newFoodQuantity(nf, q)
+}
+
 // item is sent worked out whole, with warnings about the values of its
 // new food: the item of its quantity of the user's food, or of its new
 // food nf, which the store saves with the meal and whose id the item
@@ -190,10 +223,8 @@ func newFoodQuantity(nf *food.Food, q meal.Quantity) error {
 func (s *sessions) item(ctx context.Context, p auth.Principal, sent meal.Item, nf *food.Food) (meal.Item, []meal.Warning, error) {
 	var f food.Food
 	var warnings []meal.Warning
-	if nf != nil {
-		if err := newFoodQuantity(nf, sent.Quantity); err != nil {
-			return meal.Item{}, nil, err
-		}
+	if err := s.checkNewFood(ctx, p, nf, sent.Quantity); err != nil {
+		return meal.Item{}, nil, err
 	}
 	switch {
 	case nf != nil:
@@ -323,7 +354,7 @@ func (s *sessions) logMeal(ctx context.Context, in *logMealInput) (*mealOutput, 
 	if err != nil {
 		return nil, err
 	}
-	sent, foods, warnings, err := s.sentItems(ctx, p, in.Body.Items)
+	sent, foods, warnings, err := s.sentItems(in.Body.Items)
 	if err != nil {
 		return nil, err
 	}
@@ -399,12 +430,12 @@ func (s *sessions) newMeal(p auth.Principal, b *logMealBody, now time.Time) (mea
 
 // sentItems is sentOf each of in: the items as sent, the new food of each
 // (nil for none), and their warnings.
-func (s *sessions) sentItems(ctx context.Context, p auth.Principal, in []itemInput) ([]meal.Item, []*food.Food, []meal.Warning, error) {
+func (s *sessions) sentItems(in []itemInput) ([]meal.Item, []*food.Food, []meal.Warning, error) {
 	var items []meal.Item
 	var foods []*food.Food
 	var warnings []meal.Warning
 	for i := range in {
-		it, nf, ws, err := s.sentOf(ctx, p, &in[i])
+		it, nf, ws, err := s.sentOf(&in[i])
 		if err != nil {
 			return nil, nil, nil, itemError(i, err)
 		}
@@ -665,7 +696,7 @@ func (s *sessions) opItem(ctx context.Context, p auth.Principal, m *meal.Meal, o
 	if op.Item == nil {
 		return oi, nil, nil, nil
 	}
-	sent, nf, ws, err := s.sentOf(ctx, p, op.Item)
+	sent, nf, ws, err := s.sentOf(op.Item)
 	if err != nil {
 		return oi, nil, nil, err
 	}
