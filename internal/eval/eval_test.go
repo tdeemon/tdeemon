@@ -45,6 +45,7 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/domain/metric"
 	"github.com/zarnautovic/tdeemon/internal/domain/plan"
 	"github.com/zarnautovic/tdeemon/internal/domain/profile"
+	"github.com/zarnautovic/tdeemon/internal/domain/recipe"
 	"github.com/zarnautovic/tdeemon/internal/domain/user"
 	"github.com/zarnautovic/tdeemon/internal/off"
 	"github.com/zarnautovic/tdeemon/internal/store"
@@ -71,8 +72,11 @@ type evalCase struct {
 	SeedHistory bool `json:"seed_history,omitempty"`
 	// SeedCatalog gives another user a protein bar of a label's, which
 	// the catalog has, and the user has not.
-	SeedCatalog bool   `json:"seed_catalog,omitempty"`
-	Expect      expect `json:"expect"`
+	SeedCatalog bool `json:"seed_catalog,omitempty"`
+	// SeedShared gives the user a goulash another user shares with them,
+	// of the other's beef: 600 g, 1000 g cooked.
+	SeedShared bool   `json:"seed_shared,omitempty"`
+	Expect     expect `json:"expect"`
 }
 
 type expect struct {
@@ -121,6 +125,9 @@ type expect struct {
 	// FromCatalog is a word of the name of a food of the catalog's the
 	// case makes the user's: their copy of it, of its values.
 	FromCatalog string `json:"from_catalog,omitempty"`
+	// SharedYield is the weight the shared goulash has after the case, its
+	// other member's beef still its ingredient.
+	SharedYield float64 `json:"shared_yield,omitempty"`
 }
 
 // systemPrompt is all the client says of itself: the policy comes from
@@ -263,6 +270,9 @@ func newInstance(t *testing.T, c evalCase) instance {
 	}
 	if c.SeedCatalog {
 		seedCatalog(t, db, lang, now)
+	}
+	if c.SeedShared {
+		seedShared(t, db, u.ID, lang, now)
 	}
 	if c.SeedHistory {
 		for i := 1; i <= 63; i++ {
@@ -724,6 +734,7 @@ func check(t *testing.T, in instance, e expect, foodsBefore []string, turns []tu
 	checkCalls(t, in, e, turns)
 	checkFoods(t, in, e, foodsBefore)
 	checkFromCatalog(t, in, e.FromCatalog)
+	checkShared(t, in, e.SharedYield)
 	checkSources(t, in, e, foodsBefore, today)
 	checkDay(t, in, e, today)
 }
@@ -823,6 +834,59 @@ func checkFoods(t *testing.T, in instance, e expect, foodsBefore []string) {
 		if err != nil || !reflect.DeepEqual(now, *was) {
 			t.Errorf("the food %q: %+v, %v; want it as it was, %+v", was.Name, now, err, *was)
 		}
+	}
+}
+
+// sharedNames are the shared goulash's name and the other user's beef's
+// in each language.
+var sharedNames = map[string][2]string{"en": {"Goulash", "Beef mince"}, "hr": {"Gulaš", "Mljevena junetina"}}
+
+// seedShared gives another user a goulash of their beef, 600 g cooked to
+// 1000 g in 4 portions, shared with userID.
+func seedShared(t *testing.T, db *store.DB, userID uuid.UUID, lang string, now time.Time) {
+	t.Helper()
+	other := user.User{
+		ID: uuid.NewV7(), Email: "cook@example.com", Name: "Cook", Role: user.RoleUser, Locale: lang,
+		TimeZone: "Europe/Zagreb", DayStartHour: 4, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.CreateUser(t.Context(), other, ""); err != nil {
+		t.Fatal(err)
+	}
+	n := sharedNames[lang]
+	beef := food.Food{
+		ID: uuid.NewV7(), Name: n[1], Basis: food.Per100g, Source: food.Label,
+		Nutrients: food.Nutrients{Kcal: 250, Protein: 26, Carbs: 0, Fat: 17},
+	}
+	if _, err := db.SaveFood(t.Context(), other.ID, actor, beef, now); err != nil {
+		t.Fatal(err)
+	}
+	it, err := meal.FromFood(beef, meal.Quantity{Amount: 600, Unit: "g"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	goulash := recipe.Recipe{Food: food.Food{ID: uuid.NewV7(), Name: n[0]}, Items: []meal.Item{it}, Yield: 1000, Portions: 4}
+	if _, err := db.SaveRecipe(t.Context(), other.ID, actor, goulash, nil, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.ShareRecipe(t.Context(), other.ID, actor, goulash.Food.ID, userID, now); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checkShared holds the user's shared goulash to weigh yield, its other
+// member's beef its ingredient still; no yield checks nothing.
+func checkShared(t *testing.T, in instance, yield float64) {
+	t.Helper()
+	if yield == 0 {
+		return
+	}
+	f, err := in.db.FoodByKey(t.Context(), in.user.ID, sharedNames[in.user.Locale][0], "")
+	if err != nil {
+		t.Fatalf("the shared goulash: %v", err)
+	}
+	r, err := in.db.RecipeByID(t.Context(), in.user.ID, f.ID)
+	if err != nil || r.Yield != yield || len(r.Items) != 1 || r.Items[0].FoodUser == uuid.Nil() {
+		t.Errorf("the shared goulash = %+v, %v; want %v g, of the other member's beef", r, err, yield)
 	}
 }
 
