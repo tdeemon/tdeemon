@@ -248,18 +248,66 @@ func saveFoodInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Act
 	if err := replaceFoodChildren(ctx, tx, userID, f); err != nil {
 		return food.Food{}, uuid.Nil(), err
 	}
+	return recordFood(ctx, tx, userID, a, f, before, now)
+}
+
+// recordFood reads userID's food f as saved, which was before (nil for a
+// new one), writes it into their household's copies, and records the
+// save, as saveFoodInTx returns it; the catalog takes it then, as a copy
+// of the catalog's food f.CopyOf when f is one.
+func recordFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Actor, f food.Food, before *food.Food, now time.Time) (food.Food, uuid.UUID, error) {
 	stored, err := foodInTx(ctx, tx, userID, f.ID)
 	if err != nil {
 		return food.Food{}, uuid.Nil(), err
 	}
-	id, err := record(ctx, tx, userID, a, event.FoodSave, f.ID.String(), before, stored, now)
+	was, err := householdVersion(ctx, tx, userID, f.ID)
+	if err != nil {
+		return food.Food{}, uuid.Nil(), err
+	}
+	var wasState any
+	if before != nil {
+		wasState = foodState{Food: *before, ShareVersion: was}
+	}
+	is := foodState{Food: stored, ShareVersion: was}
+	// A household's food is each member's: a save that changes it (no
+	// retry) reaches every member's copy.
+	var share string
+	if same, err := sameState(wasState, is); err != nil {
+		return food.Food{}, uuid.Nil(), err
+	} else if !same {
+		if share, err = spreadFood(ctx, tx, userID, stored, now); err != nil {
+			return food.Food{}, uuid.Nil(), err
+		}
+		if is.ShareVersion, err = householdVersion(ctx, tx, userID, f.ID); err != nil {
+			return food.Food{}, uuid.Nil(), err
+		}
+	}
+	id, err := record(ctx, tx, userID, a, event.FoodSave, f.ID.String(), wasState, is, now)
 	if err != nil {
 		return food.Food{}, uuid.Nil(), err
 	}
 	// The food as stored, of the catalog's food f was copied of.
 	synced := stored
 	synced.CopyOf = f.CopyOf
-	return stored, id, syncCatalog(ctx, tx, userID, synced, id, now)
+	if err := syncCatalog(ctx, tx, userID, synced, id, now); err != nil {
+		return food.Food{}, uuid.Nil(), err
+	}
+	copies, err := householdCopies(ctx, tx, share, userID)
+	if err != nil {
+		return food.Food{}, uuid.Nil(), err
+	}
+	return stored, id, linkCopies(ctx, tx, userID, f.ID, copies)
+}
+
+// sameState reports whether a and b, two states of an entity, are one as
+// an event records them.
+func sameState(a, b any) (bool, error) {
+	x, err := stateJSON(a)
+	if err != nil {
+		return false, err
+	}
+	y, err := stateJSON(b)
+	return x == y, err
 }
 
 // newFoods is what saveNewFoods made of the new foods a meal brings: the
@@ -803,6 +851,10 @@ func takeBackFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Eve
 		}
 		return setArchived(ctx, tx, userID, id, s.Archived, now)
 	case e.Before == nil:
+		// The household's copies the save made go with it.
+		if err := takeBackCopies(ctx, tx, userID, id, now); err != nil {
+			return err
+		}
 		used, err := foodInUse(ctx, tx, userID, id)
 		if err != nil {
 			return err
@@ -818,10 +870,11 @@ func takeBackFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Eve
 		}
 		return restoreCatalog(ctx, tx, userID, e, now)
 	}
-	var f food.Food
-	if err := decode(e.Before, &f); err != nil {
+	var was foodState
+	if err := decode(e.Before, &was); err != nil {
 		return err
 	}
+	f := was.Food
 	if err := checkFoodClash(ctx, tx, userID, f); err != nil {
 		return err
 	}
@@ -831,7 +884,45 @@ func takeBackFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Eve
 	if err := replaceFoodChildren(ctx, tx, userID, f); err != nil {
 		return err
 	}
-	return restoreCatalog(ctx, tx, userID, e, now)
+	return restoreCopies(ctx, tx, userID, f, was.ShareVersion, e, now)
+}
+
+// restoreCopies puts back the catalog of userID's save of food e, whose
+// food is f again, and the copies of f of the other members of their
+// household, and the group's version before, version: the save before is
+// the latest again.
+func restoreCopies(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, version int64, e event.Event, now time.Time) error {
+	share, err := groupOf(ctx, tx, userID, f.ID)
+	if err != nil {
+		return err
+	}
+	copies, err := householdCopies(ctx, tx, share, userID)
+	if err != nil {
+		return err
+	}
+	if err := unlinkCopies(ctx, tx, copies); err != nil {
+		return err
+	}
+	if err := restoreCatalog(ctx, tx, userID, e, now); err != nil {
+		return err
+	}
+	for _, m := range copies {
+		switch err := writeCopy(ctx, tx, f, m, now); {
+		case errors.Is(err, ErrShareNameTaken):
+			return fmt.Errorf("%w: %w", clash{UndoNameTaken}, err)
+		case errors.Is(err, ErrShareBarcodeTaken):
+			return fmt.Errorf("%w: %w", clash{UndoBarcodeTaken}, err)
+		case err != nil:
+			return err
+		}
+	}
+	if err := linkCopies(ctx, tx, userID, f.ID, copies); err != nil {
+		return err
+	}
+	if share == "" || version == 0 {
+		return nil
+	}
+	return setShareVersion(ctx, tx, share, version)
 }
 
 // checkFoodClash refuses to put food f back when another food has taken
@@ -875,7 +966,8 @@ func foodStateNow(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Eve
 	if e.Action == event.FoodArchive {
 		return archivedState{f.Archived}, nil
 	}
-	return f, nil
+	v, err := householdVersion(ctx, tx, userID, id)
+	return foodState{Food: f, ShareVersion: v}, err
 }
 
 // FindFoods returns up to limit of userID's foods, not archived, whose

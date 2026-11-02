@@ -51,6 +51,35 @@ func laterTables(t *testing.T, db *DB, names ...string) {
 	}
 }
 
+// householdStandIns makes in db, for the test's while, empty stand-ins
+// of the tables a save of a food looks its household up in (0033), in
+// the connection's temp schema, which the migrations after the test's
+// saves never see: a test of a schema before them saves its foods
+// through the store.
+func householdStandIns(t *testing.T, db *DB) {
+	t.Helper()
+	for _, q := range []string{
+		`CREATE TEMP TABLE food_shares (share_id TEXT, seat INTEGER, user_id TEXT, food_id TEXT, version INTEGER,
+			left_at TEXT, household INTEGER)`,
+		"CREATE TEMP TABLE household_members (user_id TEXT, household_id TEXT)",
+	} {
+		if _, err := db.write.ExecContext(t.Context(), q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+}
+
+// dropHouseholdStandIns drops what householdStandIns made, before the
+// test migrates on.
+func dropHouseholdStandIns(t *testing.T, db *DB) {
+	t.Helper()
+	for _, q := range []string{"DROP TABLE temp.food_shares", "DROP TABLE temp.household_members"} {
+		if _, err := db.write.ExecContext(t.Context(), q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+}
+
 // 0010 rebuilds the events table for its new operations: every row stays
 // as it was, in the order of its rowid, which orders a user's events
 // whatever their ids say.

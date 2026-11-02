@@ -32,6 +32,7 @@ func TestMigrationOfTheFoodsSearchIndexesAsTheStore(t *testing.T) {
 		VALUES (?, 'ana@example.com', 'Ana', 'user', 'en', 'UTC', 4, '2026-10-21T08:00:00Z', '2026-10-21T08:00:00Z')`, user.String())
 	now := time.Date(2026, 10, 21, 8, 0, 0, 0, time.UTC)
 	actor := event.Actor{Kind: event.User, Client: "web"}
+	householdStandIns(t, db)
 	for _, f := range []food.Food{
 		{Name: "Bijelo grožđe", Brand: "Đakovo", Aliases: []string{"slatko", "Grožđica", "zeleno"}},
 		{Name: "Ćevapi", Aliases: []string{"ćevčići"}},
@@ -44,6 +45,7 @@ func TestMigrationOfTheFoodsSearchIndexesAsTheStore(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	dropHouseholdStandIns(t, db)
 	want := searchRows(t, db)
 	// As the store indexed them before: each text as it is.
 	exec(`UPDATE foods_fts SET

@@ -34,6 +34,7 @@ func TestMigrationOfTheItemsBrandSplitsTheName(t *testing.T) {
 	now := time.Date(2026, 10, 21, 8, 0, 0, 0, time.UTC)
 	actor := event.Actor{Kind: event.User, Client: "web"}
 	ids := map[string]string{}
+	householdStandIns(t, db)
 	for _, f := range []food.Food{{Name: "Tuna u vlastitom soku", Brand: "Eva"}, {Name: "Kruh"}} {
 		f.ID = uuid.NewV7()
 		f.Basis, f.Source = food.Per100g, food.User
@@ -43,6 +44,7 @@ func TestMigrationOfTheItemsBrandSplitsTheName(t *testing.T) {
 		}
 		ids[f.Name] = f.ID.String()
 	}
+	dropHouseholdStandIns(t, db)
 	const meal = "0199f0a0-0000-7000-8000-0000000000a1"
 	exec(`INSERT INTO meals (id, user_id, eaten_at, day, description, client, note, fingerprint, created_at, updated_at)
 		VALUES (?, ?, '2026-10-21T08:00:00Z', '2026-10-21', '', 'web', '', printf('%064d', 1), '2026-10-21T08:00:00Z', '2026-10-21T08:00:00Z')`,

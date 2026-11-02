@@ -125,9 +125,18 @@ var (
 	// ErrShareMember: the user has the recipe already.
 	ErrShareMember = errors.New("the user has the recipe already")
 	// ErrShareNameTaken: a food of the recipe's name is another member's,
-	// or the user's it would be shared with; which food is theirs alone
-	// to know.
+	// or the user's it would be shared with, or, of a food's name and
+	// brand, another of a member's of its household; which food is
+	// theirs alone to know.
 	ErrShareNameTaken = errors.New("a food of the recipe's name is another member's")
+	// ErrShareBarcodeTaken: a food of a barcode of the food saved is
+	// another of a member's of its household; which is theirs alone to
+	// know.
+	ErrShareBarcodeTaken = errors.New("a food of the barcode is another member's")
+	// ErrShareHousehold: a member of a household is never taken out of
+	// one of its recipes by another member, and a household's recipe is
+	// not left by the household alone: a member leaves the household.
+	ErrShareHousehold = errors.New("the recipe is a household's")
 )
 
 // shareState is a member's place in a share, as the events of a share
@@ -139,11 +148,16 @@ var (
 //
 // It names the member by their seat alone, never their user's or their
 // food's id: the events are the user's, and their export.
+//
+// Household is the seats of the member's household that came or went
+// with them: a household has a recipe shared with one of its members, or
+// none of them.
 type shareState struct {
-	Share   string `json:"share"`
-	Seat    int    `json:"seat"`
-	Left    bool   `json:"left,omitempty"`
-	Version int64  `json:"version"`
+	Share     string `json:"share"`
+	Seat      int    `json:"seat"`
+	Left      bool   `json:"left,omitempty"`
+	Version   int64  `json:"version"`
+	Household []int  `json:"household,omitempty"`
 }
 
 // seatOf returns the member of share at seat, their recipe, or
@@ -166,16 +180,16 @@ func seatOf(ctx context.Context, tx *sql.Tx, share string, seat int) (shareMembe
 	return m, left.Valid, err
 }
 
-// insertSeat adds userID's recipe foodID to share, at its next seat,
+// insertSeat adds userID's food foodID to share, at its next seat,
 // which it returns: past every seat and version the share has had, so a
 // seat is never one of a member before (whose account went, taking their
-// row along).
-func insertSeat(ctx context.Context, tx *sql.Tx, share string, userID, foodID uuid.UUID) (int, error) {
+// row along). The seat is the household's, or an explicit share's.
+func insertSeat(ctx context.Context, tx *sql.Tx, share string, userID, foodID uuid.UUID, household bool) (int, error) {
 	var seat int
-	err := tx.QueryRowContext(ctx, `INSERT INTO food_shares (share_id, seat, user_id, food_id, version)
+	err := tx.QueryRowContext(ctx, `INSERT INTO food_shares (share_id, seat, user_id, food_id, version, household)
 		VALUES (?1, (SELECT max(coalesce(max(seat), 0), coalesce(max(version), 0)) + 1 FROM food_shares WHERE share_id = ?1), ?2, ?3,
-			(SELECT coalesce(max(version), 1) FROM food_shares WHERE share_id = ?1))
-		RETURNING seat`, share, userID.String(), foodID.String()).Scan(&seat)
+			(SELECT coalesce(max(version), 1) FROM food_shares WHERE share_id = ?1), ?4)
+		RETURNING seat`, share, userID.String(), foodID.String(), household).Scan(&seat)
 	return seat, err
 }
 
@@ -228,12 +242,16 @@ func shareVersion(ctx context.Context, tx *sql.Tx, share string) (int64, error) 
 }
 
 // memberRecipe is r, a recipe as member from saved it, as member to has
-// it: of to's food id, with to's note, aliases, barcodes and archived,
-// and each ingredient's food named by its owner as to's recipe names it.
-func memberRecipe(r recipe.Recipe, from uuid.UUID, to shareMember, own food.Food) recipe.Recipe {
+// it: of to's food id, with to's note, aliases and archived, and their
+// barcodes unless they are of one household with from, and each
+// ingredient's food named by its owner as to's recipe names it.
+func memberRecipe(r recipe.Recipe, from uuid.UUID, to shareMember, own food.Food, household bool) recipe.Recipe {
 	out := r
 	out.Food.ID = to.Food
-	out.Food.Note, out.Food.Aliases, out.Food.Barcodes, out.Food.Archived = own.Note, own.Aliases, own.Barcodes, own.Archived
+	out.Food.Note, out.Food.Aliases, out.Food.Archived = own.Note, own.Aliases, own.Archived
+	if !household {
+		out.Food.Barcodes = own.Barcodes
+	}
 	out.Items = make([]meal.Item, len(r.Items))
 	for i := range r.Items {
 		it := r.Items[i]
@@ -251,10 +269,25 @@ func memberRecipe(r recipe.Recipe, from uuid.UUID, to shareMember, own food.Food
 }
 
 // writeMemberRecipe writes r, as member from saved it, into member to's
-// recipe: the shared fields, to's own kept. A food of the name that is
-// another of to's is ErrShareNameTaken.
+// recipe: the shared fields, to's own kept, and the barcodes too when
+// they are of one household; each ingredient of a food of a member of
+// to's household of to's own copy of it (ownIngredients). A food of the
+// name that is another of to's is ErrShareNameTaken, and of a barcode,
+// in a household, ErrShareBarcodeTaken.
 func writeMemberRecipe(ctx context.Context, tx *sql.Tx, r recipe.Recipe, from uuid.UUID, to shareMember, own food.Food, now time.Time) error {
-	mr := memberRecipe(r, from, to, own)
+	mates, err := householdMates(ctx, tx, from)
+	if err != nil {
+		return err
+	}
+	mr := memberRecipe(r, from, to, own, mates[to.User])
+	if mates[to.User] {
+		if err := checkMemberBarcodes(ctx, tx, to, mr.Food.Barcodes); err != nil {
+			return err
+		}
+	}
+	if err := ownIngredients(ctx, tx, mr.Items, to.User, now); err != nil {
+		return err
+	}
 	nameKey := food.Key(mr.Food.Name)
 	if err := checkNameFree(ctx, tx, to.User, to.Food, nameKey); err != nil {
 		if errors.Is(err, ErrNameTaken) {
@@ -340,8 +373,13 @@ func shareRecipeInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.
 	if back {
 		_, err = tx.ExecContext(ctx, "UPDATE food_shares SET left_at = NULL WHERE share_id = ? AND seat = ?", share, seat)
 	} else {
-		seat, err = insertSeat(ctx, tx, share, withID, to.Food)
+		seat, err = insertSeat(ctx, tx, share, withID, to.Food, false)
 	}
+	if err != nil {
+		return err
+	}
+	// The recipient's household has it too.
+	household, err := shareWithHousehold(ctx, tx, r, userID, to, share, now)
 	if err != nil {
 		return err
 	}
@@ -350,8 +388,44 @@ func shareRecipeInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.
 		return err
 	}
 	_, err = record(ctx, tx, userID, a, event.RecipeShare, foodID.String(), nil,
-		shareState{Share: share, Seat: seat, Version: version}, now)
+		shareState{Share: share, Seat: seat, Version: version, Household: household}, now)
 	return err
+}
+
+// shareWithHousehold gives each other member of the household of to, the
+// member userID shared their recipe r with, their recipe of share, and
+// returns their seats.
+func shareWithHousehold(ctx context.Context, tx *sql.Tx, r recipe.Recipe, userID uuid.UUID, to shareMember, share string,
+	now time.Time,
+) ([]int, error) {
+	_, fresh, err := householdSeats(ctx, tx, to.User, food.Food{ID: to.Food, Name: r.Food.Name, Basis: r.Food.Basis, Source: food.Recipe}, now)
+	if err != nil {
+		return nil, err
+	}
+	var seats []int
+	for _, m := range fresh {
+		own, err := foodInTx(ctx, tx, m.User, m.Food)
+		if err != nil {
+			return nil, err
+		}
+		if err := writeMemberRecipe(ctx, tx, r, userID, m, own, now); err != nil {
+			return nil, err
+		}
+		seat, err := seatIn(ctx, tx, share, m.User)
+		if err != nil {
+			return nil, err
+		}
+		seats = append(seats, seat)
+	}
+	slices.Sort(seats)
+	return seats, nil
+}
+
+// seatIn returns userID's seat in share.
+func seatIn(ctx context.Context, tx *sql.Tx, share string, userID uuid.UUID) (int, error) {
+	var seat int
+	err := tx.QueryRowContext(ctx, "SELECT seat FROM food_shares WHERE share_id = ? AND user_id = ?", share, userID.String()).Scan(&seat)
+	return seat, err
 }
 
 // shareFrom returns userID's recipe foodID, which they share with withID,
@@ -376,7 +450,7 @@ func shareFrom(ctx context.Context, tx *sql.Tx, userID, foodID, withID uuid.UUID
 		return r, share, err
 	}
 	share = uuid.NewV7().String()
-	_, err = insertSeat(ctx, tx, share, userID, foodID)
+	_, err = insertSeat(ctx, tx, share, userID, foodID, false)
 	return r, share, err
 }
 
@@ -443,24 +517,73 @@ func (db *DB) UnshareRecipe(ctx context.Context, userID uuid.UUID, a event.Actor
 		if share == "" {
 			return ErrNotFound
 		}
-		if _, left, err := seatOf(ctx, tx, share, seat); err != nil || left {
+		m, left, err := seatOf(ctx, tx, share, seat)
+		if err != nil || left {
 			return cmpErr(err, left)
 		}
-		before := shareState{Share: share, Seat: seat, Version: version}
+		household, err := leavingWith(ctx, tx, share, userID, m.User)
+		if err != nil {
+			return err
+		}
+		before := shareState{Share: share, Seat: seat, Version: version, Household: household}
 		after, err := leave(ctx, tx, share, seat, now)
 		if err != nil {
 			return err
 		}
+		for _, s := range household {
+			if _, err := tx.ExecContext(ctx, "UPDATE food_shares SET left_at = ? WHERE share_id = ? AND seat = ?",
+				formatTime(now), share, s); err != nil {
+				return err
+			}
+		}
+		after.Household = household
 		_, err = record(ctx, tx, userID, a, event.RecipeUnshare, foodID.String(), before, after, now)
 		return err
 	})
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrShareHousehold) {
 		return err
 	}
 	if err != nil {
 		return fmt.Errorf("unshare recipe: %w", err)
 	}
 	return nil
+}
+
+// leavingWith returns the seats of share of the other members of the
+// household of who, whom userID takes out of it, which go with them: a
+// household has a recipe, or none of its members has. A member taken out
+// by another of their household, or a household that would leave it with
+// no one, is ErrShareHousehold.
+func leavingWith(ctx context.Context, tx *sql.Tx, share string, userID, who uuid.UUID) ([]int, error) {
+	mates, err := householdMates(ctx, tx, who)
+	if err != nil || len(mates) == 0 {
+		return nil, err
+	}
+	if who != userID && mates[userID] {
+		return nil, ErrShareHousehold
+	}
+	others, err := liveMembers(ctx, tx, share, who)
+	if err != nil {
+		return nil, err
+	}
+	var seats []int
+	staying := 0
+	for _, m := range others {
+		if !mates[m.User] {
+			staying++
+			continue
+		}
+		seat, err := seatIn(ctx, tx, share, m.User)
+		if err != nil {
+			return nil, err
+		}
+		seats = append(seats, seat)
+	}
+	if len(seats) > 0 && staying == 0 {
+		return nil, ErrShareHousehold
+	}
+	slices.Sort(seats)
+	return seats, nil
 }
 
 // leave takes the member at seat out of share: the group's version moves
@@ -489,7 +612,7 @@ func shareStateNow(ctx context.Context, tx *sql.Tx, e event.Event) (any, error) 
 	if err != nil {
 		return nil, err
 	}
-	now := shareState{Share: s.Share, Seat: s.Seat, Left: left}
+	now := shareState{Share: s.Share, Seat: s.Seat, Left: left, Household: s.Household}
 	if now.Version, err = shareVersion(ctx, tx, s.Share); err != nil {
 		return nil, err
 	}
@@ -504,20 +627,26 @@ func takeBackShare(ctx context.Context, tx *sql.Tx, e event.Event, now time.Time
 	if err := decode(e.After, &s); err != nil {
 		return fmt.Errorf("%w: %w", errUnreadable, err)
 	}
-	m, _, err := seatOf(ctx, tx, s.Share, s.Seat)
-	if err != nil {
-		return err
-	}
-	used, err := foodInUse(ctx, tx, m.User, m.Food)
-	if err != nil {
-		return err
-	}
-	if used {
-		if _, err := leave(ctx, tx, s.Share, s.Seat, now); err != nil {
+	for i, seat := range append([]int{s.Seat}, s.Household...) {
+		m, _, err := seatOf(ctx, tx, s.Share, seat)
+		if i > 0 && errors.Is(err, ErrNotFound) {
+			// A member of the household whose account went since.
+			continue
+		}
+		if err != nil {
 			return err
 		}
-	} else if _, err := tx.ExecContext(ctx, "DELETE FROM foods WHERE user_id = ? AND id = ?", m.User.String(), m.Food.String()); err != nil {
-		return err
+		used, err := foodInUse(ctx, tx, m.User, m.Food)
+		if err != nil {
+			return err
+		}
+		if used {
+			if _, err := leave(ctx, tx, s.Share, seat, now); err != nil {
+				return err
+			}
+		} else if _, err := tx.ExecContext(ctx, "DELETE FROM foods WHERE user_id = ? AND id = ?", m.User.String(), m.Food.String()); err != nil {
+			return err
+		}
 	}
 	// The version before the share, which moved it on by one.
 	return setShareVersion(ctx, tx, s.Share, s.Version-1)
@@ -534,10 +663,12 @@ func takeBackUnshare(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.
 	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, "UPDATE food_shares SET left_at = NULL WHERE share_id = ? AND seat = ?",
-		s.Share, s.Seat); err != nil {
+	// The member, and their household that went with them.
+	back, err := seatsOf(ctx, tx, s.Share, s.Household)
+	if err != nil {
 		return err
 	}
+	back = append([]shareMember{m}, back...)
 	others, err := liveMembers(ctx, tx, s.Share, m.User)
 	if err != nil {
 		return err
@@ -555,13 +686,7 @@ func takeBackUnshare(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.
 	if err != nil {
 		return err
 	}
-	own, err := foodInTx(ctx, tx, m.User, m.Food)
-	if err != nil {
-		return err
-	}
-	if err := writeMemberRecipe(ctx, tx, r, from.User, m, own, now); errors.Is(err, ErrShareNameTaken) {
-		return fmt.Errorf("%w: %w", clash{UndoNameTaken}, err)
-	} else if err != nil {
+	if err := giveBack(ctx, tx, s.Share, r, from.User, back, now); err != nil {
 		return err
 	}
 	var before shareState
@@ -571,12 +696,57 @@ func takeBackUnshare(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.
 	return setShareVersion(ctx, tx, s.Share, before.Version)
 }
 
+// seatsOf returns the members of share at seats, but the ones gone (their
+// account deleted).
+func seatsOf(ctx context.Context, tx *sql.Tx, share string, seats []int) ([]shareMember, error) {
+	var out []shareMember
+	for _, seat := range seats {
+		m, _, err := seatOf(ctx, tx, share, seat)
+		if errors.Is(err, ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, nil
+}
+
+// giveBack makes members, who left share, members of it again, each with
+// their recipe of r, as member from has it.
+func giveBack(ctx context.Context, tx *sql.Tx, share string, r recipe.Recipe, from uuid.UUID, members []shareMember, now time.Time) error {
+	for _, m := range members {
+		if _, err := tx.ExecContext(ctx, "UPDATE food_shares SET left_at = NULL WHERE share_id = ? AND user_id = ?",
+			share, m.User.String()); err != nil {
+			return err
+		}
+	}
+	for _, m := range members {
+		own, err := foodInTx(ctx, tx, m.User, m.Food)
+		if err != nil {
+			return err
+		}
+		switch err := writeMemberRecipe(ctx, tx, r, from, m, own, now); {
+		case errors.Is(err, ErrShareNameTaken):
+			return fmt.Errorf("%w: %w", clash{UndoNameTaken}, err)
+		case errors.Is(err, ErrShareBarcodeTaken):
+			return fmt.Errorf("%w: %w", clash{UndoBarcodeTaken}, err)
+		case err != nil:
+			return err
+		}
+	}
+	return nil
+}
+
 // adoptIngredients gives every other member whose shared recipe has an
 // ingredient of userID's food, userID's account about to go, a food of
 // their own of it, which the ingredient then names: its name, brand,
 // values and servings, no note, aliases or barcodes of userID's. A food
-// of theirs of its name and brand is that food. Nothing of it is a
-// change of theirs to undo.
+// of theirs of its name and brand is that food. A member of a household
+// gets the copy of the food another member of it adopted, as every food
+// of a member's is each member's. Nothing of it is a change of theirs to
+// undo.
 func adoptIngredients(ctx context.Context, tx *sql.Tx, userID uuid.UUID) error {
 	todo, err := foreignIngredients(ctx, tx, userID)
 	if err != nil {
@@ -584,22 +754,38 @@ func adoptIngredients(ctx context.Context, tx *sql.Tx, userID uuid.UUID) error {
 	}
 	now := time.Now()
 	type key struct {
-		to, food uuid.UUID
-		frozen   bool
+		to     string
+		food   uuid.UUID
+		frozen bool
 	}
-	made := map[key]uuid.UUID{}
+	made := map[key]shareMember{}
 	for _, a := range todo {
 		f, frozen, err := adoptedFrom(ctx, tx, a)
 		if err != nil {
 			return err
 		}
-		k := key{a.User, a.Food, frozen}
-		id, ok := made[k]
-		if !ok {
+		scope, err := householdOf(ctx, tx, a.User)
+		if err != nil {
+			return err
+		}
+		if scope == "" {
+			scope = a.User.String()
+		}
+		k := key{scope, a.Food, frozen}
+		var id uuid.UUID
+		switch had, ok := made[k]; {
+		case ok && had.User == a.User:
+			id = had.Food
+		case ok:
+			if id, err = copyIn(ctx, tx, had.User, had.Food, a.User, now); err != nil {
+				return err
+			}
+		}
+		if id == uuid.Nil() {
 			if id, err = adoptFood(ctx, tx, a.User, f, now); err != nil {
 				return err
 			}
-			made[k] = id
+			made[k] = shareMember{User: a.User, Food: id}
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE recipe_items SET food_user_id = ?, food_id = ?
 			WHERE user_id = ? AND recipe_id = ? AND food_user_id = ? AND food_id = ?`,
@@ -665,9 +851,10 @@ func foreignIngredients(ctx context.Context, tx *sql.Tx, userID uuid.UUID) ([]ad
 
 // adoptFood makes a copy of f userID's, and returns its id: never a food
 // of theirs of its name (which may be made of the recipe that has f, or
-// lack its servings), but the name with a number after it when theirs
-// has it. A recipe's food is a plain food of its values then: its recipe
-// stays its user's.
+// lack its servings), but the name with a number after it when theirs,
+// or a member's of their household, has it. A recipe's food is a plain
+// food of its values then: its recipe stays its user's. Their household
+// has it too (spreadFood).
 func adoptFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, now time.Time) (uuid.UUID, error) {
 	f.ID, f.Note, f.Aliases, f.Barcodes, f.Archived = uuid.NewV7(), "", nil, nil, false
 	if f.Source == food.Recipe {
@@ -676,7 +863,9 @@ func adoptFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, n
 	name := []rune(f.Name)
 	for n := 2; ; n++ {
 		var taken bool
-		if err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM foods WHERE user_id = ? AND name_key = ? AND brand_key = ?)",
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM foods WHERE name_key = ?2 AND brand_key = ?3
+				AND (user_id = ?1 OR user_id IN (SELECT m.user_id FROM household_members AS m
+					JOIN household_members AS me ON me.household_id = m.household_id WHERE me.user_id = ?1)))`,
 			userID.String(), food.Key(f.Name), food.Key(f.Brand)).Scan(&taken); err != nil {
 			return uuid.Nil(), err
 		}
@@ -690,18 +879,11 @@ func adoptFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, n
 	if err := insertFood(ctx, tx, userID, f, food.Key(f.Name), food.Key(f.Brand), now); err != nil {
 		return uuid.Nil(), err
 	}
-	return f.ID, replaceFoodChildren(ctx, tx, userID, f)
-}
-
-// sharedWithOthers reports whether userID's recipe foodID is in a share
-// with another live member.
-func sharedWithOthers(ctx context.Context, tx *sql.Tx, userID, foodID uuid.UUID) (bool, error) {
-	share, _, err := shareOf(ctx, tx, userID, foodID)
-	if err != nil || share == "" {
-		return false, err
+	if err := replaceFoodChildren(ctx, tx, userID, f); err != nil {
+		return uuid.Nil(), err
 	}
-	others, err := liveMembers(ctx, tx, share, userID)
-	return len(others) > 0, err
+	_, err := spreadFood(ctx, tx, userID, f, now)
+	return f.ID, err
 }
 
 // withoutWithdrawn returns ms but the meals of a food of userID's that is

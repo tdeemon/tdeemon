@@ -173,7 +173,7 @@ func recordRecipe(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Act
 	if before != nil && len(parts) == 0 && reflect.DeepEqual(*before, stored) {
 		return stored, nil
 	}
-	share, version, err := shareOf(ctx, tx, userID, id)
+	_, version, err := shareOf(ctx, tx, userID, id)
 	if err != nil {
 		return recipe.Recipe{}, err
 	}
@@ -181,11 +181,19 @@ func recordRecipe(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Act
 	if before != nil {
 		was.Recipe = *before
 	}
-	// A shared recipe's save is every member's.
+	// A recipe of a member of a household is each member's, and a shared
+	// recipe's save is every member's.
+	if _, _, err := householdSeats(ctx, tx, userID, stored.Food, now); err != nil {
+		return recipe.Recipe{}, err
+	}
 	if err := syncShared(ctx, tx, userID, id, stored, now); err != nil {
 		return recipe.Recipe{}, err
 	}
 	is := recipeState{Recipe: stored}
+	share, _, err := shareOf(ctx, tx, userID, id)
+	if err != nil {
+		return recipe.Recipe{}, err
+	}
 	if share != "" {
 		if is.ShareVersion, err = shareVersion(ctx, tx, share); err != nil {
 			return recipe.Recipe{}, err
@@ -559,11 +567,15 @@ func takeBackRecipe(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.E
 		return err
 	}
 	if e.Before == nil {
-		// Its other members' recipes would stay, of no one's making.
-		if shared, err := sharedWithOthers(ctx, tx, userID, id); err != nil {
+		// Its other members' recipes would stay, of no one's making; its
+		// household's copies go with it.
+		if shared, err := sharedOutside(ctx, tx, userID, id); err != nil {
 			return err
 		} else if shared {
 			return clash{UndoShared}
+		}
+		if err := takeBackCopies(ctx, tx, userID, id, now); err != nil {
+			return err
 		}
 		used, err := foodInUse(ctx, tx, userID, id)
 		if err != nil {
@@ -602,9 +614,12 @@ func takeBackRecipe(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.E
 // which was the one undone (stateNow), as r, e's state before, and the
 // share's version with them: the save before is the latest again.
 func restoreShared(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID, r recipe.Recipe, e event.Event, now time.Time) error {
-	if err := syncShared(ctx, tx, userID, id, r, now); errors.Is(err, ErrShareNameTaken) {
+	switch err := syncShared(ctx, tx, userID, id, r, now); {
+	case errors.Is(err, ErrShareNameTaken):
 		return fmt.Errorf("%w: %w", clash{UndoNameTaken}, err)
-	} else if err != nil {
+	case errors.Is(err, ErrShareBarcodeTaken):
+		return fmt.Errorf("%w: %w", clash{UndoBarcodeTaken}, err)
+	case err != nil:
 		return err
 	}
 	var was recipeState
