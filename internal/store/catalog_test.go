@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"slices"
@@ -508,4 +509,68 @@ func addEva(t *testing.T, db *store.DB) uuid.UUID {
 		t.Fatalf("CreateUser: %v", err)
 	}
 	return u.ID
+}
+
+// A copy of the catalog's food (CopyOf) is linked to that row and leaves
+// it as it is, though its values are older than the row's or another
+// save renamed it: the catalog keeps the latest save of a food, and a
+// copy is none. Its undo takes the copy and its link back alone.
+func TestACopyLeavesItsRow(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	saveFood(t, db, ana, tuna(116))
+	row, err := db.CatalogFoodByBarcode(t.Context(), "3850104000010")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Read before Ana renamed and corrected her tuna, so its row.
+	stale := row
+	stale.ID, stale.CopyOf, stale.Barcodes = uuid.NewV7(), row.ID, nil
+	anas, err := db.FoodByKey(t.Context(), ana, row.Name, row.Brand)
+	if err != nil {
+		t.Fatal(err)
+	}
+	anas.Name, anas.Nutrients.Kcal = "Tuna", 120
+	saveFood(t, db, ana, anas)
+
+	saveFood(t, db, ivo, stale)
+	got, err := db.CatalogFood(t.Context(), row.ID)
+	if err != nil || got.Name != "Tuna" || got.Nutrients.Kcal != 120 || catalogRows(t, db) != 1 {
+		t.Errorf("the row after Ivo's copy = %+v, %v (%d rows); want Ana's latest, alone", got, err, catalogRows(t, db))
+	}
+	if found := findCatalog(t, db, ivo, "tuna"); len(found) != 0 {
+		t.Errorf("Ivo's catalog of tuna = %v, want none: his copy names the row", found)
+	}
+
+	// The row changed under its version, as an undo of a save before the
+	// catalog changes it: the copy's undo leaves it so.
+	if err := db.WriteTx(t.Context(), func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(t.Context(), "UPDATE catalog_foods SET kcal = 99 WHERE id = ?", row.ID.String())
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.UndoLast(t.Context(), ivo, testActor, t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := db.CatalogFood(t.Context(), row.ID); err != nil || got.Name != "Tuna" || got.Nutrients.Kcal != 99 {
+		t.Errorf("the row after the undo of Ivo's copy = %+v, %v; want it as it was", got, err)
+	}
+	if found := findCatalog(t, db, ivo, "tuna"); len(found) != 1 {
+		t.Errorf("Ivo's catalog of tuna after the undo = %v, want the row", found)
+	}
+}
+
+// A copy of a row no longer there goes into the catalog as any save.
+func TestACopyOfARowGone(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	gone := tuna(116)
+	gone.Name, gone.CopyOf = "Sardines", uuid.NewV7()
+	saveFood(t, db, ivo, gone)
+	if found := findCatalog(t, db, ana, "sardines"); len(found) != 1 || found[0].ID == gone.CopyOf {
+		t.Errorf("Ana's catalog of sardines = %v, want Ivo's copy as a new row", found)
+	}
 }

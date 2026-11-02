@@ -119,6 +119,10 @@ type Food struct {
 	Source   Source
 	Note     string
 	Archived bool
+	// CopyOf is the catalog's food a new food is a copy of, when it is
+	// one: its save links it to that row and leaves the row as it is.
+	// Only a save reads it: a food read has none, and its JSON never.
+	CopyOf uuid.UUID `json:"-"`
 }
 
 // Serving is a named amount of a food, in the food's unit: "piece", 60.

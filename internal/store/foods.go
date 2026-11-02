@@ -256,7 +256,10 @@ func saveFoodInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Act
 	if err != nil {
 		return food.Food{}, uuid.Nil(), err
 	}
-	return stored, id, syncCatalog(ctx, tx, userID, stored, id, now)
+	// The food as stored, of the catalog's food f was copied of.
+	synced := stored
+	synced.CopyOf = f.CopyOf
+	return stored, id, syncCatalog(ctx, tx, userID, synced, id, now)
 }
 
 // newFoods is what saveNewFoods made of the new foods a meal brings: the
@@ -300,7 +303,7 @@ func saveNewFoods(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Act
 			if err != nil {
 				return newFoods{}, err
 			}
-			had, linked, err := linkBarcodes(ctx, tx, userID, a, had, f.Barcodes, now)
+			had, linked, err := linkBarcodes(ctx, tx, userID, a, had, f.Barcodes, f.CopyOf, now)
 			if err != nil {
 				return newFoods{}, err
 			}
@@ -346,8 +349,10 @@ func keptFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Actor, 
 // as a's save of it, whose event's id it returns (uuid.Nil when it has
 // them all). A barcode another food has is refused (ErrBarcodeTaken), as
 // it is for a new food; past food.MaxBarcodes, the rest are left out.
+// Codes of a copy of the catalog's food copyOf link had to that row,
+// which the save leaves as it is: had's values are no correction of it.
 func linkBarcodes(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Actor, had food.Food, codes []string,
-	now time.Time,
+	copyOf uuid.UUID, now time.Time,
 ) (food.Food, uuid.UUID, error) {
 	more := slices.Clone(had.Barcodes)
 	for _, code := range codes {
@@ -359,7 +364,7 @@ func linkBarcodes(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Act
 		return had, uuid.Nil(), nil
 	}
 	linked := had
-	linked.Barcodes = more
+	linked.Barcodes, linked.CopyOf = more, copyOf
 	return saveFoodInTx(ctx, tx, userID, a, linked, saveOrCorrect, now)
 }
 

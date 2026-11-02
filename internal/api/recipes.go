@@ -228,7 +228,7 @@ func (s *sessions) createRecipe(ctx context.Context, in *createRecipeInput) (*cr
 // ingredients as they are (the store works it out again in its save),
 // with the new foods it brings and warnings about it and their values.
 func (s *sessions) sentRecipe(ctx context.Context, p auth.Principal, b *RecipeFields) (recipe.Recipe, []food.Food, []meal.Warning, error) {
-	sent, foods, warnings, err := s.sentItems(ctx, p, b.Items)
+	sent, foods, warnings, err := s.sentItems(b.Items)
 	if err != nil {
 		return recipe.Recipe{}, nil, nil, err
 	}
