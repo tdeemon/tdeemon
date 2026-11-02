@@ -262,7 +262,9 @@ func unlinkCopies(ctx context.Context, tx *sql.Tx, copies []shareMember) error {
 }
 
 // householdVersion is the version of the group of userID's food id while
-// it is a household's (a live household seat has it), which a save of
+// it is a household's (another live member of it is of userID's
+// household, by a household seat or an explicit share's from before the
+// household), which a save of
 // the food records with it: an undo after another member's save, which
 // moved it on, finds the food changed since though its own fields came
 // back the same. 0 for a food in no such group.
@@ -271,7 +273,10 @@ func householdVersion(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID) (in
 	err := tx.QueryRowContext(ctx, `SELECT (SELECT max(g.version) FROM food_shares AS g WHERE g.share_id = mine.share_id)
 		FROM food_shares AS mine
 		WHERE mine.user_id = ? AND mine.food_id = ? AND mine.left_at IS NULL
-			AND EXISTS (SELECT 1 FROM food_shares AS h WHERE h.share_id = mine.share_id AND h.household = 1 AND h.left_at IS NULL)`,
+			AND EXISTS (SELECT 1 FROM food_shares AS h
+				JOIN household_members AS mate ON mate.user_id = h.user_id
+				JOIN household_members AS me ON me.household_id = mate.household_id AND me.user_id = mine.user_id
+				WHERE h.share_id = mine.share_id AND h.user_id <> mine.user_id AND h.left_at IS NULL)`,
 		userID.String(), id.String()).Scan(&v)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
