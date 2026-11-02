@@ -561,6 +561,35 @@ func TestMergeARecipeLeft(t *testing.T) {
 	}
 }
 
+// A recipe the two shared before the join is the household's: a save of
+// another member's since keeps an undo from taking it back.
+func TestMergeARecipeSharedBefore(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	k := kefir()
+	anas := saveRecipe(t, db, ana, curryOf(t, saveFood(t, db, ana, chickenBreast()), k), k)
+	if err := db.ShareRecipe(t.Context(), ana, testActor, anas.Food.ID, ivo, t0); err != nil {
+		t.Fatal(err)
+	}
+	join(t, db, ana, ivo)
+
+	f := copyNamed(t, db, ana, "Chicken curry")
+	f.Barcodes = []string{"2000000000015"}
+	saveFood(t, db, ana, f)
+	ivos := copyNamed(t, db, ivo, "Chicken curry")
+	ivos.Barcodes = nil
+	saveFood(t, db, ivo, ivos)
+	ivos.Barcodes = []string{"2000000000015"}
+	saveFood(t, db, ivo, ivos)
+	if _, err := db.UndoLast(t.Context(), ana, testActor, t0.Add(time.Minute)); !isConflict(err, store.UndoChanged) {
+		t.Errorf("Ana's undo after Ivo's saves = %v, want it changed since", err)
+	}
+	if got := copyNamed(t, db, ivo, "Chicken curry"); !slices.Equal(got.Barcodes, []string{"2000000000015"}) {
+		t.Errorf("Ivo's curry's barcodes = %v, want his save's", got.Barcodes)
+	}
+}
+
 // A preview writes nothing; an accept after the household's foods
 // changed since its preview is refused, writing nothing, and a new
 // preview's accept is done.
