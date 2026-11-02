@@ -284,7 +284,8 @@ func (db *DB) ChangeSettings(ctx context.Context, id uuid.UUID, c SettingsChange
 var ErrLastAdmin = errors.New("the instance's last admin")
 
 // DeleteUser deletes the user with id and all of their data, which every
-// table of a user's refers to with ON DELETE CASCADE, or returns
+// table of a user's refers to with ON DELETE CASCADE, after they leave
+// their household (LeaveHousehold, but its event), or returns
 // ErrNotFound; ErrLastAdmin for the instance's only active admin, whom
 // nobody could replace. It returns the user deleted.
 func (db *DB) DeleteUser(ctx context.Context, id uuid.UUID) (user.User, error) {
@@ -298,6 +299,11 @@ func (db *DB) DeleteUser(ctx context.Context, id uuid.UUID) (user.User, error) {
 			return fmt.Errorf("delete user: %w", err)
 		}
 		if err := keepAnAdmin(ctx, tx, u); err != nil {
+			return fmt.Errorf("delete user: %w", err)
+		}
+		// The household stays with its other members, whole: the user
+		// leaves it first, as a leave does.
+		if _, err := leaveHousehold(ctx, tx, id); err != nil && !errors.Is(err, ErrNotFound) {
 			return fmt.Errorf("delete user: %w", err)
 		}
 		// The shared recipes stay with their other members, whole.

@@ -371,7 +371,9 @@ func shareRecipeInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.
 		return err
 	}
 	if back {
-		_, err = tx.ExecContext(ctx, "UPDATE food_shares SET left_at = NULL WHERE share_id = ? AND seat = ?", share, seat)
+		// Their seat is the share's now, though the household's before: a
+		// leave of the household keeps it.
+		_, err = tx.ExecContext(ctx, "UPDATE food_shares SET left_at = NULL, household = 0 WHERE share_id = ? AND seat = ?", share, seat)
 	} else {
 		seat, err = insertSeat(ctx, tx, share, withID, to.Food, false)
 	}

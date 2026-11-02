@@ -46,7 +46,9 @@ type RecentChange struct {
 // which change nothing. An import's writes are left out: undo leaves them,
 // and a device sends them often enough to bury the user's own. So are
 // the writes that are part of another change (a meal's new foods):
-// undo takes them back with it, never on their own.
+// undo takes them back with it, never on their own. A join of a
+// household or a leave is listed, but undo never takes it back, nor any
+// change before it: none of them is next.
 func (db *DB) RecentChanges(ctx context.Context, userID uuid.UUID, limit int) ([]RecentChange, error) {
 	if limit <= 0 {
 		return nil, nil
@@ -71,7 +73,7 @@ func (db *DB) RecentChanges(ctx context.Context, userID uuid.UUID, limit int) ([
 			if err != nil {
 				return err
 			}
-			out = append(out, RecentChange{Event: e, Next: e.ID == next.ID})
+			out = append(out, RecentChange{Event: e, Next: e.ID == next.ID && undoable(next)})
 		}
 		if err := rows.Err(); err != nil {
 			return err
@@ -87,6 +89,12 @@ func (db *DB) RecentChanges(ctx context.Context, userID uuid.UUID, limit int) ([
 		return nil, fmt.Errorf("recent changes: %w", err)
 	}
 	return out, nil
+}
+
+// undoable reports whether undo takes e, the latest change undo comes
+// to, back: never a join of a household, nor a leave, which it refuses.
+func undoable(e event.Event) bool {
+	return e.Action != event.HouseholdJoin && e.Action != event.HouseholdLeave
 }
 
 // nameChange gives c the names of what its change was of, from its
