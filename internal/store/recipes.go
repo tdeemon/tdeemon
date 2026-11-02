@@ -323,7 +323,7 @@ func checkCycle(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID, items []m
 			)
 			SELECT 1 FROM reach
 			WHERE (reach.uid = ?3 AND reach.id = ?4)
-				OR EXISTS (SELECT 1 FROM recipe_shares AS rs
+				OR EXISTS (SELECT 1 FROM food_shares AS rs
 					WHERE rs.share_id = ?5 AND rs.user_id = reach.uid AND rs.food_id = reach.id)
 			LIMIT 1`,
 			owner.String(), items[i].FoodID.String(), userID.String(), id.String(), share).Scan(&one)

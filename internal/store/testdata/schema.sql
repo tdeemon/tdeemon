@@ -153,14 +153,14 @@ CREATE TABLE "events" (
         'profile.set', 'phase.set', 'phase.delete', 'target.set', 'target.delete',
         'day.training', 'plan.weekdays', 'limits.set', 'notes.set', 'workouts.set',
         'day.checkin', 'proposal.create', 'proposal.status', 'autopilot.set', 'autopilot.review',
-        'recipe.share', 'recipe.unshare'
+        'recipe.share', 'recipe.unshare', 'household.join', 'household.leave'
     )),
     -- What changed: a food's (a recipe's too, which a share or its stop
     -- names by the user's own recipe), a meal's or a proposal's
     -- id, a day, a day and a metric, a phase's start, a target's first
-    -- day, "profile", "plan", "limits", "notes", "autopilot", a review's
-    -- day ("review/YYYY-MM-DD") or a source of workouts, or for an undo
-    -- the event it took back.
+    -- day, "profile", "plan", "limits", "notes", "autopilot", "household",
+    -- a review's day ("review/YYYY-MM-DD") or a source of workouts, or
+    -- for an undo the event it took back.
     entity TEXT NOT NULL CHECK (entity <> ''),
     -- The entity's state as JSON; NULL where there was none.
     before_state TEXT CHECK (before_state IS NULL OR json_valid(before_state)),
@@ -220,6 +220,20 @@ CREATE TABLE food_servings (
     -- In the food's unit, grams or ml.
     amount REAL NOT NULL CHECK (amount > 0),
     PRIMARY KEY (user_id, food_id, name_key),
+    FOREIGN KEY (user_id, food_id) REFERENCES foods (user_id, id) ON DELETE CASCADE
+) STRICT;
+
+CREATE TABLE food_shares (
+    share_id TEXT NOT NULL CHECK (length(share_id) = 36),
+    seat INTEGER NOT NULL CHECK (seat >= 1),
+    user_id TEXT NOT NULL,
+    food_id TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+    left_at TEXT,
+    household INTEGER NOT NULL DEFAULT 0 CHECK (household IN (0, 1)),
+    PRIMARY KEY (share_id, user_id),
+    UNIQUE (share_id, seat),
+    UNIQUE (user_id, food_id),
     FOREIGN KEY (user_id, food_id) REFERENCES foods (user_id, id) ON DELETE CASCADE
 ) STRICT;
 
@@ -295,6 +309,33 @@ CREATE TABLE 'foods_fts_data'(id INTEGER PRIMARY KEY, block BLOB);
 CREATE TABLE 'foods_fts_docsize'(id INTEGER PRIMARY KEY, sz BLOB);
 
 CREATE TABLE 'foods_fts_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID;
+
+CREATE TABLE household_invites (
+    -- A UUIDv7 the server makes.
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    invited_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    UNIQUE (user_id, invited_id),
+    CHECK (invited_id <> user_id)
+) STRICT;
+
+CREATE INDEX household_invites_invited ON household_invites (invited_id);
+
+CREATE TABLE household_members (
+    user_id TEXT PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+    household_id TEXT NOT NULL REFERENCES households (id) ON DELETE CASCADE,
+    joined_at TEXT NOT NULL
+) STRICT;
+
+CREATE INDEX household_members_household ON household_members (household_id);
+
+CREATE TABLE households (
+    -- A UUIDv7 the server makes.
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    created_at TEXT NOT NULL
+) STRICT;
 
 CREATE TABLE invites (
     -- A UUIDv7: the handle the admin revokes it by.
@@ -558,19 +599,6 @@ CREATE TABLE "recipe_items" (
 ) STRICT;
 
 CREATE INDEX recipe_items_food ON recipe_items (food_user_id, food_id);
-
-CREATE TABLE recipe_shares (
-    share_id TEXT NOT NULL CHECK (length(share_id) = 36),
-    seat INTEGER NOT NULL CHECK (seat >= 1),
-    user_id TEXT NOT NULL,
-    food_id TEXT NOT NULL,
-    version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
-    left_at TEXT,
-    PRIMARY KEY (share_id, user_id),
-    UNIQUE (share_id, seat),
-    UNIQUE (user_id, food_id),
-    FOREIGN KEY (user_id, food_id) REFERENCES recipes (user_id, food_id) ON DELETE CASCADE
-) STRICT;
 
 CREATE TABLE recipes (
     food_id TEXT NOT NULL,
