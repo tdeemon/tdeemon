@@ -510,6 +510,8 @@ func createError(err error) error {
 		return huma.Error409Conflict("another meal is under this id: a new meal takes a new id")
 	case errors.Is(err, store.ErrMealDeleted):
 		return huma.Error409Conflict("the meal under this id was deleted: a new meal takes a new id")
+	case shareRefusal(err) != nil:
+		return shareRefusal(err)
 	}
 	return internalError("logging the meal failed", err)
 }
@@ -640,6 +642,8 @@ func (s *sessions) updateMeal(ctx context.Context, in *updateMealInput) (*mealOu
 		return nil, errItemTaken
 	case errors.Is(err, store.ErrRecipeFood):
 		return nil, errRecipeFood
+	case shareRefusal(err) != nil:
+		return nil, shareRefusal(err)
 	case err != nil:
 		return nil, internalError("changing the meal failed", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"uuid"
 
 	"github.com/zarnautovic/tdeemon/internal/domain/event"
+	"github.com/zarnautovic/tdeemon/internal/domain/user"
 )
 
 // A user invites another into their household (story 408): the invited
@@ -39,6 +40,15 @@ var (
 	// its preview showed; a new preview shows the merge now.
 	ErrMergeChanged = errors.New("the household's foods changed since the preview")
 )
+
+// HouseholdMembers returns the members of userID's household, userID
+// among them, in the order they joined; none when they are in none.
+func (db *DB) HouseholdMembers(ctx context.Context, userID uuid.UUID) ([]user.User, error) {
+	return db.users(ctx, "SELECT "+userColumnsOfU+` FROM household_members AS m
+		JOIN household_members AS me ON me.household_id = m.household_id
+		JOIN users AS u ON u.id = m.user_id
+		WHERE me.user_id = ? ORDER BY m.joined_at, m.user_id`, userID.String())
+}
 
 // HouseholdPerson is a user an invite names: who invited, or whom.
 type HouseholdPerson struct {

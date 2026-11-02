@@ -67,7 +67,7 @@ func (s *sessions) registerRecipeShares(a huma.API) {
 		Description:   "Needs a web session. Your own seat leaves the recipe: your meals of it stay, but you pick it no more. The others keep it.",
 		Tags:          []string{"foods"},
 		DefaultStatus: http.StatusNoContent,
-		Errors:        []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
+		Errors:        []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusConflict},
 	}, s.unshareRecipe)
 	huma.Register(a, huma.Operation{
 		OperationID:   "copy-ingredient-food",
@@ -108,6 +108,8 @@ func (s *sessions) shareRecipe(ctx context.Context, in *shareRecipeInput) (*food
 		return nil, huma.Error409Conflict("they have the recipe already")
 	case errors.Is(err, store.ErrShareNameTaken):
 		return nil, huma.Error409Conflict("they have a food of the recipe's name: they rename theirs, or you yours")
+	case errors.Is(err, store.ErrShareBarcodeTaken):
+		return nil, huma.Error409Conflict("a member of their household has another food of a barcode of the recipe's: they take it from theirs, or you from yours")
 	case err != nil:
 		return nil, internalError("sharing the recipe failed", err)
 	}
@@ -155,9 +157,13 @@ func (s *sessions) unshareRecipe(ctx context.Context, in *unshareRecipeInput) (*
 		return nil, huma.Error404NotFound("no such recipe")
 	}
 	err = s.db.UnshareRecipe(ctx, p.User.ID, actorOf(p), id, in.Seat, s.now())
-	if errors.Is(err, store.ErrNotFound) {
+	switch {
+	case errors.Is(err, store.ErrNotFound):
 		return nil, huma.Error404NotFound("no such member of the recipe")
-	} else if err != nil {
+	case errors.Is(err, store.ErrShareHousehold):
+		return nil, huma.Error409Conflict("a member of a household keeps its recipes, and a household does not leave one alone: " +
+			"one who wants none of them leaves the household")
+	case err != nil:
 		return nil, internalError("stopping the share failed", err)
 	}
 	return nil, nil
@@ -183,6 +189,8 @@ func (s *sessions) copyIngredientFood(ctx context.Context, in *ingredientFoodInp
 	switch {
 	case errors.As(err, &conflict):
 		return nil, huma.Error409Conflict(conflictDetail(conflict))
+	case shareRefusal(err) != nil:
+		return nil, shareRefusal(err)
 	case err != nil:
 		return nil, internalError("adding the food failed", err)
 	}

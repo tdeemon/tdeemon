@@ -233,3 +233,25 @@ func TestUndoRefusesAJoin(t *testing.T) {
 	copyNamed(t, db, ivo, "Kefir")
 	copyNamed(t, db, ana, "Kefir")
 }
+
+// HouseholdMembers lists the user's household, them among it, to each of
+// its members, and nothing to a user outside it.
+func TestHouseholdMembers(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	eva := addEva(t, db)
+	if got, err := db.HouseholdMembers(t.Context(), ana); err != nil || len(got) != 0 {
+		t.Fatalf("Ana's members before a household = %+v, %v; want none", got, err)
+	}
+	join(t, db, ana, eva)
+	for _, u := range []uuid.UUID{ana, eva} {
+		got, err := db.HouseholdMembers(t.Context(), u)
+		if err != nil || len(got) != 2 || got[0].ID != ana || got[1].ID != eva || got[1].Email != "eva@example.com" {
+			t.Errorf("the members to %v = %+v, %v; want Ana and Eva", u, got, err)
+		}
+	}
+	if got, err := db.HouseholdMembers(t.Context(), ivo); err != nil || len(got) != 0 {
+		t.Errorf("Ivo's members = %+v, %v; want none", got, err)
+	}
+}

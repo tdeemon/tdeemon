@@ -79,6 +79,11 @@ func (s *sessions) undoLast(ctx context.Context, in *undoInput) (*undoOutput, er
 		if conflict.Err != nil {
 			s.logger.DebugContext(ctx, "a change could not be undone", "event", conflict.Event.ID.String(), "error", conflict.Err)
 		}
+		if conflict.Reason == store.UndoHousehold {
+			// Never passed over: the changes before it are of the foods
+			// from before the household.
+			return nil, huma.Error409Conflict(conflict.Error() + "; undo takes back nothing before it either, and this id sent again answers the same")
+		}
 		return nil, huma.Error409Conflict(conflict.Error() + "; it is passed over, so an undo under a new id takes back the change before it, and this id sent again answers the same")
 	case err != nil:
 		return nil, internalError("undoing failed", err)
