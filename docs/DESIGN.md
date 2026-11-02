@@ -163,7 +163,10 @@ November 2026, story 401). It holds declared values alone: a food of a
 user's of `label`, `off` or `reference`, in use, goes into it when it
 is saved, with its name, brand, values, servings and barcodes, but not
 its note or aliases, which are the user's own words; an estimate, a
-user's word, a dish, a recipe or an archived food never does. One
+user's word, a dish, a recipe or an archived food never does; a row
+all of whose foods are of those sources now (a plate first saved as a
+label's, then as an estimate) is shown no more, till one says it is
+declared again. One
 product is one row, by its name and brand, else the row the food went
 into before (renamed with it), else one of its barcodes; the latest
 save of any user's food wins, but a barcode stays the product's that
