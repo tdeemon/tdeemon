@@ -975,7 +975,7 @@ export interface paths {
         put?: never;
         /**
          * Save a recipe
-         * @description Saves a recipe, a dish cooked again, or corrects one: the recipe with the id (404 for an id the user has no recipe of), or else the one of the name; else a new one. A recipe is a food (source recipe, by weight), found and logged as any: its values per 100 g of the cooked dish come from its ingredients and the dish's weight (yield_g), and its servings are recipe, the whole dish, and portion, one of its portions: a tenth of the pot is 0.1 of recipe. Not weighed, the raw ingredients' weight stands for the dish's. A save replaces the whole recipe, its ingredients taking their foods' values now: correct it from what get_food gave. A food of the name that is no recipe, or an alias another food has, is refused (409), naming it; so is an ingredient that is the recipe, at any depth (422). The answer holds its food with the recipe, and warnings: a weight far off the raw ingredients', or values of a new food that do not add up.
+         * @description Saves a recipe, a dish cooked again, or corrects one: the recipe with the id (404 for an id the user has no recipe of), or else the one of the name; else a new one. A recipe is a food (source recipe, by weight), found and logged as any: its values per 100 g of the cooked dish come from its ingredients and the dish's weight (yield_g), and its servings are recipe, the whole dish, and portion, one of its portions: a tenth of the pot is 0.1 of recipe. Not weighed, the raw ingredients' weight stands for the dish's. A save replaces the whole recipe, its ingredients taking their foods' values now: correct it from what get_food gave. A food of the name that is no recipe, or an alias another food has, is refused (409), naming it; so is an ingredient that is the recipe, at any depth (422). The answer holds its food with the recipe, and warnings: a weight far off the raw ingredients', or values of a new food that do not add up. A shared recipe (shared_with) is one recipe: a save is every member's; its ingredients of another member's food (theirs) keep their food_id.
          */
         post: operations["upsert-recipe"];
         delete?: never;
@@ -999,6 +999,66 @@ export interface paths {
          */
         post: operations["create-recipe"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recipes/{id}/ingredients/{position}/food": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add another member's ingredient to your foods
+         * @description Needs a web session. A new food of yours of a shared recipe's ingredient of another member's food: its name, brand, values and servings. A food of yours of its name and brand is a conflict (409).
+         */
+        post: operations["copy-ingredient-food"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recipes/{id}/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Share a recipe with another user
+         * @description Needs a web session. The user of the address has the recipe at once, a recipe of their own of it that a change by any member is every member's; its ingredients of your foods are theirs to see in it, never among their foods. They are told by a notification on their devices. Answers the recipe, with whom it is shared now.
+         */
+        post: operations["share-recipe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recipes/{id}/shares/{seat}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Stop sharing a recipe with a member
+         * @description Needs a web session. Your own seat leaves the recipe: your meals of it stay, but you pick it no more. The others keep it.
+         */
+        delete: operations["unshare-recipe"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1273,7 +1333,7 @@ export interface components {
             source: "label" | "estimate" | "reference" | "user" | "dish" | "off" | "recipe";
         };
         ChangeBody: {
-            /** @description What the change did: food.save, food.archive, recipe.save, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge, notes.set, or a change of the plan: profile.set, limits.set, phase.set, phase.delete, target.set, target.delete, plan.weekdays, proposal.create, proposal.status, autopilot.set (the autopilot's settings). */
+            /** @description What the change did: food.save, food.archive, recipe.save, recipe.share, recipe.unshare, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge, notes.set, or a change of the plan: profile.set, limits.set, phase.set, phase.delete, target.set, target.delete, plan.weekdays, proposal.create, proposal.status, autopilot.set (the autopilot's settings). */
             action: string;
             /** @description Of food.archive: true when it archived the food, false when it brought it back in use. */
             archived?: boolean;
@@ -1927,6 +1987,8 @@ export interface components {
             quantity: components["schemas"]["QuantityBody"];
             /** @enum {string} */
             source: "label" | "estimate" | "reference" | "user" | "dish" | "off" | "recipe";
+            /** @description Another member's food: a save keeps it by food_id. */
+            theirs?: boolean;
             /** @enum {string} */
             unit: "g" | "ml" | "portion";
         };
@@ -2751,6 +2813,8 @@ export interface components {
              * @description The raw ingredients' weight in g (ml as g); absent when one's is not known.
              */
             raw_weight?: number;
+            /** @description A shared recipe's members, you too: a save is every member's. */
+            shared_with?: components["schemas"]["RecipeMemberBody"][];
             /** @description The whole dish's. */
             total: components["schemas"]["NutrientsBody"];
             /**
@@ -2790,6 +2854,16 @@ export interface components {
              * @description The cooked dish's weight in g. Left out when not weighed: the raw ingredients' weight stands for it, so a share of the dish is exact and its grams not.
              */
             yield_g?: number;
+        };
+        RecipeMemberBody: {
+            name: string;
+            /**
+             * Format: int64
+             * @description What a stop names.
+             */
+            seat: number;
+            /** @description A stop of your seat leaves the recipe. */
+            you?: boolean;
         };
         RecipeWarningBody: {
             /**
@@ -3069,6 +3143,13 @@ export interface components {
             /** @description The user as they stand now. */
             user: components["schemas"]["UserBody"];
         };
+        ShareRecipeInputBody: {
+            /**
+             * Format: email
+             * @description The address of the user of the instance to share the recipe with.
+             */
+            email: string;
+        };
         StrongBody: {
             /** @description The days that became days with a workout. */
             added: string[];
@@ -3299,7 +3380,7 @@ export interface components {
             undone: components["schemas"]["UndoneBody"];
         };
         UndoneBody: {
-            /** @description What the change did: food.save, food.archive, recipe.save, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge or notes.set. */
+            /** @description What the change did: food.save, food.archive, recipe.save, recipe.share, recipe.unshare, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge or notes.set. */
             action: string;
             /**
              * Format: date-time
@@ -8813,6 +8894,298 @@ export interface operations {
             };
             /** @description Unsupported Media Type */
             415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "copy-ingredient-food": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The recipe's food. */
+                id: string;
+                /** @description The ingredient's place in the recipe, from 0. */
+                position: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodBody"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "share-recipe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The recipe's food. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareRecipeInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodBody"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Request Timeout */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "unshare-recipe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The recipe's food. */
+                id: string;
+                /** @description The member's seat, of the recipe's shared_with. */
+                seat: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

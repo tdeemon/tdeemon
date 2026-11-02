@@ -220,7 +220,7 @@ func (s *sessions) checkNewFood(ctx context.Context, p auth.Principal, nf *food.
 // and brand of a food the user has is that food, as the user has it
 // (the store keeps it so in the meal's transaction), which the warning
 // says, rather than the values sent.
-func (s *sessions) item(ctx context.Context, p auth.Principal, sent meal.Item, nf *food.Food) (meal.Item, []meal.Warning, error) {
+func (s *sessions) item(ctx context.Context, p auth.Principal, sent meal.Item, nf *food.Food, known map[uuid.UUID]food.Food) (meal.Item, []meal.Warning, error) {
 	var f food.Food
 	var warnings []meal.Warning
 	if err := s.checkNewFood(ctx, p, nf, sent.Quantity); err != nil {
@@ -241,7 +241,9 @@ func (s *sessions) item(ctx context.Context, p auth.Principal, sent meal.Item, n
 		}
 	case sent.FoodID != uuid.Nil():
 		var err error
-		if f, err = s.foodOf(ctx, p, sent.FoodID); err != nil {
+		if k, ok := known[sent.FoodID]; ok {
+			f = k
+		} else if f, err = s.foodOf(ctx, p, sent.FoodID); err != nil {
 			return meal.Item{}, nil, err
 		}
 	default:
@@ -449,10 +451,18 @@ func (s *sessions) sentItems(in []itemInput) ([]meal.Item, []*food.Food, []meal.
 // items works out each of sent whole, with its new food in foods, and the
 // warnings about the new foods' values.
 func (s *sessions) items(ctx context.Context, p auth.Principal, sent []meal.Item, foods []*food.Food) ([]meal.Item, []meal.Warning, error) {
+	return s.itemsKnown(ctx, p, sent, foods, nil)
+}
+
+// itemsKnown is items, of foods known by their id besides the user's: a
+// shared recipe's ingredients of other members' foods.
+func (s *sessions) itemsKnown(ctx context.Context, p auth.Principal, sent []meal.Item, foods []*food.Food,
+	known map[uuid.UUID]food.Food,
+) ([]meal.Item, []meal.Warning, error) {
 	items := make([]meal.Item, len(sent))
 	var warnings []meal.Warning
 	for i := range sent {
-		it, ws, err := s.item(ctx, p, sent[i], foods[i])
+		it, ws, err := s.item(ctx, p, sent[i], foods[i], known)
 		if err != nil {
 			return nil, nil, itemError(i, err)
 		}
@@ -707,7 +717,7 @@ func (s *sessions) opItem(ctx context.Context, p auth.Principal, m *meal.Meal, o
 	if at := opTarget(m, oi); at >= 0 && m.Items[at].SameAs(sent) {
 		return oi, nil, ws, nil
 	}
-	it, fws, err := s.item(ctx, p, sent, nf)
+	it, fws, err := s.item(ctx, p, sent, nf, nil)
 	if err != nil {
 		return oi, nil, nil, err
 	}

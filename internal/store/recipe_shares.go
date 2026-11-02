@@ -875,3 +875,114 @@ func setShareVersion(ctx context.Context, tx *sql.Tx, share string, v int64) err
 	_, err := tx.ExecContext(ctx, "UPDATE recipe_shares SET version = ?2 WHERE share_id = ?1 AND version > ?2", share, v)
 	return err
 }
+
+// IngredientFood returns a new food of userID's of the ingredient at
+// position of their recipe recipeID that is another member's food: as a
+// save reads it (ingredientSource), its name, brand, values, portion and
+// servings, of its source, under a new id; no note, aliases or barcodes
+// of its owner's. An ingredient of none, or of a food of userID's own,
+// is ErrNotFound.
+func (db *DB) IngredientFood(ctx context.Context, userID, recipeID uuid.UUID, position int) (food.Food, error) {
+	var out food.Food
+	err := db.readTx(ctx, func(tx *sql.Tx) error {
+		if left, err := withdrawn(ctx, tx, userID, recipeID); err != nil || left {
+			return cmpErr(err, left)
+		}
+		r, err := recipeInTx(ctx, tx, userID, recipeID)
+		if err != nil {
+			return err
+		}
+		if position < 0 || position >= len(r.Items) || r.Items[position].FoodUser == uuid.Nil() || r.Items[position].FoodID == uuid.Nil() {
+			return ErrNotFound
+		}
+		share, _, err := shareOf(ctx, tx, userID, recipeID)
+		if err != nil {
+			return err
+		}
+		stored, err := storedItems(ctx, tx, userID, recipeID)
+		if err != nil {
+			return err
+		}
+		f, _, _, err := ingredientSource(ctx, tx, userID, share, stored, &r.Items[position])
+		if err != nil {
+			return err
+		}
+		out = food.Food{
+			ID: uuid.NewV7(), Name: f.Name, Brand: f.Brand, Basis: f.Basis, Nutrients: f.Nutrients,
+			PortionGrams: f.PortionGrams, Servings: f.Servings, Source: f.Source,
+		}
+		// A recipe's food is a plain food of its values: the recipe stays
+		// its user's.
+		if out.Source == food.Recipe {
+			out.Source = food.User
+		}
+		return nil
+	})
+	if errors.Is(err, ErrNotFound) {
+		return food.Food{}, err
+	}
+	if err != nil {
+		return food.Food{}, fmt.Errorf("ingredient food: %w", err)
+	}
+	return out, nil
+}
+
+// MembersRecipe returns the food of memberID's recipe of the share of
+// userID's recipe foodID, and its name: the recipe a notification of the
+// share opens. ErrNotFound when memberID is no live member of it.
+func (db *DB) MembersRecipe(ctx context.Context, userID, foodID, memberID uuid.UUID) (uuid.UUID, string, error) {
+	var id, name string
+	err := db.read.QueryRowContext(ctx, `SELECT f.id, f.name FROM recipe_shares AS mine
+		JOIN recipe_shares AS theirs ON theirs.share_id = mine.share_id AND theirs.user_id = ?3 AND theirs.left_at IS NULL
+		JOIN foods AS f ON f.user_id = theirs.user_id AND f.id = theirs.food_id
+		WHERE mine.user_id = ?1 AND mine.food_id = ?2 AND mine.left_at IS NULL`,
+		userID.String(), foodID.String(), memberID.String()).Scan(&id, &name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return uuid.Nil(), "", ErrNotFound
+	}
+	if err != nil {
+		return uuid.Nil(), "", fmt.Errorf("member's recipe: %w", err)
+	}
+	f, err := uuid.Parse(id)
+	return f, name, err
+}
+
+// ForeignIngredientFoods returns the foods of other members' that
+// userID's recipe id has as ingredients, by their id, as a save reads
+// them (ingredientSource; of the values the recipe keeps when frozen):
+// what a save of it names by food_id though they are none of userID's.
+// None for a recipe of none of theirs.
+func (db *DB) ForeignIngredientFoods(ctx context.Context, userID, id uuid.UUID) (map[uuid.UUID]food.Food, error) {
+	out := map[uuid.UUID]food.Food{}
+	err := db.readTx(ctx, func(tx *sql.Tx) error {
+		if left, err := withdrawn(ctx, tx, userID, id); err != nil || left {
+			return err
+		}
+		share, _, err := shareOf(ctx, tx, userID, id)
+		if err != nil {
+			return err
+		}
+		stored, err := storedItems(ctx, tx, userID, id)
+		if err != nil {
+			return err
+		}
+		for fid := range stored {
+			it := stored[fid]
+			if it.FoodUser == uuid.Nil() {
+				continue
+			}
+			f, _, _, err := ingredientSource(ctx, tx, userID, share, stored, &it)
+			if err != nil && !errors.Is(err, ErrNotFound) {
+				return err
+			}
+			if err == nil {
+				out[fid] = f
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("foreign ingredient foods: %w", err)
+	}
+	return out, nil
+}

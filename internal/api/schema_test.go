@@ -372,6 +372,42 @@ func answerCases() map[string]answerCase {
 			saveIsolationMeals(t, in.db, in.user, saveIsolationFoods(t, in.db, in.user, now), now)
 			in.do(t, http.MethodGet, "/api/v1/foods?query=rye", "", []*http.Cookie{session}, nil)
 		},
+		// A share, then each refusal; a stop, then one of no member.
+		"share-recipe": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			now := in.clock.Now()
+			saveIsolationRecipe(t, in.db, in.user, saveIsolationFoods(t, in.db, in.user, now), now)
+			pudding := foodOf(t, in.db, in.user.ID, in.user.Name+"'s bread pudding")
+			in.addUser(t, user.RoleUser)
+			path := "/api/v1/recipes/" + pudding.ID.String() + "/shares"
+			for _, to := range []string{"zoe@example.com", "nobody@example.com", "zoe@example.com"} {
+				in.do(t, http.MethodPost, path, `{"email": "`+to+`"}`, []*http.Cookie{session}, nil)
+			}
+		},
+		"unshare-recipe": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			now := in.clock.Now()
+			zoe := in.addUser(t, user.RoleUser)
+			saveIsolationShare(t, in.db, in.user, zoe, saveIsolationFoods(t, in.db, in.user, now), now)
+			stew := foodOf(t, in.db, in.user.ID, "Shared bread stew")
+			for range 2 {
+				in.do(t, http.MethodDelete, "/api/v1/recipes/"+stew.ID.String()+"/shares/2", "", []*http.Cookie{session}, nil)
+			}
+		},
+		// A copy, then one of a name the user has, and one of their own.
+		"copy-ingredient-food": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			now := in.clock.Now()
+			zoe := in.addUser(t, user.RoleUser)
+			saveIsolationShare(t, in.db, zoe, in.user, saveIsolationFoods(t, in.db, zoe, now), now)
+			stew := foodOf(t, in.db, in.user.ID, "Shared bread stew")
+			for range 2 {
+				in.do(t, http.MethodPost, "/api/v1/recipes/"+stew.ID.String()+"/ingredients/0/food", "", []*http.Cookie{session}, nil)
+			}
+			saveIsolationRecipe(t, in.db, in.user, saveIsolationFoods(t, in.db, in.user, now), now)
+			own := foodOf(t, in.db, in.user.ID, in.user.Name+"'s bread pudding")
+			in.do(t, http.MethodPost, "/api/v1/recipes/"+own.ID.String()+"/ingredients/0/food", "", []*http.Cookie{session}, nil)
+		},
 		"create-food": func(t *testing.T, in *instance, session *http.Cookie) {
 			t.Helper()
 			in.do(t, http.MethodPost, "/api/v1/foods/new", `{"name": "Rolls", "brand": "Bakery", "basis": "100g", "source": "label",

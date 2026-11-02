@@ -1130,6 +1130,72 @@ func isolateDeleteUser(t *testing.T, e isolationEnv) {
 	}
 }
 
+// isolateShareRecipe is share-recipe's case: the owner's recipe answers
+// the other as one that does not exist; theirs they share with a third
+// user.
+func isolateShareRecipe(t *testing.T, e isolationEnv) {
+	t.Helper()
+	session := []*http.Cookie{e.other.session}
+	owners := foodOf(t, e.in.db, e.owner.user.ID, e.owner.user.Name+"'s bread pudding")
+	zoe := e.in.addUser(t, user.RoleUser)
+	theirs := e.in.do(t, http.MethodPost, "/api/v1/recipes/"+owners.ID.String()+"/shares", `{"email": "`+zoe.Email+`"}`, session, nil)
+	none := e.in.do(t, http.MethodPost, "/api/v1/recipes/"+uuid.NewV7().String()+"/shares", `{"email": "`+zoe.Email+`"}`, session, nil)
+	if theirs.Code != http.StatusNotFound || theirs.Body.String() != none.Body.String() {
+		t.Errorf("the owner's recipe: %d %s; none: %d %s; want the same 404", theirs.Code, theirs.Body.String(), none.Code, none.Body.String())
+	}
+	own := foodOf(t, e.in.db, e.other.user.ID, e.other.user.Name+"'s bread pudding")
+	if rec := e.in.do(t, http.MethodPost, "/api/v1/recipes/"+own.ID.String()+"/shares", `{"email": "`+zoe.Email+`"}`, session, nil); rec.Code != http.StatusOK {
+		t.Errorf("their own recipe: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// isolateUnshareRecipe is unshare-recipe's case: the owner's recipe
+// answers the other as one that does not exist; theirs, shared with a
+// third user, they stop sharing with them.
+func isolateUnshareRecipe(t *testing.T, e isolationEnv) {
+	t.Helper()
+	session := []*http.Cookie{e.other.session}
+	owners := foodOf(t, e.in.db, e.owner.user.ID, e.owner.user.Name+"'s bread pudding")
+	theirs := e.in.do(t, http.MethodDelete, "/api/v1/recipes/"+owners.ID.String()+"/shares/1", "", session, nil)
+	none := e.in.do(t, http.MethodDelete, "/api/v1/recipes/"+uuid.NewV7().String()+"/shares/1", "", session, nil)
+	if theirs.Code != http.StatusNotFound || theirs.Body.String() != none.Body.String() {
+		t.Errorf("the owner's recipe: %d %s; none: %d %s; want the same 404", theirs.Code, theirs.Body.String(), none.Code, none.Body.String())
+	}
+	own := foodOf(t, e.in.db, e.other.user.ID, e.other.user.Name+"'s bread pudding")
+	zoe := e.in.addUser(t, user.RoleUser)
+	if err := e.in.db.ShareRecipe(t.Context(), e.other.user.ID, isolationActor, own.ID, zoe.ID, e.in.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	members, err := e.in.db.RecipeMembers(t.Context(), e.other.user.ID, own.ID)
+	if err != nil || len(members) != 2 {
+		t.Fatalf("members = %v, %v", members, err)
+	}
+	path := fmt.Sprintf("/api/v1/recipes/%s/shares/%d", own.ID, members[1].Seat)
+	if rec := e.in.do(t, http.MethodDelete, path, "", session, nil); rec.Code != http.StatusNoContent {
+		t.Errorf("their own share: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// isolateCopyIngredient is copy-ingredient-food's case: the owner's
+// recipe answers the other as one that does not exist; the recipe the
+// owner shared with them gives them a food of its ingredient, the
+// owner's food's name and values alone, which their recipe shows them
+// already.
+func isolateCopyIngredient(t *testing.T, e isolationEnv) {
+	t.Helper()
+	session := []*http.Cookie{e.other.session}
+	owners := foodOf(t, e.in.db, e.owner.user.ID, e.owner.user.Name+"'s bread pudding")
+	theirs := e.in.do(t, http.MethodPost, "/api/v1/recipes/"+owners.ID.String()+"/ingredients/0/food", "", session, nil)
+	none := e.in.do(t, http.MethodPost, "/api/v1/recipes/"+uuid.NewV7().String()+"/ingredients/0/food", "", session, nil)
+	if theirs.Code != http.StatusNotFound || theirs.Body.String() != none.Body.String() {
+		t.Errorf("the owner's recipe: %d %s; none: %d %s; want the same 404", theirs.Code, theirs.Body.String(), none.Code, none.Body.String())
+	}
+	stew := foodOf(t, e.in.db, e.other.user.ID, "Shared bread stew")
+	if rec := e.in.do(t, http.MethodPost, "/api/v1/recipes/"+stew.ID.String()+"/ingredients/0/food", "", session, nil); rec.Code != http.StatusCreated {
+		t.Errorf("the shared recipe's ingredient: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 // isolateDeletePush is delete-push-subscription's case: the owner's
 // subscription answers the other as one that does not exist; their own
 // goes.
@@ -1221,6 +1287,9 @@ func isolationCases() map[string]isolationCase {
 		}),
 		"save-push-subscription":   isolateSavePush,
 		"delete-push-subscription": isolateDeletePush,
+		"share-recipe":             isolateShareRecipe,
+		"unshare-recipe":           isolateUnshareRecipe,
+		"copy-ingredient-food":     isolateCopyIngredient,
 		"delete-account":           isolateDeleteAccount,
 		"export-account":           isolateExport,
 		"list-users":               isolateListUsers,
