@@ -298,10 +298,10 @@ WHERE me.user_id = :user AND m.user_id != :user;
 DELETE FROM food_shares
 WHERE user_id = :user AND household = 1 AND left_at IS NULL;
 
--- A recipe they left with their household (a share with it stopped)
--- stays theirs, left: its group's version moves on, so an undo of that
--- stop, of before the leave, never gives it back to them with the
--- household's.
+-- A recipe they left with their household (a share with them, or with
+-- another member, stopped) stays theirs, left: its group's version moves
+-- on, so an undo of that stop, of before the leave, never gives it back
+-- to them with the household's, nor to the household with them.
 UPDATE food_shares SET
     version = (
         SELECT max(v.version) + 1 FROM food_shares AS v
@@ -311,7 +311,7 @@ WHERE
     left_at IS NULL
     AND share_id IN (
         SELECT l.share_id FROM food_shares AS l
-        WHERE l.user_id = :user AND l.household = 1 AND l.left_at IS NOT NULL
+        WHERE l.user_id = :user AND l.left_at IS NOT NULL
     );
 
 -- A group the others are in by the household's seats alone, with

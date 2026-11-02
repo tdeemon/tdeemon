@@ -626,25 +626,36 @@ func eatSoup(t *testing.T, db *store.DB, userID uuid.UUID) {
 
 // A stop of a share with a household, from before a member left it, is
 // undone no more: it would give the one who left the recipe back with
-// the household's. They keep it as it was, left.
+// the household's, or the household with them, whichever of them it was
+// shared with. They keep it as it was, left.
 func TestUndoAStopAfterALeave(t *testing.T) {
 	t.Parallel()
 
-	db, ana, ivo := kitchenOfTwo(t)
-	eva := addEva(t, db)
-	soup := soupOf(t, db, eva)
-	share(t, db, eva, soup.Food.ID, ana)
-	eatSoup(t, db, ivo)
-	ivos := copyNamed(t, db, ivo, "Soup")
-	if err := db.UnshareRecipe(t.Context(), eva, testActor, soup.Food.ID, seatOf(t, db, eva, soup.Food.ID, ana), t0); err != nil {
-		t.Fatal(err)
-	}
-	leave(t, db, ivo)
-	if _, err := db.UndoLast(t.Context(), eva, testActor, t0.Add(time.Minute)); !isConflict(err, store.UndoChanged) {
-		t.Errorf("Eva's undo of her stop after Ivo left = %v, want it changed since", err)
-	}
-	if !leftBy(t, db, ivo, ivos.ID) {
-		t.Error("Ivo's soup is no longer left: want it his, for his meals")
+	for _, leaverIsRecipient := range []bool{false, true} {
+		t.Run(fmt.Sprint("the recipient leaves: ", leaverIsRecipient), func(t *testing.T) {
+			t.Parallel()
+			db, ana, ivo := kitchenOfTwo(t)
+			eva := addEva(t, db)
+			soup := soupOf(t, db, eva)
+			share(t, db, eva, soup.Food.ID, ana)
+			eatSoup(t, db, ana)
+			eatSoup(t, db, ivo)
+			anas, ivos := copyNamed(t, db, ana, "Soup"), copyNamed(t, db, ivo, "Soup")
+			if err := db.UnshareRecipe(t.Context(), eva, testActor, soup.Food.ID, seatOf(t, db, eva, soup.Food.ID, ana), t0); err != nil {
+				t.Fatal(err)
+			}
+			leaver := ivo
+			if leaverIsRecipient {
+				leaver = ana
+			}
+			leave(t, db, leaver)
+			if _, err := db.UndoLast(t.Context(), eva, testActor, t0.Add(time.Minute)); !isConflict(err, store.UndoChanged) {
+				t.Errorf("Eva's undo of her stop after the leave = %v, want it changed since", err)
+			}
+			if !leftBy(t, db, ana, anas.ID) || !leftBy(t, db, ivo, ivos.ID) {
+				t.Error("a soup is no longer left: want each theirs, for their meals")
+			}
+		})
 	}
 }
 
