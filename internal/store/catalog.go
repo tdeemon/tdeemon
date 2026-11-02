@@ -432,6 +432,15 @@ func foodCatalogID(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID) (sql.N
 const catalogColumns = `c.id, c.name, c.brand, c.basis, c.kcal, c.protein, c.carbs, c.fat,
 	c.fiber, c.saturated_fat, c.sugars, c.salt, c.polyols, c.alcohol, c.portion_g, c.source, '', 0`
 
+// catalogShown holds a row of the catalog c to be shown: one a food of
+// declared values names, archived too, or none at all (its users gone).
+// A row all of whose foods are of no declared values now, such as a
+// plate first saved as a label's and then as an estimate, is not: no one
+// says its values are a label's. The foods keep their link, so a save of
+// one as declared again, or an undo, shows it again.
+const catalogShown = `(NOT EXISTS (SELECT 1 FROM foods AS l WHERE l.catalog_id = c.id)
+	OR EXISTS (SELECT 1 FROM foods AS l WHERE l.catalog_id = c.id AND l.source IN ('label', 'off', 'reference')))`
+
 // FindCatalog returns up to limit of the catalog's foods that match
 // query as FindFoods matches, but the ones userID has already: a food of
 // theirs, archived too, that names the row, or has its name and brand,
@@ -449,7 +458,7 @@ func (db *DB) FindCatalog(ctx context.Context, userID uuid.UUID, query string, l
 		var err error
 		out, err = queryFoods(ctx, tx, `
 			SELECT `+catalogColumns+` FROM catalog_foods AS c
-			WHERE c.id IN (SELECT catalog_id FROM catalog_fts WHERE catalog_fts MATCH ?2)
+			WHERE c.id IN (SELECT catalog_id FROM catalog_fts WHERE catalog_fts MATCH ?2) AND `+catalogShown+`
 				AND NOT EXISTS (SELECT 1 FROM foods AS f WHERE f.user_id = ?1
 					AND (f.catalog_id = c.id OR (f.name_key = c.name_key AND f.brand_key = c.brand_key)))
 				AND NOT EXISTS (SELECT 1 FROM catalog_barcodes AS b
@@ -488,7 +497,7 @@ func (db *DB) CatalogFoodByBarcode(ctx context.Context, code string) (food.Food,
 func (db *DB) catalogFood(ctx context.Context, where, arg string) (food.Food, error) {
 	var f food.Food
 	err := db.readTx(ctx, func(tx *sql.Tx) error {
-		found, err := queryFoods(ctx, tx, "SELECT "+catalogColumns+" FROM catalog_foods AS c WHERE "+where, arg)
+		found, err := queryFoods(ctx, tx, "SELECT "+catalogColumns+" FROM catalog_foods AS c WHERE "+catalogShown+" AND "+where, arg)
 		if err != nil {
 			return err
 		}

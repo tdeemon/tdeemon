@@ -574,3 +574,59 @@ func TestACopyOfARowGone(t *testing.T) {
 		t.Errorf("Ana's catalog of sardines = %v, want Ivo's copy as a new row", found)
 	}
 }
+
+// A row whose foods are all of no declared values now (a plate saved as a
+// label's, then as an estimate) is no longer shown: not in a search, by
+// its id or its barcode; an undo of the estimate shows it again.
+func TestAnEstimateHidesItsRow(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	plate := saveFood(t, db, ana, tuna(116))
+	row, err := db.CatalogFoodByBarcode(t.Context(), "3850104000010")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plate.Source = food.Estimate
+	saveFood(t, db, ana, plate)
+	shown := func() (bool, bool, bool) {
+		t.Helper()
+		_, byID := db.CatalogFood(t.Context(), row.ID)
+		_, byCode := db.CatalogFoodByBarcode(t.Context(), "3850104000010")
+		return len(findCatalog(t, db, ivo, "tuna")) > 0, byID == nil, byCode == nil
+	}
+	if found, byID, byCode := shown(); found || byID || byCode {
+		t.Errorf("the plate's row after the estimate: found %v, by id %v, by code %v; want none", found, byID, byCode)
+	}
+	if _, err := db.UndoLast(t.Context(), ana, testActor, t0.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if found, byID, byCode := shown(); !found || !byID || !byCode {
+		t.Errorf("the row after the undo: found %v, by id %v, by code %v; want it back", found, byID, byCode)
+	}
+}
+
+// A row a food of declared values names still, another user's or an
+// archived one, stays shown when another of its foods becomes an
+// estimate.
+func TestAnEstimateLeavesASharedRow(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	eva := addEva(t, db)
+	anas := saveFood(t, db, ana, tuna(116))
+	ivos := tuna(116)
+	ivos.Barcodes = nil
+	ivos = saveFood(t, db, ivo, ivos)
+	anas.Source = food.Estimate
+	saveFood(t, db, ana, anas)
+	if found := findCatalog(t, db, eva, "tuna"); len(found) != 1 {
+		t.Errorf("Eva's catalog of tuna with Ivo's label = %v, want the row", found)
+	}
+	if err := db.SetFoodArchived(t.Context(), ivo, testActor, ivos.ID, true, t0); err != nil {
+		t.Fatal(err)
+	}
+	if found := findCatalog(t, db, eva, "tuna"); len(found) != 1 {
+		t.Errorf("Eva's catalog of tuna with Ivo's archived = %v, want the row", found)
+	}
+}
