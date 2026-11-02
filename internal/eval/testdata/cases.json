@@ -862,5 +862,37 @@
         "get_day"
       ]
     }
+  },
+  {
+    "name": "a shared recipe cooked again",
+    "lang": "en",
+    "seed_shared": true,
+    "say": [
+      "I cooked the goulash again, same ingredients, it weighed 1200 g this time. Just update the recipe, don't log anything."
+    ],
+    "expect": {
+      "meals": 0,
+      "tools": [
+        "upsert_recipe"
+      ],
+      "shared_yield": 1200,
+      "max_rounds": 3
+    }
+  },
+  {
+    "name": "zajednički recept ponovno skuhan",
+    "lang": "hr",
+    "seed_shared": true,
+    "say": [
+      "Opet sam skuhao gulaš, isti sastojci, ovaj put je težio 1200 g. Samo ažuriraj recept, ništa ne upisuj."
+    ],
+    "expect": {
+      "meals": 0,
+      "tools": [
+        "upsert_recipe"
+      ],
+      "shared_yield": 1200,
+      "max_rounds": 3
+    }
   }
 ]
