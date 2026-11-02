@@ -109,6 +109,11 @@ const (
 	// AutopilotReview recorded a weekly review; undo leaves both.
 	AutopilotSet    Action = "autopilot.set"
 	AutopilotReview Action = "autopilot.review"
+	// HouseholdJoin joined the user to a household, merging their foods
+	// and recipes into its; HouseholdLeave took them out of it. Undo never
+	// takes either back: the user leaves, or is invited again.
+	HouseholdJoin  Action = "household.join"
+	HouseholdLeave Action = "household.leave"
 	// Undo took another event back; its Entity is that event's id.
 	Undo Action = "undo"
 )
@@ -123,8 +128,9 @@ type Event struct {
 	// proposal's id, a day (YYYY-MM-DD), a day and a metric
 	// ("2026-10-21/weight"), a phase by its start or a target by its
 	// first day (YYYY-MM-DD), "profile", "limits", "plan" (the training
-	// weekdays), "notes", "autopilot" (its settings), a review by its day
-	// ("review/2026-11-02") or a source of workouts ("strong"), or for an
+	// weekdays), "notes", "autopilot" (its settings), "household", a
+	// review by its day ("review/2026-11-02") or a source of workouts
+	// ("strong"), or for an
 	// undo the event undone, or "nothing" for an undo under a client's id
 	// that found nothing to take back.
 	Entity string

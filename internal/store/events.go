@@ -87,6 +87,10 @@ const (
 	// UndoPassedOver: the same undo, sent before, passed over the change
 	// for one of the reasons above.
 	UndoPassedOver UndoReason = "this undo passed over it before"
+	// UndoHousehold: joining a household, or leaving one, is never taken
+	// back, and undo goes no further back than it: the user leaves the
+	// household, or is invited again.
+	UndoHousehold UndoReason = "joining or leaving a household is not undone: leave it, or be invited again"
 )
 
 // clash is what a way back returns when putting the entity back would
@@ -301,7 +305,9 @@ func (db *DB) undo(ctx context.Context, userID uuid.UUID, a event.Actor, request
 			nothing = true
 			return nil
 		}
-		if err != nil || request == nil {
+		if err != nil || request == nil || (conflict != nil && conflict.Reason == UndoHousehold) {
+			// A join or a leave stays the latest change: the same undo sent
+			// again finds it again.
 			return err
 		}
 		// The change the undo settled, taken back or passed over.
@@ -404,6 +410,11 @@ func undoInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Actor, 
 	}
 	if of != nil && (e.Action != of.Action || e.Entity != of.Entity) {
 		return event.Event{}, nil, &NotLatestError{Latest: e}
+	}
+	if e.Action == event.HouseholdJoin || e.Action == event.HouseholdLeave {
+		// Refused, and never passed over: the changes before it are of
+		// foods from before the household.
+		return event.Event{}, &UndoConflictError{Event: e, Reason: UndoHousehold}, nil
 	}
 	after, conflict, err := takeBackChecked(ctx, tx, userID, e, now)
 	if err != nil || conflict != nil {
@@ -629,7 +640,7 @@ func stateNow(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Event) 
 		return planStateNow(ctx, tx, userID, e)
 	case event.ProfileSet, event.LimitsSet, event.PhaseSet, event.PhaseDelete, event.TargetSet, event.TargetDelete,
 		event.WeekdaysSet, event.WorkoutsSet, event.ProposalCreate, event.ProposalStatus, event.AutopilotSet,
-		event.AutopilotReview, event.Undo: // UndoLast never takes them back
+		event.AutopilotReview, event.Undo, event.HouseholdJoin, event.HouseholdLeave: // UndoLast never takes them back
 	}
 	return nil, fmt.Errorf("no state for %q", e.Action)
 }
@@ -657,7 +668,7 @@ func takeBack(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Event, 
 		return takeBackPlan(ctx, tx, userID, e, now)
 	case event.ProfileSet, event.LimitsSet, event.PhaseSet, event.PhaseDelete, event.TargetSet, event.TargetDelete,
 		event.WeekdaysSet, event.WorkoutsSet, event.ProposalCreate, event.ProposalStatus, event.AutopilotSet,
-		event.AutopilotReview, event.Undo:
+		event.AutopilotReview, event.Undo, event.HouseholdJoin, event.HouseholdLeave:
 	}
 	return fmt.Errorf("no way to take back %q", e.Action)
 }
