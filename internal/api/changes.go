@@ -17,7 +17,7 @@ import (
 // says in the user's language, never a sentence of the server's.
 type changeBody struct {
 	ID     string    `json:"id" format:"uuid" doc:"The change's own id, its event's."`
-	Action string    `json:"action" doc:"What the change did: food.save, food.archive, recipe.save, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge, notes.set, or a change of the plan: profile.set, limits.set, phase.set, phase.delete, target.set, target.delete, plan.weekdays, proposal.create, proposal.status, autopilot.set (the autopilot's settings)."`
+	Action string    `json:"action" doc:"What the change did: food.save, food.archive, recipe.save, recipe.share, recipe.unshare, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge, notes.set, or a change of the plan: profile.set, limits.set, phase.set, phase.delete, target.set, target.delete, plan.weekdays, proposal.create, proposal.status, autopilot.set (the autopilot's settings)."`
 	Entity string    `json:"entity" doc:"What it changed, as undo's last names it: a food's, a meal's or a proposal's id, a day (YYYY-MM-DD), a day and a metric (2026-10-21/weight), profile, limits, plan or notes."`
 	At     time.Time `json:"at" doc:"When the change was made."`
 	Client string    `json:"client" doc:"What it came through: web, api, mcp, or autopilot for the autopilot's own step or proposal, which undo never takes back."`

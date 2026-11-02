@@ -32,14 +32,15 @@ type RecipeFields struct {
 
 // recipeBody is a recipe of a food, beside the food's fields.
 type recipeBody struct {
-	Weight    float64          `json:"weight" doc:"The cooked dish's weight in g: yield_g, or the raw ingredients' when not weighed. The serving recipe is the whole dish, portion a portion of it."`
-	YieldG    float64          `json:"yield_g,omitempty" doc:"The cooked dish's weight as weighed; absent when not weighed: a share of the dish is exact, its grams not."`
-	RawWeight float64          `json:"raw_weight,omitempty" doc:"The raw ingredients' weight in g (ml as g); absent when one's is not known."`
-	Portions  int              `json:"portions,omitempty" doc:"How many portions the dish is divided into."`
-	PotG      float64          `json:"pot_g,omitempty" doc:"The empty pot's weight in g."`
-	Total     nutrientsBody    `json:"total" doc:"The whole dish's."`
-	Portion   *nutrientsBody   `json:"portion,omitempty" doc:"A portion's, when divided."`
-	Items     []ingredientBody `json:"items,omitempty" nullable:"false" doc:"The ingredients, with the values each brought when the recipe was saved; get_food gives them."`
+	Weight     float64            `json:"weight" doc:"The cooked dish's weight in g: yield_g, or the raw ingredients' when not weighed. The serving recipe is the whole dish, portion a portion of it."`
+	YieldG     float64            `json:"yield_g,omitempty" doc:"The cooked dish's weight as weighed; absent when not weighed: a share of the dish is exact, its grams not."`
+	RawWeight  float64            `json:"raw_weight,omitempty" doc:"The raw ingredients' weight in g (ml as g); absent when one's is not known."`
+	Portions   int                `json:"portions,omitempty" doc:"How many portions the dish is divided into."`
+	PotG       float64            `json:"pot_g,omitempty" doc:"The empty pot's weight in g."`
+	Total      nutrientsBody      `json:"total" doc:"The whole dish's."`
+	Portion    *nutrientsBody     `json:"portion,omitempty" doc:"A portion's, when divided."`
+	Items      []ingredientBody   `json:"items,omitempty" nullable:"false" doc:"The ingredients, with the values each brought when the recipe was saved; get_food gives them."`
+	SharedWith []recipeMemberBody `json:"shared_with,omitempty" nullable:"false" doc:"A shared recipe's members, you too: a save is every member's."`
 }
 
 // ingredientBody is one of a recipe's ingredients.
@@ -54,6 +55,7 @@ type ingredientBody struct {
 	Source    string        `json:"source" enum:"label,estimate,reference,user,dish,off,recipe"`
 	Note      string        `json:"note,omitempty"`
 	Changed   bool          `json:"changed,omitempty" doc:"Its food's values give another amount now: the recipe saved again takes them."`
+	Theirs    bool          `json:"theirs,omitempty" doc:"Another member's food: a save keeps it by food_id."`
 }
 
 // newRecipeBody is r's body; with its ingredients when items, each marked
@@ -83,6 +85,7 @@ func newRecipeBody(r *recipe.Recipe, items bool, changed map[int]bool) *recipeBo
 				Servings: it.Quantity.Servings, Serving: it.Quantity.Serving, Portions: it.Quantity.Portions,
 			},
 			Nutrients: newNutrientsBody(it.Nutrients), Source: string(it.Source), Note: it.Note, Changed: changed[i],
+			Theirs: it.FoodUser != uuid.Nil(),
 		})
 	}
 	return b
@@ -139,6 +142,13 @@ func (s *sessions) recipeFoodBody(ctx context.Context, p auth.Principal, r *reci
 	}
 	b := newFoodBody(&r.Food)
 	b.Recipe = newRecipeBody(r, true, changed)
+	members, err := s.db.RecipeMembers(ctx, p.User.ID, r.Food.ID)
+	if err != nil {
+		return foodBody{}, err
+	}
+	for _, m := range members {
+		b.Recipe.SharedWith = append(b.Recipe.SharedWith, recipeMemberBody{Seat: m.Seat, Name: m.Name, You: m.ID == p.User.ID})
+	}
 	return b, nil
 }
 
@@ -184,7 +194,11 @@ func (s *sessions) upsertRecipe(ctx context.Context, in *upsertRecipeInput) (*re
 		return nil, err
 	}
 	b := &in.Body
-	r, foods, warnings, err := s.sentRecipe(ctx, p, &b.RecipeFields)
+	known, err := s.foreignIngredients(ctx, p, b.ID, b.Name)
+	if err != nil {
+		return nil, err
+	}
+	r, foods, warnings, err := s.sentRecipe(ctx, p, &b.RecipeFields, known)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +230,7 @@ func (s *sessions) createRecipe(ctx context.Context, in *createRecipeInput) (*cr
 	if err != nil {
 		return nil, err
 	}
-	r, foods, warnings, err := s.sentRecipe(ctx, p, &in.Body)
+	r, foods, warnings, err := s.sentRecipe(ctx, p, &in.Body, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -231,10 +245,32 @@ func (s *sessions) createRecipe(ctx context.Context, in *createRecipeInput) (*cr
 	return &createdRecipeOutput{Body: body}, nil
 }
 
+// foreignIngredients is the foods of other members' that the user's
+// recipe of id, or else of name, has as ingredients, by their id, which a
+// save of it names (store.ForeignIngredientFoods); none for a new one.
+func (s *sessions) foreignIngredients(ctx context.Context, p auth.Principal, id, name string) (map[uuid.UUID]food.Food, error) {
+	rid, err := uuid.Parse(id)
+	if err != nil {
+		f, err := s.db.FoodByKey(ctx, p.User.ID, name, "")
+		if errors.Is(err, store.ErrNotFound) || (err == nil && f.Source != food.Recipe) {
+			return nil, nil
+		} else if err != nil {
+			return nil, internalError("saving the recipe failed", err)
+		}
+		rid = f.ID
+	}
+	known, err := s.db.ForeignIngredientFoods(ctx, p.User.ID, rid)
+	if err != nil {
+		return nil, internalError("saving the recipe failed", err)
+	}
+	return known, nil
+}
+
 // sentRecipe is the recipe b sends, under a new id, worked out of its
 // ingredients as they are (the store works it out again in its save),
 // with the new foods it brings and warnings about it and their values.
-func (s *sessions) sentRecipe(ctx context.Context, p auth.Principal, b *RecipeFields) (recipe.Recipe, []food.Food, []meal.Warning, error) {
+// known are the foods of other members' its ingredients may name.
+func (s *sessions) sentRecipe(ctx context.Context, p auth.Principal, b *RecipeFields, known map[uuid.UUID]food.Food) (recipe.Recipe, []food.Food, []meal.Warning, error) {
 	sent, foods, warnings, err := s.sentItems(b.Items)
 	if err != nil {
 		return recipe.Recipe{}, nil, nil, err
@@ -245,7 +281,7 @@ func (s *sessions) sentRecipe(ctx context.Context, p auth.Principal, b *RecipeFi
 				"an ingredient is a food, by food_id, catalog_id or a new one, with its quantity: no estimate"))
 		}
 	}
-	items, ws, err := s.items(ctx, p, sent, foods)
+	items, ws, err := s.itemsKnown(ctx, p, sent, foods, known)
 	if err != nil {
 		return recipe.Recipe{}, nil, nil, err
 	}
@@ -291,6 +327,9 @@ func recipeError(err error, sent *RecipeFields) error {
 		return huma.Error422UnprocessableEntity("the recipe: " + oneLine(err))
 	case errors.Is(err, store.ErrRecipeFood):
 		return errRecipeFood
+	case errors.Is(err, store.ErrShareNameTaken):
+		// Which food is the member's own to know.
+		return huma.Error409Conflict("another member of the shared recipe has a food of that name: they rename theirs, or you keep the recipe's")
 	}
 	return internalError("saving the recipe failed", err)
 }
@@ -307,12 +346,13 @@ func (s *sessions) recipeTool() tool {
 			"and its servings are recipe, the whole dish, and portion, one of its portions: a tenth of the pot is 0.1 of recipe. " +
 			"Not weighed, the raw ingredients' weight stands for the dish's. A save replaces the whole recipe, its ingredients taking their foods' values now: " +
 			"correct it from what get_food gave. A food of the name that is no recipe, or an alias another food has, is refused (409), naming it; " +
-			"so is an ingredient that is the recipe, at any depth (422). The answer holds its food with the recipe, and warnings: a weight far off the raw ingredients', or values of a new food that do not add up.",
+			"so is an ingredient that is the recipe, at any depth (422). The answer holds its food with the recipe, and warnings: a weight far off the raw ingredients', or values of a new food that do not add up. " +
+			"A shared recipe (shared_with) is one recipe: a save is every member's; its ingredients of another member's food (theirs) keep their food_id.",
 		Errors: []int{http.StatusUnauthorized, http.StatusNotFound, http.StatusConflict},
 	}, s.upsertRecipe).
 		briefly("Saves a recipe, or corrects one: by its id, or else its name; else a new one. Its ingredients are log_meal's items, no estimates; " +
 			"a save replaces it whole, so correct from what get_food gave. A recipe is a food: its servings recipe (the whole dish) and portion. " +
-			"Answers its food with the recipe, and warnings.").destroys()
+			"Answers its food with the recipe, and warnings. Shared, a save is every member's.").destroys()
 }
 
 func (s *sessions) registerRecipes(a huma.API) {

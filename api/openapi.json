@@ -305,7 +305,7 @@
         "additionalProperties": false,
         "properties": {
           "action": {
-            "description": "What the change did: food.save, food.archive, recipe.save, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge, notes.set, or a change of the plan: profile.set, limits.set, phase.set, phase.delete, target.set, target.delete, plan.weekdays, proposal.create, proposal.status, autopilot.set (the autopilot's settings).",
+            "description": "What the change did: food.save, food.archive, recipe.save, recipe.share, recipe.unshare, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge, notes.set, or a change of the plan: profile.set, limits.set, phase.set, phase.delete, target.set, target.delete, plan.weekdays, proposal.create, proposal.status, autopilot.set (the autopilot's settings).",
             "type": "string"
           },
           "archived": {
@@ -1836,6 +1836,10 @@
               "recipe"
             ],
             "type": "string"
+          },
+          "theirs": {
+            "description": "Another member's food: a save keeps it by food_id.",
+            "type": "boolean"
           },
           "unit": {
             "enum": [
@@ -3710,6 +3714,13 @@
             "format": "double",
             "type": "number"
           },
+          "shared_with": {
+            "description": "A shared recipe's members, you too: a save is every member's.",
+            "items": {
+              "$ref": "#/components/schemas/RecipeMemberBody"
+            },
+            "type": "array"
+          },
           "total": {
             "$ref": "#/components/schemas/NutrientsBody",
             "description": "The whole dish's."
@@ -3791,6 +3802,28 @@
         "required": [
           "name",
           "items"
+        ],
+        "type": "object"
+      },
+      "RecipeMemberBody": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "seat": {
+            "description": "What a stop names.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "you": {
+            "description": "A stop of your seat leaves the recipe.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "seat",
+          "name"
         ],
         "type": "object"
       },
@@ -4304,6 +4337,21 @@
         ],
         "type": "object"
       },
+      "ShareRecipeInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "description": "The address of the user of the instance to share the recipe with.",
+            "format": "email",
+            "maxLength": 254,
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
       "StrongBody": {
         "additionalProperties": false,
         "properties": {
@@ -4785,7 +4833,7 @@
         "additionalProperties": false,
         "properties": {
           "action": {
-            "description": "What the change did: food.save, food.archive, recipe.save, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge or notes.set.",
+            "description": "What the change did: food.save, food.archive, recipe.save, recipe.share, recipe.unshare, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge or notes.set.",
             "type": "string"
           },
           "at": {
@@ -11727,7 +11775,7 @@
     },
     "/api/v1/recipes": {
       "post": {
-        "description": "Saves a recipe, a dish cooked again, or corrects one: the recipe with the id (404 for an id the user has no recipe of), or else the one of the name; else a new one. A recipe is a food (source recipe, by weight), found and logged as any: its values per 100 g of the cooked dish come from its ingredients and the dish's weight (yield_g), and its servings are recipe, the whole dish, and portion, one of its portions: a tenth of the pot is 0.1 of recipe. Not weighed, the raw ingredients' weight stands for the dish's. A save replaces the whole recipe, its ingredients taking their foods' values now: correct it from what get_food gave. A food of the name that is no recipe, or an alias another food has, is refused (409), naming it; so is an ingredient that is the recipe, at any depth (422). The answer holds its food with the recipe, and warnings: a weight far off the raw ingredients', or values of a new food that do not add up.",
+        "description": "Saves a recipe, a dish cooked again, or corrects one: the recipe with the id (404 for an id the user has no recipe of), or else the one of the name; else a new one. A recipe is a food (source recipe, by weight), found and logged as any: its values per 100 g of the cooked dish come from its ingredients and the dish's weight (yield_g), and its servings are recipe, the whole dish, and portion, one of its portions: a tenth of the pot is 0.1 of recipe. Not weighed, the raw ingredients' weight stands for the dish's. A save replaces the whole recipe, its ingredients taking their foods' values now: correct it from what get_food gave. A food of the name that is no recipe, or an alias another food has, is refused (409), naming it; so is an ingredient that is the recipe, at any depth (422). The answer holds its food with the recipe, and warnings: a weight far off the raw ingredients', or values of a new food that do not add up. A shared recipe (shared_with) is one recipe: a save is every member's; its ingredients of another member's food (theirs) keep their food_id.",
         "operationId": "upsert-recipe",
         "requestBody": {
           "content": {
@@ -11994,6 +12042,386 @@
           }
         },
         "summary": "Make a new recipe",
+        "tags": [
+          "foods"
+        ]
+      }
+    },
+    "/api/v1/recipes/{id}/ingredients/{position}/food": {
+      "post": {
+        "description": "Needs a web session. A new food of yours of a shared recipe's ingredient of another member's food: its name, brand, values and servings. A food of yours of its name and brand is a conflict (409).",
+        "operationId": "copy-ingredient-food",
+        "parameters": [
+          {
+            "description": "The recipe's food.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "The recipe's food.",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The ingredient's place in the recipe, from 0.",
+            "in": "path",
+            "name": "position",
+            "required": true,
+            "schema": {
+              "description": "The ingredient's place in the recipe, from 0.",
+              "format": "int64",
+              "maximum": 49,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodBody"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Add another member's ingredient to your foods",
+        "tags": [
+          "foods"
+        ]
+      }
+    },
+    "/api/v1/recipes/{id}/shares": {
+      "post": {
+        "description": "Needs a web session. The user of the address has the recipe at once, a recipe of their own of it that a change by any member is every member's; its ingredients of your foods are theirs to see in it, never among their foods. They are told by a notification on their devices. Answers the recipe, with whom it is shared now.",
+        "operationId": "share-recipe",
+        "parameters": [
+          {
+            "description": "The recipe's food.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "The recipe's food.",
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareRecipeInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodBody"
+                }
+              }
+            },
+            "description": "OK",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "408": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Request Timeout"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Share a recipe with another user",
+        "tags": [
+          "foods"
+        ]
+      }
+    },
+    "/api/v1/recipes/{id}/shares/{seat}": {
+      "delete": {
+        "description": "Needs a web session. Your own seat leaves the recipe: your meals of it stay, but you pick it no more. The others keep it.",
+        "operationId": "unshare-recipe",
+        "parameters": [
+          {
+            "description": "The recipe's food.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "The recipe's food.",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The member's seat, of the recipe's shared_with.",
+            "in": "path",
+            "name": "seat",
+            "required": true,
+            "schema": {
+              "description": "The member's seat, of the recipe's shared_with.",
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Stop sharing a recipe with a member",
         "tags": [
           "foods"
         ]
