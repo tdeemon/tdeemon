@@ -36,7 +36,7 @@ func TestMigrationOfTheItemsBrandSplitsTheName(t *testing.T) {
 	ids := map[string]string{}
 	for _, f := range []food.Food{{Name: "Tuna u vlastitom soku", Brand: "Eva"}, {Name: "Kruh"}} {
 		f.ID = uuid.NewV7()
-		f.Basis, f.Source = food.Per100g, food.Label
+		f.Basis, f.Source = food.Per100g, food.User
 		f.Nutrients = food.Nutrients{Kcal: 116, Protein: 26, Carbs: 0, Fat: 1}
 		if _, err := db.SaveFood(t.Context(), user, actor, f, now); err != nil {
 			t.Fatal(err)

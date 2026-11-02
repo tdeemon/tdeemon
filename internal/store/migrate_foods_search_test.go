@@ -38,7 +38,7 @@ func TestMigrationOfTheFoodsSearchIndexesAsTheStore(t *testing.T) {
 		{Name: "Kruh"},
 	} {
 		f.ID = uuid.NewV7()
-		f.Basis, f.Source = food.Per100g, food.Label
+		f.Basis, f.Source = food.Per100g, food.User
 		f.Nutrients = food.Nutrients{Kcal: 70, Protein: 1, Carbs: 16, Fat: 0.2}
 		if _, err := db.SaveFood(t.Context(), user, actor, f, now); err != nil {
 			t.Fatal(err)

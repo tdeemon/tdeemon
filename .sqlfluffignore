@@ -3,3 +3,4 @@ internal/store/testdata/
 **/node_modules/
 # sqlfluff cannot parse the arguments of an FTS5 table.
 internal/store/migrations/0006_foods_search.sql
+internal/store/migrations/0031_food_catalog_search.sql
