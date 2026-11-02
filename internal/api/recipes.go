@@ -56,6 +56,9 @@ type ingredientBody struct {
 	Note      string        `json:"note,omitempty"`
 	Changed   bool          `json:"changed,omitempty" doc:"Its food's values give another amount now: the recipe saved again takes them."`
 	Theirs    bool          `json:"theirs,omitempty" doc:"Another member's food: a save keeps it by food_id."`
+	// PortionGrams is for the web app's editor of a shared recipe, which
+	// has another member's ingredient by these values alone.
+	PortionGrams float64 `json:"portion_grams,omitempty" doc:"A portion's grams of its food, per portion, when it said them."`
 }
 
 // newRecipeBody is r's body; with its ingredients when items, each marked
@@ -85,7 +88,7 @@ func newRecipeBody(r *recipe.Recipe, items bool, changed map[int]bool) *recipeBo
 				Servings: it.Quantity.Servings, Serving: it.Quantity.Serving, Portions: it.Quantity.Portions,
 			},
 			Nutrients: newNutrientsBody(it.Nutrients), Source: string(it.Source), Note: it.Note, Changed: changed[i],
-			Theirs: it.FoodUser != uuid.Nil(),
+			Theirs: it.FoodUser != uuid.Nil(), PortionGrams: it.PortionGrams,
 		})
 	}
 	return b

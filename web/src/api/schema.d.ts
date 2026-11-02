@@ -1983,6 +1983,11 @@ export interface components {
             note?: string;
             /** @description What it brought when the recipe was saved. */
             nutrients: components["schemas"]["NutrientsBody"];
+            /**
+             * Format: double
+             * @description A portion's grams of its food, per portion, when it said them.
+             */
+            portion_grams?: number;
             /** @description How much, as it was given. */
             quantity: components["schemas"]["QuantityBody"];
             /** @enum {string} */

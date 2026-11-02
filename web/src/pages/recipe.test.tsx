@@ -554,3 +554,194 @@ test('a recipe whose save failed is sent again from its status, and then said an
   })
   expect(server.sent).toHaveLength(2)
 })
+
+// shared is the curry Ana shares with Zoe, its rice Zoe's.
+const shared: Food = {
+  ...curry,
+  recipe: {
+    ...(curry.recipe ?? notWeighed.recipe ?? { weight: 0, total: curry.nutrients }),
+    items: [
+      ...(curry.recipe?.items ?? []).filter((i) => i.food_id !== rice.id),
+      ...(curry.recipe?.items ?? [])
+        .filter((i) => i.food_id === rice.id)
+        .map((i) => Object.assign({}, i, { theirs: true, changed: false })),
+    ],
+    shared_with: [
+      { seat: 1, name: 'Ana', you: true },
+      { seat: 2, name: 'Zoe' },
+    ],
+  },
+}
+
+// sharedServer is the shared curry's server, which keeps what it was
+// sent; Zoe's rice is none of the user's to ask for.
+function sharedServer(over: Record<string, Handler> = {}) {
+  const sent: { method: string; path: string; body: unknown }[] = []
+  async function keep(request: Request) {
+    const text = await request.text()
+    sent.push({
+      method: request.method,
+      path: new URL(request.url).pathname,
+      body: text === '' ? undefined : (JSON.parse(text) as unknown),
+    })
+  }
+  recipeServer(shared, {
+    [`GET /api/v1/foods/${rice.id}`]: () => problem(404),
+    [`POST /api/v1/recipes/${curryId}/shares`]: async (request) => {
+      await keep(request)
+      return Response.json(shared)
+    },
+    [`DELETE /api/v1/recipes/${curryId}/shares/2`]: async (request) => {
+      await keep(request)
+      return new Response(null, { status: 204 })
+    },
+    [`DELETE /api/v1/recipes/${curryId}/shares/1`]: async (request) => {
+      await keep(request)
+      return new Response(null, { status: 204 })
+    },
+    [`POST /api/v1/recipes/${curryId}/ingredients/1/food`]: async (request) => {
+      await keep(request)
+      return Response.json({ ...rice, id: '0193c3a5-0000-7000-8000-0000000000f9' }, { status: 201 })
+    },
+    ...over,
+  })
+  return { sent }
+}
+
+test("a shared recipe's page says with whom, marks another's ingredient, and adds it to the user's foods", async () => {
+  const server = sharedServer()
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  const members = within(page).getByRole('list', { name: 'Shared with' })
+  expect(
+    within(members)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent),
+  ).toEqual(['Ana · youLeave the recipe', 'Zoe'])
+  const ingredients = within(page).getByRole('list', { name: 'Ingredients' })
+  expect(within(ingredients).getByText('theirs')).toBeDefined()
+  // Zoe's rice opens no page of the user's.
+  expect(within(ingredients).queryAllByRole('link')).toHaveLength(0)
+  fireEvent.click(within(page).getByRole('button', { name: 'Add to my foods: Basmati rice' }))
+  expect(await screen.findByText('Added to your foods: Basmati rice')).toBeDefined()
+  expect(server.sent).toEqual([
+    { method: 'POST', path: `/api/v1/recipes/${curryId}/ingredients/1/food`, body: undefined },
+  ])
+})
+
+test('a recipe is shared by an address, a refusal said at it, and a member removed', async () => {
+  const server = sharedServer()
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  fireEvent.click(within(page).getByRole('button', { name: 'Share' }))
+  const sheet = await screen.findByRole('dialog', { name: 'Share the recipe' })
+  fireEvent.change(within(sheet).getByLabelText('Their email address'), {
+    target: { value: ' eva@example.com ' },
+  })
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Share' }))
+  expect(await screen.findByText('Shared with eva@example.com')).toBeDefined()
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: 'Share the recipe' })).toBeNull()
+  })
+
+  fireEvent.click(within(page).getByRole('button', { name: 'Stop sharing with Zoe' }))
+  expect(await screen.findByText('Stopped sharing with Zoe')).toBeDefined()
+  expect(server.sent).toEqual([
+    {
+      method: 'POST',
+      path: `/api/v1/recipes/${curryId}/shares`,
+      body: { email: 'eva@example.com' },
+    },
+    { method: 'DELETE', path: `/api/v1/recipes/${curryId}/shares/2`, body: undefined },
+  ])
+})
+
+test('an address of no user is said at its field, in Croatian too', async () => {
+  sharedServer({
+    ...signedIn('hr'),
+    [`POST /api/v1/recipes/${curryId}/shares`]: () => problem(422),
+  })
+  setLocale('hr')
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  fireEvent.click(within(page).getByRole('button', { name: 'Podijeli' }))
+  const sheet = await screen.findByRole('dialog', { name: 'Podijeli recept' })
+  fireEvent.change(within(sheet).getByLabelText('Njihova e-mail adresa'), {
+    target: { value: 'nitko@example.com' },
+  })
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Podijeli' }))
+  expect(
+    await within(sheet).findByText('Nijedan korisnik ove instance nema tu adresu.'),
+  ).toBeDefined()
+})
+
+test("cooked again keeps another member's ingredient, of the values the recipe has", async () => {
+  const server = recipeServer(shared, { [`GET /api/v1/foods/${rice.id}`]: () => problem(404) })
+  renderAt(`/foods/${curryId}`)
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Cooked again' }))
+  const sheet = await screen.findByRole('dialog', { name: 'Cooked again' })
+  expect(await within(sheet).findByLabelText('Unit: Basmati rice')).toHaveProperty(
+    'value',
+    'serving:cup',
+  )
+  fireEvent.change(within(sheet).getByLabelText('Full pot'), { target: { value: '2700' } })
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Save' }))
+  await waitFor(() => {
+    expect(server.sent).toHaveLength(1)
+  })
+  expect(server.sent[0]?.body).toMatchObject({
+    items: [
+      { food_id: chicken.id, amount: 800, unit: 'g' },
+      { food_id: rice.id, serving: 'cup', servings: 2 },
+    ],
+  })
+})
+
+test("an own ingredient no longer the user's (a recipe they left) stands for itself in cooked again", async () => {
+  recipeServer(curry, { [`GET /api/v1/foods/${chicken.id}`]: () => problem(404) })
+  renderAt(`/foods/${curryId}`)
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Cooked again' }))
+  const sheet = await screen.findByRole('dialog', { name: 'Cooked again' })
+  expect(await within(sheet).findByLabelText('Amount: Chicken breast')).toHaveProperty(
+    'value',
+    '800',
+  )
+})
+
+test('a share with your own address says so', async () => {
+  sharedServer({ [`POST /api/v1/recipes/${curryId}/shares`]: () => problem(422) })
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  fireEvent.click(within(page).getByRole('button', { name: 'Share' }))
+  const sheet = await screen.findByRole('dialog', { name: 'Share the recipe' })
+  fireEvent.change(within(sheet).getByLabelText('Their email address'), {
+    target: { value: 'ANA@example.com' },
+  })
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Share' }))
+  expect(
+    await within(sheet).findByText('That is your own address: share it with someone else.'),
+  ).toBeDefined()
+})
+
+test('leaving a recipe goes back to the foods, which a toast says, though the recipe is gone first', async () => {
+  let left = false
+  sharedServer({
+    [`GET /api/v1/foods/${curryId}`]: () => (left ? problem(404) : Response.json(shared)),
+    [`DELETE /api/v1/recipes/${curryId}/shares/1`]: () => {
+      left = true
+      return new Response(null, { status: 204 })
+    },
+  })
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  fireEvent.click(within(page).getByRole('button', { name: 'Leave the recipe' }))
+  expect(await screen.findByText('You left Chicken curry')).toBeDefined()
+  expect(await screen.findByRole('heading', { name: 'Foods', level: 1 })).toBeDefined()
+})

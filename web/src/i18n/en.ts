@@ -808,6 +808,33 @@ export const en = {
   },
   // A recipe: a dish cooked again, a food of its own whose values come
   // from its ingredients and the cooked dish's weight.
+  // A recipe shared with other users of the instance.
+  sharing: {
+    title: 'Shared with',
+    // Shared with no one yet.
+    none: 'Only you have it. Shared, it is one recipe: a change by any of you is everyone’s.',
+    share: 'Share',
+    sheet: 'Share the recipe',
+    email: 'Their email address',
+    hint: 'They have it at once, and a notification tells them.',
+    submit: 'Share',
+    sharing: 'Sharing…',
+    you: 'you',
+    remove: (name: string) => `Stop sharing with ${name}`,
+    leave: 'Leave the recipe',
+    leaveHint: 'Your meals of it stay; you pick it no more.',
+    noUser: 'No user of this instance has that address.',
+    self: 'That is your own address: share it with someone else.',
+    taken: 'They have it already, or a food of its name.',
+    failed: (why: string) => `The share failed: ${why}`,
+    shared: (email: string) => `Shared with ${email}`,
+    removed: (name: string) => `Stopped sharing with ${name}`,
+    left: (name: string) => `You left ${name}`,
+    theirs: 'theirs',
+    addToMine: (name: string) => `Add to my foods: ${name}`,
+    added: (name: string) => `Added to your foods: ${name}`,
+    youHaveIt: 'You have a food of its name already.',
+  },
   recipes: {
     // A recipe's mark beside its name.
     mark: 'recipe',

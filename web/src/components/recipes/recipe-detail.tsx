@@ -7,12 +7,15 @@ import {
   CookingPot,
   Info,
   Pencil,
+  Plus,
   RefreshCw,
   Scale,
 } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 
+import { statusOf } from '@/api/errors'
 import { fieldsOf, useFoodUse, useSaveFood } from '@/api/foods'
+import { useCopyIngredient } from '@/api/recipe-shares'
 import { recipeInput, useSaveRecipe, type RecipeBody } from '@/api/recipes'
 import { sessionQuery } from '@/api/session'
 import type { Food } from '@/api/types'
@@ -22,11 +25,13 @@ import { FoodAvatar } from '@/components/foods/food-avatar'
 import { LogFood } from '@/components/foods/log-food'
 import { NutritionTable } from '@/components/foods/nutrition-table'
 import { CookedAgain } from '@/components/recipes/cooked-again'
+import { RecipeSharing } from '@/components/recipes/recipe-sharing'
 import { ingredientAmount, warningOf } from '@/components/recipes/recipe-values'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
+import { problem } from '@/i18n/problem'
 import { sayChange } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
@@ -42,7 +47,9 @@ const card = 'rounded-lg bg-card p-4 shadow-card lg:p-5'
 // new values (the recipe saved again); what it brings (NutritionTable);
 // its note, and how often it was logged. It logs the recipe today, saves
 // it cooked again or weighed (CookedAgain), opens its editor, and
-// archives it or brings it back, which a toast says, with Undo.
+// archives it or brings it back, which a toast says, with Undo. Shared
+// with other users, it says with whom (RecipeSharing), and another
+// member's ingredient is added to the user's foods in a tap.
 export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody }) {
   const t = useMessages()
   const f = useFormat()
@@ -248,6 +255,7 @@ export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody 
                     <span className="font-medium break-words">{item.name}</span>
                     {item.brand && <span className="text-muted-foreground">· {item.brand}</span>}
                     {item.source === 'recipe' && <Badge tone="primary">{t.recipes.mark}</Badge>}
+                    {item.theirs === true && <Badge>{t.sharing.theirs}</Badge>}
                   </span>
                   <span className="block text-small text-muted-foreground">
                     {ingredientAmount(item, t, f)}
@@ -261,7 +269,12 @@ export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody 
             )
             return (
               <li key={`${item.food_id}-${String(i)}`}>
-                {item.source === 'recipe' ? (
+                {item.theirs === true ? (
+                  <span className="flex items-center gap-3 py-2.5">
+                    {words}
+                    <AddToMine food={food} position={i} name={item.name} />
+                  </span>
+                ) : item.source === 'recipe' ? (
                   <Link
                     to="/foods/$id"
                     params={{ id: item.food_id }}
@@ -288,6 +301,7 @@ export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody 
         </p>
         <p className="text-caption text-muted-foreground">{t.recipes.valuesOfSave}</p>
       </section>
+      <RecipeSharing food={food} className={card} />
       <NutritionTable food={food} />
       {food.note && (
         <section className={cn(card, 'space-y-1.5')}>
@@ -375,5 +389,46 @@ function ArchiveButton({
       {food.archived ? <ArchiveRestore aria-hidden /> : <Archive aria-hidden />}
       {food.archived ? t.foods.unarchive : t.recipes.archive}
     </Button>
+  )
+}
+
+// AddToMine adds a shared recipe's ingredient of another member's food,
+// at position, to the user's foods, which a toast says, with Undo; a food
+// of its name they have already is said instead.
+function AddToMine({ food, position, name }: { food: Food; position: number; name: string }) {
+  const t = useMessages()
+  const copy = useCopyIngredient()
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="icon"
+        className="shrink-0"
+        aria-label={t.sharing.addToMine(name)}
+        disabled={copy.isPending}
+        onClick={() => {
+          copy.mutate(
+            { params: { path: { id: food.id, position } } },
+            {
+              onSuccess: (added) => {
+                sayChange(
+                  { title: t.sharing.added(added.name) },
+                  { last: { action: 'food.save', entity: added.id }, date: 'today' },
+                )
+              },
+            },
+          )
+        }}
+      >
+        <Plus aria-hidden />
+      </Button>
+      {copy.isError && (
+        <span role="alert" className="text-caption text-destructive">
+          {statusOf(copy.error) === 409
+            ? t.sharing.youHaveIt
+            : t.sharing.failed(problem(t, copy.error))}
+        </span>
+      )}
+    </>
   )
 }
