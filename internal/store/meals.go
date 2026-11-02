@@ -612,6 +612,10 @@ func (db *DB) RecentMeals(ctx context.Context, userID uuid.UUID, limit int) ([][
 	if err != nil {
 		return nil, fmt.Errorf("recent meals: %w", err)
 	}
+	// A meal of a recipe the user left repeats no more.
+	if ms, err = db.withoutWithdrawn(ctx, userID, ms); err != nil {
+		return nil, fmt.Errorf("recent meals: %w", err)
+	}
 	groups := meal.Distinct(ms)
 	return groups[:min(len(groups), max(limit, 0), MaxRecentMeals)], nil
 }

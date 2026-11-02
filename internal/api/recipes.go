@@ -113,14 +113,21 @@ func (s *sessions) withRecipes(ctx context.Context, p auth.Principal, foods []fo
 }
 
 // recipeFoodBody is the body of r's food, with r whole: each ingredient
-// marked changed whose food gives another amount now.
+// marked changed whose food gives another amount now. An ingredient that
+// keeps its values (of a member who left a shared recipe) never is.
 func (s *sessions) recipeFoodBody(ctx context.Context, p auth.Principal, r *recipe.Recipe) (foodBody, error) {
 	changed := map[int]bool{}
+	// Each ingredient's food as a save reads it: the user's, or a
+	// member's of a shared recipe; none for one that keeps its values.
+	foods, err := s.db.IngredientFoods(ctx, p.User.ID, r.Food.ID)
+	if err != nil {
+		return foodBody{}, err
+	}
 	for i := range r.Items {
 		it := &r.Items[i]
-		f, err := s.db.FoodByID(ctx, p.User.ID, it.FoodID)
-		if err != nil {
-			return foodBody{}, err
+		f, ok := foods[i]
+		if !ok {
+			continue
 		}
 		// A recipe as an ingredient reweighed brings as much, but weighs
 		// another amount: the raw weight it adds changes, as it does for a

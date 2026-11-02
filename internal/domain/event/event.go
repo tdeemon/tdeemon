@@ -68,15 +68,19 @@ const (
 	FoodSave    Action = "food.save"
 	FoodArchive Action = "food.archive"
 	// RecipeSave saved a recipe whole: its food and its ingredients.
-	RecipeSave   Action = "recipe.save"
-	MealCreate   Action = "meal.create"
-	MealReplace  Action = "meal.replace"
-	MealDelete   Action = "meal.delete"
-	DayExclude   Action = "day.exclude"
-	DayInclude   Action = "day.include"
-	MetricsMerge Action = "metrics.merge"
-	MetricSet    Action = "metric.set"
-	MetricDelete Action = "metric.delete"
+	RecipeSave Action = "recipe.save"
+	// RecipeShare shared a recipe with another user; RecipeUnshare took
+	// it from one, or the user left it.
+	RecipeShare   Action = "recipe.share"
+	RecipeUnshare Action = "recipe.unshare"
+	MealCreate    Action = "meal.create"
+	MealReplace   Action = "meal.replace"
+	MealDelete    Action = "meal.delete"
+	DayExclude    Action = "day.exclude"
+	DayInclude    Action = "day.include"
+	MetricsMerge  Action = "metrics.merge"
+	MetricSet     Action = "metric.set"
+	MetricDelete  Action = "metric.delete"
 	// DayCheckIn changed what the user says of a day at once: the mood,
 	// hunger and note, the toggle of its type and its exclusion.
 	DayCheckIn Action = "day.checkin"

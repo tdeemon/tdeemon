@@ -58,8 +58,10 @@ func TestMigrationOfTheCatalog(t *testing.T) {
 		t.Fatalf("migrate to 0029: %v", err)
 	}
 	seedCatalog(t, db)
-	if err := db.migrate(t.Context(), upTo(t, "0031_food_catalog_search.sql"), discard()); err != nil {
-		t.Fatalf("migrate to 0031: %v", err)
+	// Every migration since too: the store's code runs on the newest
+	// schema.
+	if err := db.migrate(t.Context(), upTo(t, "9999"), discard()); err != nil {
+		t.Fatalf("migrate from 0029: %v", err)
 	}
 	grape := checkCatalogRows(t, db)
 	checkCatalogLinks(t, db, grape)
@@ -251,7 +253,14 @@ func legacySaves(t *testing.T, db *DB, user uuid.UUID, saves []legacySave) {
 // foodAt is user's food id.
 func foodAt(t *testing.T, db *DB, user, id uuid.UUID) food.Food {
 	t.Helper()
-	f, err := db.FoodByID(t.Context(), user, id)
+	// Read as the store reads its own, on any schema since foods had
+	// their columns: FoodByID asks tables of later migrations.
+	var f food.Food
+	err := db.readTx(t.Context(), func(tx *sql.Tx) error {
+		var err error
+		f, err = foodInTx(t.Context(), tx, user, id)
+		return err
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,8 +295,10 @@ func migratedCatalog(t *testing.T, same bool, setup func(db *DB)) *DB {
 	if setup != nil {
 		setup(db)
 	}
-	if err := db.migrate(t.Context(), upTo(t, "0031_food_catalog_search.sql"), discard()); err != nil {
-		t.Fatalf("migrate to 0031: %v", err)
+	// Every migration since too: the store's code runs on the newest
+	// schema.
+	if err := db.migrate(t.Context(), upTo(t, "9999"), discard()); err != nil {
+		t.Fatalf("migrate from 0029: %v", err)
 	}
 	return db
 }

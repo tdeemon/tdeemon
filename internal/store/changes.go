@@ -103,21 +103,16 @@ func nameChange(ctx context.Context, tx *sql.Tx, userID uuid.UUID, c *RecentChan
 				c.Items = append(c.Items, s.Meal.Items[i].Name)
 			}
 		}
-	case event.FoodSave:
-		var f food.Food
-		if readState(e, &f) {
-			c.Name, c.Brand = f.Name, f.Brand
-		}
-	case event.RecipeSave:
-		var r recipe.Recipe
-		if readState(e, &r) {
-			c.Name = r.Food.Name
-		}
+	case event.FoodSave, event.RecipeSave:
+		nameSaved(c)
 	case event.FoodArchive:
 		var s archivedState
 		if readState(e, &s) {
 			c.Archived = s.Archived
 		}
+		return nameFood(ctx, tx, userID, c)
+	case event.RecipeShare, event.RecipeUnshare:
+		// The recipe, by its name now: the change records its member.
 		return nameFood(ctx, tx, userID, c)
 	case event.MetricSet, event.MetricDelete:
 		if _, kind, ok := strings.Cut(e.Entity, "/"); ok {
@@ -131,6 +126,22 @@ func nameChange(ctx context.Context, tx *sql.Tx, userID uuid.UUID, c *RecentChan
 	default:
 	}
 	return nil
+}
+
+// nameSaved gives c, of a food's or a recipe's save, its name and brand
+// as the save left them.
+func nameSaved(c *RecentChange) {
+	if c.Event.Action == event.RecipeSave {
+		var r recipe.Recipe
+		if readState(c.Event, &r) {
+			c.Name = r.Food.Name
+		}
+		return
+	}
+	var f food.Food
+	if readState(c.Event, &f) {
+		c.Name, c.Brand = f.Name, f.Brand
+	}
 }
 
 // readState decodes into v the state e left, or the one before it for a

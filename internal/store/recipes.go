@@ -95,6 +95,9 @@ func saveRecipeInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.A
 	if err != nil {
 		return recipe.Recipe{}, err
 	}
+	if err := checkNotLeft(ctx, tx, userID, r.Food.ID, target, exists); err != nil {
+		return recipe.Recipe{}, err
+	}
 	var before *recipe.Recipe
 	if exists {
 		had, err := recipeBefore(ctx, tx, userID, target, mode)
@@ -109,7 +112,7 @@ func saveRecipeInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.A
 		}
 	}
 	var parts []uuid.UUID
-	if r.Items, parts, err = ingredients(ctx, tx, userID, a, r.Items, foods, now); err != nil {
+	if r.Items, parts, err = ingredients(ctx, tx, userID, a, target, r.Items, foods, now); err != nil {
 		return recipe.Recipe{}, err
 	}
 	r.Food.ID = target
@@ -138,25 +141,84 @@ func saveRecipeInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.A
 	if err := writeRecipe(ctx, tx, userID, made); err != nil {
 		return recipe.Recipe{}, err
 	}
-	stored, err := recipeInTx(ctx, tx, userID, target)
+	return recordRecipe(ctx, tx, userID, a, target, before, parts, now)
+}
+
+// checkNotLeft refuses a save of userID's recipe target, when it is one
+// they left: theirs to change no more, none to correct by its id (sent),
+// and its name in the way.
+func checkNotLeft(ctx context.Context, tx *sql.Tx, userID, sent, target uuid.UUID, exists bool) error {
+	left, err := withdrawn(ctx, tx, userID, target)
+	switch {
+	case err != nil || !exists || !left:
+		return err
+	case sent == target:
+		return ErrNotFound
+	}
+	return conflict(ctx, tx, userID, ErrNameTaken, target.String(), "")
+}
+
+// recordRecipe reads userID's recipe id as saved, writes it into its
+// share's other members' recipes, and records the save, its new foods'
+// writes parts of it.
+func recordRecipe(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Actor, id uuid.UUID, before *recipe.Recipe, parts []uuid.UUID,
+	now time.Time,
+) (recipe.Recipe, error) {
+	stored, err := recipeInTx(ctx, tx, userID, id)
 	if err != nil {
 		return recipe.Recipe{}, err
+	}
+	// A save that changes nothing (a retry) records nothing, and writes
+	// nothing into the share.
+	if before != nil && len(parts) == 0 && reflect.DeepEqual(*before, stored) {
+		return stored, nil
+	}
+	share, version, err := shareOf(ctx, tx, userID, id)
+	if err != nil {
+		return recipe.Recipe{}, err
+	}
+	was := recipeState{ShareVersion: version}
+	if before != nil {
+		was.Recipe = *before
+	}
+	// A shared recipe's save is every member's.
+	if err := syncShared(ctx, tx, userID, id, stored, now); err != nil {
+		return recipe.Recipe{}, err
+	}
+	is := recipeState{Recipe: stored}
+	if share != "" {
+		if is.ShareVersion, err = shareVersion(ctx, tx, share); err != nil {
+			return recipe.Recipe{}, err
+		}
+	}
+	var wasState any = was
+	if before == nil {
+		wasState = nil
 	}
 	// A save that changes the recipe not, but its new ingredients (an
 	// archived food brought back), is a change all the same, which undo
 	// takes back with them.
-	saved, err := recordEvent(ctx, tx, userID, a, event.RecipeSave, target.String(), before, stored, len(parts) > 0, now)
+	saved, err := recordEvent(ctx, tx, userID, a, event.RecipeSave, id.String(), wasState, is, len(parts) > 0, now)
 	if err != nil {
 		return recipe.Recipe{}, err
 	}
 	return stored, markParts(ctx, tx, userID, saved, parts)
 }
 
+// recipeState is a recipe as the events of its saves record it, with its
+// share's version (none for a recipe shared with no one): an undo of a
+// save after another member's, which moved the version on, finds the
+// recipe changed since though its values came back the same.
+type recipeState struct {
+	recipe.Recipe
+	ShareVersion int64 `json:"share_version,omitempty"`
+}
+
 // ingredients saves the new foods of foods that items name, as a meal's
 // are saved, and returns items of the foods they are stored under, each
 // worked out of its food as it is now (freshItems), with the events of
-// the foods' writes.
-func ingredients(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Actor, items []meal.Item, foods []food.Food,
+// the foods' writes. recipeID is the recipe they are of.
+func ingredients(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Actor, recipeID uuid.UUID, items []meal.Item, foods []food.Food,
 	now time.Time,
 ) ([]meal.Item, []uuid.UUID, error) {
 	brought, err := saveNewFoods(ctx, tx, userID, a, foods, items, now)
@@ -166,19 +228,31 @@ func ingredients(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Acto
 	if items, err = itemsOf(items, brought.ids, brought.kept); err != nil {
 		return nil, nil, err
 	}
-	items, err = freshItems(ctx, tx, userID, items)
+	items, err = freshItems(ctx, tx, userID, recipeID, items)
 	return items, brought.parts, err
 }
 
-// freshItems returns items worked out of their foods as userID has them
-// now, in the quantity each was given: a recipe saved takes its
-// ingredients' values as they are then, whatever values the client sent.
-// An ingredient of no food of the user's, or in a quantity its food no
-// longer takes (a serving taken away), is ErrInvalidRecipe.
-func freshItems(ctx context.Context, tx *sql.Tx, userID uuid.UUID, items []meal.Item) ([]meal.Item, error) {
+// freshItems returns items of userID's recipe recipeID worked out of
+// their foods as they are now, in the quantity each was given: a recipe
+// saved takes its ingredients' values as they are then, whatever values
+// the client sent. An ingredient's food is userID's, or, in a shared
+// recipe, another member's that the recipe has already
+// (ingredientSource), read as that member has it, or kept as the recipe
+// has it when that member left or archived it. An ingredient of no such food, or in a
+// quantity its food no longer takes (a serving taken away), is
+// ErrInvalidRecipe.
+func freshItems(ctx context.Context, tx *sql.Tx, userID, recipeID uuid.UUID, items []meal.Item) ([]meal.Item, error) {
+	share, _, err := shareOf(ctx, tx, userID, recipeID)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
+	stored, err := storedItems(ctx, tx, userID, recipeID)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]meal.Item, len(items))
 	for i := range items {
-		f, err := foodInTx(ctx, tx, userID, items[i].FoodID)
+		f, owner, _, err := ingredientSource(ctx, tx, userID, share, stored, &items[i])
 		if errors.Is(err, ErrNotFound) {
 			return nil, fmt.Errorf("%w: ingredient %q: no such food", ErrInvalidRecipe, items[i].Name)
 		}
@@ -188,6 +262,7 @@ func freshItems(ctx context.Context, tx *sql.Tx, userID uuid.UUID, items []meal.
 		if out[i], err = meal.FromFood(f, items[i].Quantity, items[i].Note); err != nil {
 			return nil, fmt.Errorf("%w: ingredient %w", ErrInvalidRecipe, err)
 		}
+		out[i].FoodUser = owner
 	}
 	return out, nil
 }
@@ -221,21 +296,37 @@ func checkNameFree(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID, nameKe
 	return conflict(ctx, tx, userID, ErrNameTaken, other, "")
 }
 
-// checkCycle refuses items of the recipe id when one of them is the
-// recipe, or a recipe made of it, at any depth (ErrRecipeCycle).
+// checkCycle refuses items of userID's recipe id when one of them is the
+// recipe, or a recipe made of it, at any depth (ErrRecipeCycle): across
+// users, through shared recipes, where any member's recipe of its share
+// is the recipe.
 func checkCycle(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID, items []meal.Item) error {
+	share, _, err := shareOf(ctx, tx, userID, id)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return err
+	}
 	for i := range items {
-		if items[i].FoodID == id {
+		if items[i].FoodID == id && items[i].FoodUser == uuid.Nil() {
 			return fmt.Errorf("%w: %q", ErrRecipeCycle, items[i].Name)
 		}
+		owner := items[i].FoodUser
+		if owner == uuid.Nil() {
+			owner = userID
+		}
 		var one int
-		err := tx.QueryRowContext(ctx, `WITH RECURSIVE reach (id) AS (
-				SELECT ?
+		err := tx.QueryRowContext(ctx, `WITH RECURSIVE reach (uid, id) AS (
+				SELECT ?1, ?2
 				UNION
-				SELECT ri.food_id FROM recipe_items AS ri JOIN reach ON ri.recipe_id = reach.id WHERE ri.user_id = ?
+				SELECT ri.food_user_id, ri.food_id FROM recipe_items AS ri
+					JOIN reach ON ri.user_id = reach.uid AND ri.recipe_id = reach.id
+				WHERE ri.food_id IS NOT NULL
 			)
-			SELECT 1 FROM reach WHERE id = ? LIMIT 1`,
-			items[i].FoodID.String(), userID.String(), id.String()).Scan(&one)
+			SELECT 1 FROM reach
+			WHERE (reach.uid = ?3 AND reach.id = ?4)
+				OR EXISTS (SELECT 1 FROM recipe_shares AS rs
+					WHERE rs.share_id = ?5 AND rs.user_id = reach.uid AND rs.food_id = reach.id)
+			LIMIT 1`,
+			owner.String(), items[i].FoodID.String(), userID.String(), id.String(), share).Scan(&one)
 		if err == nil {
 			return fmt.Errorf("%w: %q", ErrRecipeCycle, items[i].Name)
 		}
@@ -254,11 +345,13 @@ func writeRecipe(ctx context.Context, tx *sql.Tx, userID uuid.UUID, r recipe.Rec
 		return err
 	}
 	id, uid := r.Food.ID.String(), userID.String()
-	if _, err := tx.ExecContext(ctx, "DELETE FROM recipes WHERE food_id = ? AND user_id = ?", id, uid); err != nil {
+	// In place, not deleted and made anew: a share names the recipes row.
+	if _, err := tx.ExecContext(ctx, `INSERT INTO recipes (food_id, user_id, yield_g, portions, pot_g) VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT (user_id, food_id) DO UPDATE SET yield_g = excluded.yield_g, portions = excluded.portions, pot_g = excluded.pot_g`,
+		id, uid, positive(r.Yield), positive(float64(r.Portions)), positive(r.Pot)); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, "INSERT INTO recipes (food_id, user_id, yield_g, portions, pot_g) VALUES (?, ?, ?, ?, ?)",
-		id, uid, positive(r.Yield), positive(float64(r.Portions)), positive(r.Pot)); err != nil {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM recipe_items WHERE recipe_id = ? AND user_id = ?", id, uid); err != nil {
 		return err
 	}
 	for i := range r.Items {
@@ -266,11 +359,12 @@ func writeRecipe(ctx context.Context, tx *sql.Tx, userID uuid.UUID, r recipe.Rec
 		n := it.Nutrients
 		o := optionalNutrients(&n)
 		q := it.Quantity
-		if _, err := tx.ExecContext(ctx, `INSERT INTO recipe_items (recipe_id, user_id, position, food_id, name, brand,
+		owner, foodID := ingredientFood(userID, it)
+		if _, err := tx.ExecContext(ctx, `INSERT INTO recipe_items (recipe_id, user_id, position, food_user_id, food_id, name, brand,
 			quantity_amount, quantity_unit, quantity_servings, quantity_serving, quantity_portions, amount, unit,
 			kcal, protein, carbs, fat, fiber, saturated_fat, sugars, salt, polyols, alcohol, source, note, portion_grams)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			id, uid, i, it.FoodID.String(), it.Name, it.Brand,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			id, uid, i, owner, foodID, it.Name, it.Brand,
 			q.Amount, q.Unit, q.Servings, q.Serving, q.Portions, it.Amount, it.Unit,
 			n.Kcal, n.Protein, n.Carbs, n.Fat, nullable(*o[0]), nullable(*o[1]), nullable(*o[2]), nullable(*o[3]),
 			nullable(*o[4]), nullable(*o[5]), string(it.Source), it.Note, positive(it.PortionGrams)); err != nil {
@@ -278,6 +372,20 @@ func writeRecipe(ctx context.Context, tx *sql.Tx, userID uuid.UUID, r recipe.Rec
 		}
 	}
 	return nil
+}
+
+// ingredientFood is the owner and the id of the food of userID's
+// recipe's ingredient it, as recipe_items keeps them: userID for a food
+// of theirs, the member it names for another's (meal.Item.FoodUser), and
+// both NULL for a food gone (its owner's account deleted).
+func ingredientFood(userID uuid.UUID, it *meal.Item) (any, any) {
+	switch {
+	case it.FoodID == uuid.Nil():
+		return nil, nil
+	case it.FoodUser != uuid.Nil():
+		return it.FoodUser.String(), it.FoodID.String()
+	}
+	return userID.String(), it.FoodID.String()
 }
 
 // positive is v for a column that is NULL for none: NULL for 0.
@@ -289,11 +397,18 @@ func positive(v float64) any {
 }
 
 // RecipeByID returns userID's recipe of the food with id, archived or
-// not, or ErrNotFound: for a food that is no recipe too.
+// not, or ErrNotFound: for a food that is no recipe too, and for a
+// recipe they left the share of.
 func (db *DB) RecipeByID(ctx context.Context, userID, id uuid.UUID) (recipe.Recipe, error) {
 	var r recipe.Recipe
 	err := db.readTx(ctx, func(tx *sql.Tx) error {
-		var err error
+		left, err := withdrawn(ctx, tx, userID, id)
+		if err != nil {
+			return err
+		}
+		if left {
+			return ErrNotFound
+		}
 		r, err = recipeInTx(ctx, tx, userID, id)
 		return err
 	})
@@ -323,7 +438,7 @@ func recipeInTx(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID) (recipe.R
 	if r.Food, err = foodInTx(ctx, tx, userID, id); err != nil {
 		return recipe.Recipe{}, err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT food_id, name, brand, quantity_amount, quantity_unit, quantity_servings,
+	rows, err := tx.QueryContext(ctx, `SELECT food_user_id, food_id, name, brand, quantity_amount, quantity_unit, quantity_servings,
 		quantity_serving, quantity_portions, amount, unit, kcal, protein, carbs, fat,
 		fiber, saturated_fat, sugars, salt, polyols, alcohol, source, note, portion_grams
 		FROM recipe_items WHERE user_id = ? AND recipe_id = ? ORDER BY position`, userID.String(), id.String())
@@ -333,18 +448,19 @@ func recipeInTx(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID) (recipe.R
 	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var it meal.Item
-		var foodID, source string
+		var owner, foodID sql.NullString
+		var source string
 		var opt [6]sql.NullFloat64
 		var portionGrams sql.NullFloat64
 		q, n := &it.Quantity, &it.Nutrients
-		if err := rows.Scan(&foodID, &it.Name, &it.Brand, &q.Amount, &q.Unit, &q.Servings, &q.Serving, &q.Portions,
+		if err := rows.Scan(&owner, &foodID, &it.Name, &it.Brand, &q.Amount, &q.Unit, &q.Servings, &q.Serving, &q.Portions,
 			&it.Amount, &it.Unit, &n.Kcal, &n.Protein, &n.Carbs, &n.Fat,
 			&opt[0], &opt[1], &opt[2], &opt[3], &opt[4], &opt[5], &source, &it.Note, &portionGrams); err != nil {
 			return recipe.Recipe{}, err
 		}
 		it.PortionGrams = portionGrams.Float64
-		if it.FoodID, err = uuid.Parse(foodID); err != nil {
-			return recipe.Recipe{}, fmt.Errorf("ingredient food id %q: %w", foodID, err)
+		if it.FoodID, it.FoodUser, err = ingredientIDs(userID, owner, foodID); err != nil {
+			return recipe.Recipe{}, err
 		}
 		for i, p := range optionalNutrients(n) {
 			if opt[i].Valid {
@@ -356,6 +472,27 @@ func recipeInTx(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID) (recipe.R
 		r.Items = append(r.Items, it)
 	}
 	return r, rows.Err()
+}
+
+// ingredientIDs reads an ingredient's food of userID's recipe: its id,
+// and its owner when that is another member (meal.Item.FoodUser); both
+// uuid.Nil for a food gone.
+func ingredientIDs(userID uuid.UUID, owner, foodID sql.NullString) (uuid.UUID, uuid.UUID, error) {
+	if !foodID.Valid {
+		return uuid.Nil(), uuid.Nil(), nil
+	}
+	id, err := uuid.Parse(foodID.String)
+	if err != nil {
+		return uuid.Nil(), uuid.Nil(), fmt.Errorf("ingredient food id %q: %w", foodID.String, err)
+	}
+	if owner.String == userID.String() {
+		return id, uuid.Nil(), nil
+	}
+	who, err := uuid.Parse(owner.String)
+	if err != nil {
+		return uuid.Nil(), uuid.Nil(), fmt.Errorf("ingredient food's user %q: %w", owner.String, err)
+	}
+	return id, who, nil
 }
 
 // RecipesOf returns the recipes of userID's foods among ids, by id, with
@@ -401,13 +538,13 @@ func checkRecipeFood(before *food.Food, f food.Food) error {
 	return nil
 }
 
-// foodInUse reports whether a meal's item or a recipe's ingredient is of
-// userID's food id, which then stays, archived, when undo would take it
+// foodInUse reports whether a meal's item or a recipe's ingredient, a
+// shared recipe's of another member's too, is of userID's food id, which then stays, archived, when undo would take it
 // away.
 func foodInUse(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID) (bool, error) {
 	var used int
 	err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM meal_items WHERE user_id = ?1 AND food_id = ?2)
-		OR EXISTS (SELECT 1 FROM recipe_items WHERE user_id = ?1 AND food_id = ?2)`,
+		OR EXISTS (SELECT 1 FROM recipe_items WHERE food_user_id = ?1 AND food_id = ?2)`,
 		userID.String(), id.String()).Scan(&used)
 	return used != 0, err
 }
@@ -422,6 +559,12 @@ func takeBackRecipe(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.E
 		return err
 	}
 	if e.Before == nil {
+		// Its other members' recipes would stay, of no one's making.
+		if shared, err := sharedWithOthers(ctx, tx, userID, id); err != nil {
+			return err
+		} else if shared {
+			return clash{UndoShared}
+		}
 		used, err := foodInUse(ctx, tx, userID, id)
 		if err != nil {
 			return err
@@ -449,7 +592,30 @@ func takeBackRecipe(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.E
 	if err := updateFood(ctx, tx, userID, r.Food, food.Key(r.Food.Name), food.Key(r.Food.Brand), now); err != nil {
 		return err
 	}
-	return writeRecipe(ctx, tx, userID, r)
+	if err := writeRecipe(ctx, tx, userID, r); err != nil {
+		return err
+	}
+	return restoreShared(ctx, tx, userID, id, r, e, now)
+}
+
+// restoreShared puts back every member's recipe of userID's recipe id,
+// which was the one undone (stateNow), as r, e's state before, and the
+// share's version with them: the save before is the latest again.
+func restoreShared(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID, r recipe.Recipe, e event.Event, now time.Time) error {
+	if err := syncShared(ctx, tx, userID, id, r, now); errors.Is(err, ErrShareNameTaken) {
+		return fmt.Errorf("%w: %w", clash{UndoNameTaken}, err)
+	} else if err != nil {
+		return err
+	}
+	var was recipeState
+	if err := decode(e.Before, &was); err != nil {
+		return err
+	}
+	share, _, err := shareOf(ctx, tx, userID, id)
+	if err != nil || share == "" || was.ShareVersion == 0 {
+		return err
+	}
+	return setShareVersion(ctx, tx, share, was.ShareVersion)
 }
 
 // recipeStateNow returns the recipe of e now, as e records it, or nil
@@ -459,6 +625,10 @@ func recipeStateNow(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.E
 	if err != nil {
 		return nil, err
 	}
+	// A recipe its user left is gone to them: its changes stay.
+	if left, err := withdrawn(ctx, tx, userID, id); err != nil || left {
+		return nil, err
+	}
 	r, err := recipeInTx(ctx, tx, userID, id)
 	if errors.Is(err, ErrNotFound) {
 		return nil, nil
@@ -466,5 +636,13 @@ func recipeStateNow(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.E
 	if err != nil {
 		return nil, err
 	}
-	return r, nil
+	s := recipeState{Recipe: r}
+	if share, _, err := shareOf(ctx, tx, userID, id); err != nil {
+		return nil, err
+	} else if share != "" {
+		if s.ShareVersion, err = shareVersion(ctx, tx, share); err != nil {
+			return nil, err
+		}
+	}
+	return s, nil
 }

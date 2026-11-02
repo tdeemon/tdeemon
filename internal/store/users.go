@@ -300,6 +300,10 @@ func (db *DB) DeleteUser(ctx context.Context, id uuid.UUID) (user.User, error) {
 		if err := keepAnAdmin(ctx, tx, u); err != nil {
 			return fmt.Errorf("delete user: %w", err)
 		}
+		// The shared recipes stay with their other members, whole.
+		if err := adoptIngredients(ctx, tx, id); err != nil {
+			return fmt.Errorf("delete user: %w", err)
+		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id.String()); err != nil {
 			return fmt.Errorf("delete user: %w", err)
 		}
