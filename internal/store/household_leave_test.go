@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -532,11 +533,16 @@ func TestAdminLeaveIsALeave(t *testing.T) {
 	}
 }
 
-// adminLeave is the statements of the SQL block of docs/DESIGN.md that
-// takes a member out, which must be household_leave.sql.
-func adminLeave(t *testing.T) []string {
-	t.Helper()
+// docs/DESIGN.md gives an admin household_leave.sql as it is. The image's
+// build context holds no docs/DESIGN.md (.dockerignore), so the test
+// skips there; CI's Go job runs it.
+func TestDesignGivesTheAdminLeave(t *testing.T) {
+	t.Parallel()
+
 	doc, err := os.ReadFile(filepath.Join("..", "..", "docs", "DESIGN.md"))
+	if errors.Is(err, fs.ErrNotExist) {
+		t.Skip("docs/DESIGN.md is not in this tree")
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -546,6 +552,16 @@ func adminLeave(t *testing.T) []string {
 	}
 	if !strings.Contains(string(doc), "```sql\n"+string(file)+"```\n") {
 		t.Fatal("docs/DESIGN.md does not give household_leave.sql as it is")
+	}
+}
+
+// adminLeave is the statements of household_leave.sql, which
+// docs/DESIGN.md gives an admin to take a member out.
+func adminLeave(t *testing.T) []string {
+	t.Helper()
+	file, err := os.ReadFile("household_leave.sql")
+	if err != nil {
+		t.Fatal(err)
 	}
 	var out []string
 	for s := range strings.SplitSeq(string(file), ";\n") {
