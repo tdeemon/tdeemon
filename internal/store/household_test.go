@@ -218,12 +218,18 @@ func TestUndoRefusesAJoin(t *testing.T) {
 			t.Fatalf("Ivo's undo #%d after the join = %v, want UndoHousehold", i+1, err)
 		}
 	}
+	// The same undo sent again is refused again, though a change came
+	// since, which it leaves.
 	request := uuid.NewV7()
 	for i := range 2 {
 		if _, _, err := db.Undo(t.Context(), ivo, testActor, request, time.Now()); !isConflict(err, store.UndoHousehold) {
 			t.Fatalf("Ivo's undo #%d under a request after the join = %v, want UndoHousehold", i+1, err)
 		}
+		if i == 0 {
+			saveFood(t, db, ivo, chickenBreast())
+		}
 	}
+	copyNamed(t, db, ivo, "Chicken breast")
 	copyNamed(t, db, ivo, "Kefir")
 	copyNamed(t, db, ana, "Kefir")
 }

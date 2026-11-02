@@ -305,10 +305,14 @@ func (db *DB) undo(ctx context.Context, userID uuid.UUID, a event.Actor, request
 			nothing = true
 			return nil
 		}
-		if err != nil || request == nil || (conflict != nil && conflict.Reason == UndoHousehold) {
-			// A join or a leave stays the latest change: the same undo sent
-			// again finds it again.
+		if err != nil || request == nil {
 			return err
+		}
+		if conflict != nil && conflict.Reason == UndoHousehold {
+			// A join or a leave stays the latest change, so the request is
+			// kept on an undo of its own: sent again, it is refused again,
+			// though a change came since.
+			return recordRefused(ctx, tx, userID, a, *request, conflict.Event, now)
 		}
 		// The change the undo settled, taken back or passed over.
 		id := undone.ID
@@ -376,12 +380,43 @@ func settledBy(ctx context.Context, tx *sql.Tx, userID uuid.UUID, request *uuid.
 		return event.Event{}, false, nil, nil
 	case err != nil:
 		return event.Event{}, false, nil, err
+	case e.Action == event.Undo && strings.HasPrefix(e.Entity, refusedUndo):
+		return refusedBy(ctx, tx, userID, e)
 	case e.Action == event.Undo:
 		return event.Event{}, true, nil, ErrNothingToUndo
 	case e.UndoneBy == uuid.Nil():
 		return event.Event{}, true, &UndoConflictError{Event: e, Reason: UndoPassedOver}, nil
 	}
 	return e, true, nil, nil
+}
+
+// refusedUndo begins the entity of the undo of a request that a join or
+// a leave of a household refused; the event's id follows it.
+const refusedUndo = "refused/"
+
+// recordRefused records a's undo under request that the join or leave e
+// refused, so the same undo sent again is refused again.
+func recordRefused(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Actor, request uuid.UUID, e event.Event,
+	now time.Time,
+) error {
+	id, err := record(ctx, tx, userID, a, event.Undo, refusedUndo+e.ID.String(), nil, nil, now)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, "UPDATE events SET undo_request = ? WHERE user_id = ? AND id = ?",
+		request.String(), userID.String(), id.String())
+	return err
+}
+
+// refusedBy is settledBy of the undo u a join or a leave refused: that
+// refusal again.
+func refusedBy(ctx context.Context, tx *sql.Tx, userID uuid.UUID, u event.Event) (event.Event, bool, *UndoConflictError, error) {
+	e, err := scanEvent(tx.QueryRowContext(ctx, "SELECT "+eventColumns+" FROM events WHERE user_id = ? AND id = ?",
+		userID.String(), strings.TrimPrefix(u.Entity, refusedUndo)))
+	if err != nil {
+		return event.Event{}, false, nil, err
+	}
+	return event.Event{}, true, &UndoConflictError{Event: e, Reason: UndoHousehold}, nil
 }
 
 // nothingUndone is the entity of the undo of a request that found nothing

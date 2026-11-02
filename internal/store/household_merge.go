@@ -36,7 +36,8 @@ import (
 //     a member of H's and U share already (story 403) is one before any.
 //  2. A match takes H's shared fields: U's row keeps its id (its meals
 //     and recipes name it), its note, aliases and archived; the barcodes
-//     are both sides', but one another food has.
+//     are both sides', but one another food has, and as many as a food
+//     may have (food.MaxBarcodes), H's first.
 //  3. A food of one side without a match is copied to each member of the
 //     other: its shared fields, no note or aliases.
 //  4. A recipe's ingredients are H's in a match; each member's recipe
@@ -540,7 +541,7 @@ func (p *mergePlan) resolveBarcodes() {
 
 // addBarcodes gives item it U's food's barcodes, but the ones claimed by
 // another food, or, for one of U's alone, of a recipe left of a member of
-// H's (hLeft), which it drops.
+// H's (hLeft), and the ones past food.MaxBarcodes, which it drops.
 func (p *mergePlan) addBarcodes(it *mergeItem, claimed, hLeft map[string]bool) {
 	var codes []string
 	if it.h != nil {
@@ -549,7 +550,7 @@ func (p *mergePlan) addBarcodes(it *mergeItem, claimed, hLeft map[string]bool) {
 	for _, c := range it.u.food.Barcodes {
 		switch {
 		case slices.Contains(codes, c):
-		case claimed[c] || (it.h == nil && hLeft[c]):
+		case claimed[c] || (it.h == nil && hLeft[c]) || len(codes) == food.MaxBarcodes:
 			p.report.Dropped = append(p.report.Dropped, MergeBarcode{Food: it.food.Name, Code: c})
 		default:
 			claimed[c] = true

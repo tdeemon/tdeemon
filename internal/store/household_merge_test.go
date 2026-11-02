@@ -347,6 +347,30 @@ func TestMergeDropsAClashingBarcode(t *testing.T) {
 	}
 }
 
+// A match keeps as many barcodes as a food may have, the inviter's
+// first; the invited user's past them are dropped.
+func TestMergeKeepsTheBarcodesAFoodMayHave(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	theirs, mine := kefir(), kefir()
+	for i := range 6 {
+		theirs.Barcodes = append(theirs.Barcodes, ean13(t, 2000000000+i))
+		mine.Barcodes = append(mine.Barcodes, ean13(t, 2000000100+i))
+	}
+	saveFood(t, db, ana, theirs)
+	saveFood(t, db, ivo, mine)
+
+	got := join(t, db, ana, ivo)
+	want := []store.MergeBarcode{{Food: "Kefir", Code: mine.Barcodes[4]}, {Food: "Kefir", Code: mine.Barcodes[5]}}
+	if !reflect.DeepEqual(got.Dropped, want) {
+		t.Errorf("dropped = %+v, want %+v", got.Dropped, want)
+	}
+	if f := copyNamed(t, db, ivo, "Kefir"); !slices.Equal(f.Barcodes, append(theirs.Barcodes, mine.Barcodes[:4]...)) {
+		t.Errorf("the kefir's barcodes = %v, want Ana's six and Ivo's first four", f.Barcodes)
+	}
+}
+
 // A recipe and a food of one name do not merge: the invited user's is
 // renamed, of the lowest number free.
 func TestMergeRenamesARecipeOfAFoodsName(t *testing.T) {
