@@ -40,9 +40,11 @@ func TestMigrationOfRecipeShares(t *testing.T) {
 		ID: uuid.NewV7(), Name: "Beef mince", Basis: food.Per100g, Source: food.Label,
 		Nutrients: food.Nutrients{Kcal: 250, Protein: 26, Carbs: 0, Fat: 17},
 	}
+	householdStandIns(t, db)
 	if _, err := db.SaveFood(t.Context(), ana, actor, beef, now); err != nil {
 		t.Fatal(err)
 	}
+	dropHouseholdStandIns(t, db)
 	sauce := uuid.NewV7()
 	must(`INSERT INTO foods (id, user_id, name, name_key, basis, kcal, protein, carbs, fat, source, created_at, updated_at)
 		VALUES (?, ?, 'Bolognese', 'bolognese', '100g', 150, 13, 3, 10, 'recipe', ?, ?)`, sauce.String(), ana.String(), formatTime(now), formatTime(now))

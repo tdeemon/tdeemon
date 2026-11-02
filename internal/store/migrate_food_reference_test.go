@@ -92,6 +92,7 @@ func seedBeforeReference(t *testing.T, db *DB) (uuid.UUID, map[string]string) {
 		{Name: "Jabuka", Source: food.Estimate, Aliases: []string{"apple"}},
 		{Name: "Tuna u vlastitom soku", Brand: "Eva", Source: food.User},
 	}
+	householdStandIns(t, db)
 	for i := range foods {
 		f := &foods[i]
 		f.ID = uuid.NewV7()
@@ -102,6 +103,7 @@ func seedBeforeReference(t *testing.T, db *DB) (uuid.UUID, map[string]string) {
 		}
 		ids[f.Name] = f.ID.String()
 	}
+	dropHouseholdStandIns(t, db)
 	ids["Gulaš"] = uuid.NewV7().String()
 	must(`INSERT INTO foods (id, user_id, name, name_key, basis, kcal, protein, carbs, fat, source, created_at, updated_at)
 		VALUES (?, ?, 'Gulaš', 'gulas', '100g', 120, 10, 5, 6, 'recipe', '2026-11-01T08:00:00Z', '2026-11-01T08:00:00Z')`,
