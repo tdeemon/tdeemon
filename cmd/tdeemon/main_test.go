@@ -211,13 +211,15 @@ func (b *syncBuffer) String() string {
 func waitFor(t *testing.T, logs *syncBuffer, want string) {
 	t.Helper()
 
-	// Generous: under -race, with the other packages' argon2 tests on the
-	// same cores, migrating and preparing sign-in can take seconds. The
-	// deadline only turns a hang into a failure.
-	deadline := time.Now().Add(30 * time.Second)
+	// Generous: under -race, with the other packages' tests on the same
+	// cores, each migration can take a second or more, and there are more
+	// of them with every release. The deadline only turns a hang into a
+	// failure.
+	const wait = 2 * time.Minute
+	deadline := time.Now().Add(wait)
 	for !strings.Contains(logs.String(), want) {
 		if time.Now().After(deadline) {
-			t.Fatalf("no log line with %s within 30s; logs:\n%s", want, logs.String())
+			t.Fatalf("no log line with %s within %v; logs:\n%s", want, wait, logs.String())
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
