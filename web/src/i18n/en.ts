@@ -490,6 +490,7 @@ export const en = {
     fromOpenFoodFacts: 'Found at',
     checkLabel: 'Check the values against the label before you add it.',
     yours: 'Your food',
+    catalog: 'From the catalog: added, it is yours.',
     named: (name: string) => `It is your ${name}, without this barcode yet.`,
     link: 'Add the barcode to it',
   },
@@ -523,6 +524,8 @@ export const en = {
     list: { all: 'All', recent: 'Recent', frequent: 'Frequent', meals: 'Meals' },
     results: 'What there is to add',
     lastAmount: (amount: string) => `last ${amount}`,
+    // A food of the instance's catalog, which other users entered.
+    catalog: 'catalog',
     addOf: (name: string) => `Add: ${name}`,
     // A serving's chip, one of it, by its name alone, which may hold a
     // number: "slice (40 g)", "½ cup (100 g)".

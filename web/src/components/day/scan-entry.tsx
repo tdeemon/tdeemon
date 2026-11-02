@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { $api } from '@/api/client'
 import { detailOf, statusOf } from '@/api/errors'
 import { fieldsOf, useSaveFood } from '@/api/foods'
-import type { Food } from '@/api/types'
+import { catalogFood, type Food } from '@/api/types'
 import { Amount } from '@/components/day/finder'
 import {
   entryWrong,
@@ -29,7 +29,8 @@ function nameOf(food: Food): string {
 // ScanEntry is the quick add's step of a barcode, in the search's place:
 // the camera reads it, or its digits are typed, and the server says what
 // it is (lookup-barcode), asked anew each time. The user's food of it
-// opens for its amount, the last eaten; a product of Open Food Facts
+// opens for its amount, the last eaten, and so does the catalog's,
+// which the meal makes the user's; a product of Open Food Facts
 // opens as a new food (NewEntry), its values to check against the label,
 // saved with the barcode as it is added; the user's food of the
 // product's name, which lacks the barcode, gets it in a tap, and opens
@@ -74,7 +75,9 @@ export function ScanEntry({
   const status = statusOf(lookup.error)
   const data = code === undefined ? undefined : lookup.data
   const product =
-    data?.food === undefined && data?.named_food === undefined ? data?.open_food_facts : undefined
+    data?.food === undefined && data?.named_food === undefined && data?.catalog === undefined
+      ? data?.open_food_facts
+      : undefined
   if (code !== undefined && (making || status === 404)) {
     return (
       <NewEntry
@@ -158,6 +161,10 @@ export function ScanEntry({
     const named = data?.named_food
     if (yours !== undefined) {
       body = <FoodAmount key={yours.id} food={yours} onAdd={onAdd} />
+    } else if (data?.catalog !== undefined && named === undefined) {
+      body = (
+        <FoodAmount key={data.catalog.id} food={catalogFood(data.catalog)} catalog onAdd={onAdd} />
+      )
     } else if (named !== undefined) {
       body = <Named food={named} code={code} onLinked={setLinked} />
     }
@@ -181,11 +188,23 @@ export function ScanEntry({
   )
 }
 
-// FoodAmount is the user's food of the barcode, open for its amount.
-function FoodAmount({ food, onAdd }: { food: Food; onAdd: (entry: Entry) => void }) {
+// FoodAmount is the user's food of the barcode, or the catalog's
+// (catalog), open for its amount.
+function FoodAmount({
+  food,
+  catalog = false,
+  onAdd,
+}: {
+  food: Food
+  catalog?: boolean
+  onAdd: (entry: Entry) => void
+}) {
   const t = useMessages()
   const f = useFormat()
-  const [entry, setEntry] = useState<FoodEntry>(() => foodEntry(food, f.field))
+  const [entry, setEntry] = useState<FoodEntry>(() => {
+    const e = foodEntry(food, f.field)
+    return catalog ? { ...e, catalog: true } : e
+  })
   const [wrong, setWrong] = useState<Wrong | undefined>(undefined)
 
   return (
@@ -193,7 +212,8 @@ function FoodAmount({ food, onAdd }: { food: Food; onAdd: (entry: Entry) => void
       <p className="font-medium">
         {nameOf(food)}
         <span className="block text-caption font-normal text-muted-foreground">
-          {t.scan.yours} · {t.unit.kcal(f.number(food.nutrients.kcal))} {t.foods.per[food.basis]}
+          {catalog ? t.scan.catalog : t.scan.yours} · {t.unit.kcal(f.number(food.nutrients.kcal))}{' '}
+          {t.foods.per[food.basis]}
         </span>
       </p>
       <Amount

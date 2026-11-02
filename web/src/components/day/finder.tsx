@@ -6,7 +6,7 @@ import { flushSync } from 'react-dom'
 import { $api } from '@/api/client'
 import { useFindFoods, useFrequentFoods } from '@/api/foods'
 import { useRecentMeals } from '@/api/meals'
-import type { Food, Meal, RecentMeal } from '@/api/types'
+import { catalogFood, type Food, type Meal, type RecentMeal } from '@/api/types'
 import {
   entryAmount,
   entryValues,
@@ -105,6 +105,9 @@ export function Finder({
   const frequentFoods = useFrequentFoods(list === 'frequent')
   const recentMeals = useRecentMeals(ingredient === undefined)
   const q = query.trim()
+  // A search's foods of the catalog, after the user's: logged, theirs.
+  const fromCatalog = q === '' ? [] : (found.data?.catalog ?? []).map(catalogFood)
+  const catalog = new Set(fromCatalog.map((food) => food.id))
   const shownLists = ingredient === undefined ? lists : lists.filter((l) => l !== 'meals')
   const repeat = (meal: Meal) => {
     onRepeat?.(meal)
@@ -152,7 +155,7 @@ export function Finder({
             pending: recentFoods.isPending || (ingredient === undefined && recentMeals.isPending),
           }
         : {
-            foods: (found.data?.foods ?? []).filter(offered),
+            foods: [...(found.data?.foods ?? []).filter(offered), ...fromCatalog],
             meals: meals.slice(0, firstMeals),
             pending: found.isPending,
           },
@@ -165,8 +168,14 @@ export function Finder({
     meals: { foods: [], meals, pending: recentMeals.isPending },
   }
 
+  // entryOf is a food's entry, of the catalog's food as one.
+  const entryOf = (food: Food): FoodEntry => {
+    const entry = foodEntry(food, f.field)
+    return catalog.has(food.id) ? { ...entry, catalog: true } : entry
+  }
+
   function pick(food: Food) {
-    setPicked(foodEntry(food, f.field))
+    setPicked(entryOf(food))
     setPickedWrong(undefined)
   }
 
@@ -294,8 +303,9 @@ export function Finder({
                 }
               }}
               onAdd={(food) => {
-                add(foodEntry(food, f.field))
+                add(entryOf(food))
               }}
+              catalog={catalog}
               onRepeat={repeat}
               ingredient={ingredient !== undefined}
             />
@@ -376,6 +386,7 @@ function Results({
   onRepeat,
   ingredient,
   pinned,
+  catalog,
 }: {
   foods: Food[]
   meals: Meal[]
@@ -393,6 +404,8 @@ function Results({
   ingredient: boolean
   // The food the finder opened with, first of all while it is picked.
   pinned?: string | undefined
+  // The ids of the foods of the catalog among foods.
+  catalog: Set<string>
 }) {
   const t = useMessages()
   const searched = query !== ''
@@ -422,6 +435,7 @@ function Results({
       key={food.id}
       food={food}
       query={query}
+      catalog={catalog.has(food.id)}
       open={picked === food.id}
       amount={pickedRow(food)}
       onPick={() => {
@@ -478,11 +492,12 @@ function initials(name: string): string {
 }
 
 // FoodResult is a food found, what the search matched in its name
-// marked: a tap opens it for its amount (amount), its + adds it in the
-// amount it was eaten in last.
+// marked, and marked of the catalog when it is: a tap opens it for its
+// amount (amount), its + adds it in the amount it was eaten in last.
 function FoodResult({
   food,
   query,
+  catalog,
   open,
   amount,
   onPick,
@@ -490,6 +505,7 @@ function FoodResult({
 }: {
   food: Food
   query: string
+  catalog: boolean
   open: boolean
   amount: React.ReactNode
   onPick: () => void
@@ -532,6 +548,7 @@ function FoodResult({
                 )}
               </span>
               {isRecipe(food) && <Badge tone="primary">{t.recipes.mark}</Badge>}
+              {catalog && <Badge>{t.log.catalog}</Badge>}
             </span>
             <span className="block text-caption text-muted-foreground">
               {about && '≈ '}
