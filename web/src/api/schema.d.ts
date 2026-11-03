@@ -430,8 +430,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Invite a user into your household
-         * @description Needs a web session. Invites the user of the address into your household, or into one of the two of you when you are in none, for 7 days; they are told by a notification on their devices. A refusal's error at body.email has a code as its value: no_user, self or deactivated (422: no user of the instance has the address, it is yours, or the admin deactivated its user); member, other_household or waiting (409: they are in your household already, they are in another, which they leave first, or an invite of them from your household waits).
+         * Invite an address into your household
+         * @description Needs a web session. Invites the address into your household, or into one of the two of you when you are in none, for 7 days: whoever has an account of it answers, told by a notification on their devices, now or once they have one. The answer is the same whether a user has the address or not, and names no one. A refusal's error at body.email has a code as its value: self (422: the address is yours); member or waiting (409: a member of your household has it, or an invite of it from your household waits). A user makes 30 invites and recipe shares by address in 24 hours; more answer 429 with Retry-After.
          */
         post: operations["invite-to-household"];
         delete?: never;
@@ -1155,7 +1155,7 @@ export interface paths {
         put?: never;
         /**
          * Share a recipe with another user
-         * @description Needs a web session. The user of the address has the recipe at once, a recipe of their own of it that a change by any member is every member's; its ingredients of your foods are theirs to see in it, never among their foods. They are told by a notification on their devices. Answers the recipe, with whom it is shared now.
+         * @description Needs a web session. The user of the address has the recipe at once, a recipe of their own of it that a change by any member is every member's; its ingredients of your foods are theirs to see in it, never among their foods. They are told by a notification on their devices. Answers the recipe, with whom it is shared now. A user makes 30 recipe shares and invites into a household by address in 24 hours; more answer 429 with Retry-After.
          */
         post: operations["share-recipe"];
         delete?: never;
@@ -2026,6 +2026,10 @@ export interface components {
             /** Format: double */
             weight_kg?: number;
         };
+        HouseholdAddressBody: {
+            /** Format: email */
+            email: string;
+        };
         HouseholdBody: {
             /** @description The household's members, you among them, in the order they joined; none when you are in no household. */
             members: components["schemas"]["HouseholdMemberBody"][];
@@ -2049,7 +2053,8 @@ export interface components {
              * @description What a revoke, a decline, a preview and an accept name.
              */
             id: string;
-            invited: components["schemas"]["HouseholdPersonBody"];
+            /** @description The address invited. */
+            invited: components["schemas"]["HouseholdAddressBody"];
         };
         HouseholdMemberBody: {
             /** Format: email */
@@ -2203,7 +2208,7 @@ export interface components {
         InviteToHouseholdInputBody: {
             /**
              * Format: email
-             * @description The address of the user of the instance to invite.
+             * @description The address to invite.
              */
             email: string;
         };

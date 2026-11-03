@@ -444,10 +444,10 @@ func TestExportAMember(t *testing.T) {
 	}
 	var invites []string
 	for i := range got["household_invites"].Rows {
-		invites = append(invites, fmt.Sprint(cell("household_invites", i, "user_id"), ">", cell("household_invites", i, "invited_id")))
+		invites = append(invites, fmt.Sprint(cell("household_invites", i, "user_id"), ">", cell("household_invites", i, "email")))
 	}
 	slices.Sort(invites)
-	want := []string{ivo.String() + ">" + eva.String(), mia.String() + ">" + ivo.String()}
+	want := []string{ivo.String() + ">" + emailOf(t, db, eva), mia.String() + ">" + emailOf(t, db, ivo)}
 	slices.Sort(want)
 	if !slices.Equal(invites, want) {
 		t.Errorf("household_invites = %v, want Mia's to Ivo and his to Eva", invites)
@@ -605,7 +605,7 @@ func householdState(t *testing.T, db *store.DB, users ...uuid.UUID) string {
 	for _, q := range []string{
 		"SELECT id || created_at FROM households ORDER BY id",
 		"SELECT user_id || household_id || joined_at FROM household_members ORDER BY user_id",
-		"SELECT id || user_id || invited_id FROM household_invites ORDER BY id",
+		"SELECT id || user_id || email FROM household_invites ORDER BY id",
 	} {
 		for _, s := range textRows(t, db, q) {
 			fmt.Fprintln(&b, s)

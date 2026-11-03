@@ -310,18 +310,19 @@ CREATE TABLE 'foods_fts_docsize'(id INTEGER PRIMARY KEY, sz BLOB);
 
 CREATE TABLE 'foods_fts_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID;
 
-CREATE TABLE household_invites (
+CREATE TABLE "household_invites" (
     -- A UUIDv7 the server makes.
     id TEXT PRIMARY KEY CHECK (length(id) = 36),
     user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    invited_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    -- The address invited, normalized as a user's is (lower case, NFC):
+    -- the user of it answers.
+    email TEXT NOT NULL CHECK (email <> ''),
     created_at TEXT NOT NULL,
     expires_at TEXT NOT NULL,
-    UNIQUE (user_id, invited_id),
-    CHECK (invited_id <> user_id)
+    UNIQUE (user_id, email)
 ) STRICT;
 
-CREATE INDEX household_invites_invited ON household_invites (invited_id);
+CREATE INDEX household_invites_email ON household_invites (email);
 
 CREATE TABLE household_members (
     user_id TEXT PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,

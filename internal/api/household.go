@@ -33,18 +33,15 @@ const householdPage = "/settings/household"
 // at its location: a client tells them apart by it, as their statuses
 // alone do not.
 const (
-	// householdNoUser: no user of the instance has the address.
-	householdNoUser = "no_user"
 	// householdSelf: the address is the user's own.
 	householdSelf = "self"
-	// householdDeactivated: the admin deactivated the user of the address.
-	householdDeactivated = "deactivated"
 	// householdMember: they are in the household already.
 	householdMember = "member"
-	// householdOther: they (the invited user, of an accept) are in
-	// another household, which they leave first.
+	// householdOther: the invited user, of an accept, is in another
+	// household, which they leave first.
 	householdOther = "other_household"
-	// householdWaiting: an invite of them from the household waits already.
+	// householdWaiting: an invite of the address from the household waits
+	// already.
 	householdWaiting = "waiting"
 	// householdCycle: the merge would make a recipe its own ingredient.
 	householdCycle = "recipe_cycle"
@@ -67,19 +64,25 @@ type householdMemberBody struct {
 	You   bool   `json:"you,omitempty" doc:"The member is you."`
 }
 
+// householdAddressBody is the address an invite was made to. It names
+// no user: whether one has it, and who, is theirs to say by joining.
+type householdAddressBody struct {
+	Email string `json:"email" format:"email"`
+}
+
 type householdInviteBody struct {
-	ID        string              `json:"id" format:"uuid" doc:"What a revoke, a decline, a preview and an accept name."`
-	By        householdPersonBody `json:"by" doc:"Who invited: a member of the household, or a user in none, whom the accept makes a household with."`
-	Invited   householdPersonBody `json:"invited"`
-	CreatedAt time.Time           `json:"created_at"`
-	ExpiresAt time.Time           `json:"expires_at" doc:"When it stops waiting, unanswered: 7 days after it was made."`
+	ID        string               `json:"id" format:"uuid" doc:"What a revoke, a decline, a preview and an accept name."`
+	By        householdPersonBody  `json:"by" doc:"Who invited: a member of the household, or a user in none, whom the accept makes a household with."`
+	Invited   householdAddressBody `json:"invited" doc:"The address invited."`
+	CreatedAt time.Time            `json:"created_at"`
+	ExpiresAt time.Time            `json:"expires_at" doc:"When it stops waiting, unanswered: 7 days after it was made."`
 }
 
 func newHouseholdInviteBody(inv *store.HouseholdInvite) householdInviteBody {
 	return householdInviteBody{
 		ID:        inv.ID.String(),
 		By:        householdPersonBody{Name: inv.By.Name, Email: inv.By.Email},
-		Invited:   householdPersonBody{Name: inv.Invited.Name, Email: inv.Invited.Email},
+		Invited:   householdAddressBody{Email: inv.Invited.Email},
 		CreatedAt: inv.CreatedAt.UTC(),
 		ExpiresAt: inv.ExpiresAt.UTC(),
 	}
@@ -102,7 +105,7 @@ type householdInviteOutput struct {
 
 type inviteToHouseholdInput struct {
 	Body struct {
-		Email string `json:"email" format:"email" maxLength:"254" doc:"The address of the user of the instance to invite."`
+		Email string `json:"email" format:"email" maxLength:"254" doc:"The address to invite."`
 	}
 }
 
@@ -179,15 +182,16 @@ func (s *sessions) registerHousehold(a huma.API) {
 		OperationID: "invite-to-household",
 		Method:      http.MethodPost,
 		Path:        Prefix + "/household/invites",
-		Summary:     "Invite a user into your household",
-		Description: "Needs a web session. Invites the user of the address into your household, or into one of the two of you when you are in none, " +
-			"for 7 days; they are told by a notification on their devices. A refusal's error at body.email has a code as its value: " +
-			"no_user, self or deactivated (422: no user of the instance has the address, it is yours, or the admin deactivated its user); " +
-			"member, other_household or waiting (409: they are in your household already, they are in another, which they leave first, " +
-			"or an invite of them from your household waits).",
+		Summary:     "Invite an address into your household",
+		Description: "Needs a web session. Invites the address into your household, or into one of the two of you when you are in none, " +
+			"for 7 days: whoever has an account of it answers, told by a notification on their devices, now or once they have one. " +
+			"The answer is the same whether a user has the address or not, and names no one. A refusal's error at body.email has " +
+			"a code as its value: self (422: the address is yours); member or waiting (409: a member of your household has it, or an " +
+			"invite of it from your household waits). A user makes 30 invites and recipe shares by address in 24 hours; more " +
+			"answer 429 with Retry-After.",
 		Tags:          []string{"household"},
 		DefaultStatus: http.StatusCreated,
-		Errors:        append(session, http.StatusConflict, http.StatusUnprocessableEntity),
+		Errors:        append(session, http.StatusConflict, http.StatusUnprocessableEntity, http.StatusTooManyRequests),
 	}, s.inviteToHousehold)
 	huma.Register(a, huma.Operation{
 		OperationID:   "delete-household-invite",
@@ -290,40 +294,33 @@ func (s *sessions) inviteToHousehold(ctx context.Context, in *inviteToHouseholdI
 	if err != nil {
 		return nil, err
 	}
+	if _, wait, ok := s.addressInvites.take(p.User.ID.String()); !ok {
+		return nil, tooManyInvites(wait)
+	}
 	const refused = "the invite is refused"
 	refuse := func(status int, code, why string) error {
 		return householdRefusal(status, refused, "body.email", code, why)
 	}
-	// The instance's users know one another, as a recipe's share does: an
-	// address of none says so.
-	invited, err := s.db.UserByEmail(ctx, user.NormalizeEmail(in.Body.Email))
+	// The invite is the address's, and its answer the same whether a user
+	// has it or not: who has an account here is no one's to find out by
+	// inviting.
+	email := user.NormalizeEmail(in.Body.Email)
+	inv, err := s.db.InviteToHousehold(ctx, p.User.ID, email, s.now())
 	switch {
-	case errors.Is(err, store.ErrNotFound):
-		return nil, refuse(http.StatusUnprocessableEntity, householdNoUser, "no user of this instance has that address")
-	case err != nil:
-		return nil, internalError("inviting failed", err)
-	case invited.ID == p.User.ID:
-		return nil, refuse(http.StatusUnprocessableEntity, householdSelf, "that is your own address: invite someone else")
-	case invited.DisabledAt != nil:
-		return nil, refuse(http.StatusUnprocessableEntity, householdDeactivated, "the admin deactivated that user")
-	}
-	inv, err := s.db.InviteToHousehold(ctx, p.User.ID, invited.ID, s.now())
-	switch {
-	case errors.Is(err, store.ErrNotFound):
-		// Deleted since the lookup.
-		return nil, refuse(http.StatusUnprocessableEntity, householdNoUser, "no user of this instance has that address")
 	case errors.Is(err, store.ErrInviteSelf):
 		return nil, refuse(http.StatusUnprocessableEntity, householdSelf, "that is your own address: invite someone else")
 	case errors.Is(err, store.ErrInviteMember):
-		return nil, refuse(http.StatusConflict, householdMember, "they are in your household already")
-	case errors.Is(err, store.ErrInviteOtherHousehold):
-		return nil, refuse(http.StatusConflict, householdOther, "they are in another household: they leave it first")
+		return nil, refuse(http.StatusConflict, householdMember, "a member of your household has that address")
 	case errors.Is(err, store.ErrInviteWaiting):
-		return nil, refuse(http.StatusConflict, householdWaiting, "an invite of theirs from your household waits already")
+		return nil, refuse(http.StatusConflict, householdWaiting, "an invite of that address from your household waits already")
 	case err != nil:
 		return nil, internalError("inviting failed", err)
 	}
-	s.tellHousehold(ctx, []user.User{invited}, invitedWords, p.User.Name, "household-invite-"+inv.ID.String())
+	if invited, err := s.db.UserByEmail(ctx, email); err == nil && invited.DisabledAt == nil {
+		s.tellHousehold(ctx, []user.User{invited}, invitedWords, p.User.Name, "household-invite-"+inv.ID.String())
+	} else if err != nil && !errors.Is(err, store.ErrNotFound) {
+		s.logger.WarnContext(ctx, "telling of an invite failed", "error", err)
+	}
 	return &householdInviteOutput{Body: newHouseholdInviteBody(&inv)}, nil
 }
 

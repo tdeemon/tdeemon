@@ -282,7 +282,7 @@ func saveIsolationHousehold(t *testing.T, db *store.DB, u user.User, guest uuid.
 				return err
 			}
 		}
-		_, err := tx.ExecContext(t.Context(), "INSERT INTO household_invites (id, user_id, invited_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+		_, err := tx.ExecContext(t.Context(), "INSERT INTO household_invites (id, user_id, email, created_at, expires_at) VALUES (?, ?, (SELECT email FROM users WHERE id = ?), ?, ?)",
 			invite.String(), u.ID.String(), guest.String(), at, now.Add(7*24*time.Hour).UTC().Format(time.RFC3339))
 		return err
 	})
@@ -1290,18 +1290,19 @@ func asNone(t *testing.T, e isolationEnv, method, ownerPath, nonePath, body stri
 	}
 }
 
-// isolateInviteToHousehold is invite-to-household's case: the owner, in
-// a household of theirs, is refused; a third user, in none, is invited.
+// isolateInviteToHousehold is invite-to-household's case: an invite is
+// the inviter's row alone and names the address alone, of a third user
+// or of none. (The owner's address is invited as any other, and told:
+// TestHouseholdInviteAnswersTheSameForAnyAddress.)
 func isolateInviteToHousehold(t *testing.T, e isolationEnv) {
 	t.Helper()
 	session := []*http.Cookie{e.other.session}
-	rec := e.in.do(t, http.MethodPost, "/api/v1/household/invites", `{"email": "`+e.owner.user.Email+`"}`, session, nil)
-	if rec.Code != http.StatusConflict || codeOf(t, rec.Body, "body.email") != "other_household" {
-		t.Errorf("an invite of the owner: %d %s, want 409 other_household", rec.Code, rec.Body.String())
-	}
 	zoe := e.in.addUser(t, user.RoleUser)
-	if rec := e.in.do(t, http.MethodPost, "/api/v1/household/invites", `{"email": "`+zoe.Email+`"}`, session, nil); rec.Code != http.StatusCreated {
-		t.Errorf("an invite of a third user: %d %s", rec.Code, rec.Body.String())
+	for _, address := range []string{zoe.Email, "nobody@example.com"} {
+		rec := e.in.do(t, http.MethodPost, "/api/v1/household/invites", `{"email": "`+address+`"}`, session, nil)
+		if rec.Code != http.StatusCreated || !strings.Contains(rec.Body.String(), `"invited":{"email":"`+address+`"}`) {
+			t.Errorf("an invite of %s: %d %s, want 201 naming the address alone", address, rec.Code, rec.Body.String())
+		}
 	}
 }
 
@@ -1326,7 +1327,7 @@ func invitedByAThird(t *testing.T, e isolationEnv) string {
 		t.Fatal(err)
 	}
 	zoe := e.in.addUser(t, user.RoleUser)
-	inv, err := e.in.db.InviteToHousehold(t.Context(), zoe.ID, e.other.user.ID, e.in.clock.Now())
+	inv, err := e.in.db.InviteToHousehold(t.Context(), zoe.ID, e.other.user.Email, e.in.clock.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

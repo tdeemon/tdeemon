@@ -729,6 +729,22 @@ test('a share with your own address says so', async () => {
   ).toBeDefined()
 })
 
+test("a share past the day's limit says so", async () => {
+  sharedServer({ [`POST /api/v1/recipes/${curryId}/shares`]: () => problem(429) })
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  fireEvent.click(within(page).getByRole('button', { name: 'Share' }))
+  const sheet = await screen.findByRole('dialog', { name: 'Share the recipe' })
+  fireEvent.change(within(sheet).getByLabelText('Their email address'), {
+    target: { value: 'eva@example.com' },
+  })
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Share' }))
+  expect(
+    await within(sheet).findByText('You have shared too many times today. Try again tomorrow.'),
+  ).toBeDefined()
+})
+
 test('leaving a recipe goes back to the foods, which a toast says, though the recipe is gone first', async () => {
   let left = false
   sharedServer({

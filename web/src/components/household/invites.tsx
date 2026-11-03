@@ -71,7 +71,8 @@ export function Invites({
       </h2>
       <ul className="space-y-3">
         {invites.map((inv) => {
-          const who = sent ? inv.invited : inv.by
+          // A sent invite names the address alone; a received one who sent it.
+          const who = sent ? { name: inv.invited.email, email: undefined } : inv.by
           return (
             <li key={inv.id} className="space-y-3 rounded-lg border bg-card p-4 shadow-card">
               <div className="flex flex-wrap items-start gap-3">
@@ -79,7 +80,9 @@ export function Invites({
                   <h3 className="font-semibold break-words">
                     {sent ? who.name : h.invitesYou(who.name)}
                   </h3>
-                  <p className="text-small break-words text-muted-foreground">{who.email}</p>
+                  {who.email !== undefined && (
+                    <p className="text-small break-words text-muted-foreground">{who.email}</p>
+                  )}
                   <p className="text-small text-muted-foreground">
                     {h.waitsUntil(f.day(inv.expires_at, timeZone))}
                   </p>

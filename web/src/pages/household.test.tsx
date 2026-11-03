@@ -25,14 +25,14 @@ const mia = { name: 'Mia', email: 'mia@example.com' }
 const fromMia: Invite = {
   id: '0193c3a5-0000-7000-8000-0000000000a1',
   by: mia,
-  invited: ana,
+  invited: { email: ana.email },
   created_at: '2026-10-22T08:00:00Z',
   expires_at: '2026-10-29T08:00:00Z',
 }
 const ofZoe: Invite = {
   id: '0193c3a5-0000-7000-8000-0000000000a2',
   by: ana,
-  invited: zoe,
+  invited: { email: zoe.email },
   created_at: '2026-10-22T08:00:00Z',
   expires_at: '2026-10-29T08:00:00Z',
 }
@@ -120,7 +120,7 @@ const none: Household = { members: [], sent: [], received: [] }
 const withZoe: Household = { members: [{ ...ana, you: true }, zoe], sent: [], received: [] }
 
 test('the settings have a row to the household, which lists its members and the invites it sent', async () => {
-  server({ ...withZoe, sent: [{ ...ofZoe, invited: mia }] })
+  server({ ...withZoe, sent: [{ ...ofZoe, invited: { email: mia.email } }] })
   renderAt('/settings')
 
   const row = await screen.findByRole('link', { name: /Household/ })
@@ -157,12 +157,12 @@ test('a user in no household is told so, and invites someone in a sheet', async 
   })
   expect(sent['POST /api/v1/household/invites']).toEqual([{ email: 'zoe@example.com' }])
   const list = within(await screen.findByRole('region', { name: 'Invites sent' }))
-  expect(await list.findByText('Zoe')).toBeDefined()
+  expect(await list.findByText('zoe@example.com')).toBeDefined()
 })
 
-test('an invite refused says why by its code, in Croatian too', async () => {
+test('an invite refused says why by its code, or too many today, in Croatian too', async () => {
   server(none, {
-    'POST /api/v1/household/invites': () => problemOf(409, 'body.email', 'other_household'),
+    'POST /api/v1/household/invites': () => problemOf(409, 'body.email', 'waiting'),
   })
   renderAt('/settings/household')
 
@@ -173,14 +173,14 @@ test('an invite refused says why by its code, in Croatian too', async () => {
   })
   fireEvent.click(sheet.getByRole('button', { name: 'Invite' }))
   expect((await sheet.findByRole('alert')).textContent).toBe(
-    'They are in another household: they leave it first.',
+    'An invite to that address waits already.',
   )
   cleanup()
 
   fakeServer({
     ...signedIn('hr'),
     'GET /api/v1/household': () => Response.json(none),
-    'POST /api/v1/household/invites': () => problemOf(422, 'body.email', 'no_user'),
+    'POST /api/v1/household/invites': () => problemOf(429, 'body', 'none'),
   })
   renderAt('/settings/household')
   fireEvent.click(await screen.findByRole('button', { name: 'Pozovi nekoga' }))
@@ -190,7 +190,7 @@ test('an invite refused says why by its code, in Croatian too', async () => {
   })
   fireEvent.click(hr.getByRole('button', { name: 'Pozovi' }))
   expect((await hr.findByRole('alert')).textContent).toBe(
-    'Nijedan korisnik ovog servera nema tu adresu.',
+    'Danas je poslano previše pozivnica. Pokušaj ponovno sutra.',
   )
 })
 
@@ -291,19 +291,19 @@ test('an invite for the user is declined after it asks', async () => {
 })
 
 test('an invite the household sent is revoked after it asks; Keep keeps it', async () => {
-  const { sent } = server({ ...withZoe, sent: [{ ...ofZoe, invited: mia }] })
+  const { sent } = server({ ...withZoe, sent: [{ ...ofZoe, invited: { email: mia.email } }] })
   renderAt('/settings/household')
 
   const list = within(await screen.findByRole('region', { name: 'Invites sent' }))
-  const revoke = list.getByRole('button', { name: 'Revoke the invite of Mia' })
+  const revoke = list.getByRole('button', { name: 'Revoke the invite of mia@example.com' })
   fireEvent.click(revoke)
   fireEvent.click(list.getByRole('button', { name: 'Keep' }))
   expect(document.activeElement).toBe(
-    list.getByRole('button', { name: 'Revoke the invite of Mia' }),
+    list.getByRole('button', { name: 'Revoke the invite of mia@example.com' }),
   )
   expect(sent[`DELETE ${ofZoe.id}`]).toBeUndefined()
 
-  fireEvent.click(list.getByRole('button', { name: 'Revoke the invite of Mia' }))
+  fireEvent.click(list.getByRole('button', { name: 'Revoke the invite of mia@example.com' }))
   fireEvent.click(list.getByRole('button', { name: 'Revoke' }))
   await waitFor(() => {
     expect(screen.queryByRole('region', { name: 'Invites sent' })).toBeNull()
