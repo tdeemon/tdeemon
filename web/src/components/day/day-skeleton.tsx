@@ -11,7 +11,8 @@ const meals = [0, 1, 2]
 // DaySkeleton stands in for a day under its header while what it shows
 // comes (DayPage), in its shape: on a phone the hero, its ring, numbers
 // and macros, the week under it, and three meals' rows; from a tablet's
-// 768 px, the body and the check-in beside them; on a desktop (columns)
+// 768 px, the hero and the week across, the body and the check-in beside
+// the meals; on a desktop (columns)
 // the hero and the meals' table, and beside them the week, the body and
 // the check-in. A screen reader hears that it loads.
 export function DaySkeleton({ columns }: { columns: boolean }) {
@@ -43,9 +44,14 @@ export function DaySkeleton({ columns }: { columns: boolean }) {
     <div aria-busy className="space-y-4">
       <output className="sr-only">{t.loading}</output>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start lg:grid-cols-12">
+        {!columns && (
+          <div className="space-y-4 md:col-span-2">
+            <Hero />
+            {weekCard}
+          </div>
+        )}
         <div className="space-y-4 lg:col-span-7 xl:col-span-8">
-          <Hero />
-          {!columns && weekCard}
+          {columns && <Hero />}
           <div className="space-y-2">
             <Skeleton className="h-6.5 w-24" />
             {columns ? <MealTable /> : <MealCards />}

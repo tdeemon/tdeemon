@@ -155,7 +155,9 @@ export function WeekBars({ date, today }: { date: string; today: string }) {
                   aria-label={w.day(name, said(day))}
                   className={cn(
                     cell,
-                    'outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring',
+                    // 44 px wide to a finger at 390 px too: an ::after
+                    // over half the gap either side.
+                    "relative outline-none after:absolute after:-inset-x-0.75 after:inset-y-0 after:content-[''] hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
                   )}
                 >
                   {face}

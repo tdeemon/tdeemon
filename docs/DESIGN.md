@@ -1601,7 +1601,9 @@ the first spec.
     its target, by the plan's targets of the days to come; below the
     plan's kcal floor, the day's target is said instead. A phone has
     the week under the hero, both on its first screen at 390 px, then
-    the meals, the body and the check-in, a row that opens. A desktop
+    the meals, the body and the check-in, a row that opens; a tablet
+    the hero and the week across, the body and the check-in beside the
+    meals. A desktop
     has the day in 8 of 12 columns, the macros beside the ring and the
     meals a table of their kcal and macros with the day's total, and
     beside it the week, the body and the check-in, open. A check-in's

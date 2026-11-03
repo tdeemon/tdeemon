@@ -49,7 +49,7 @@ test('a meal deleted comes back from the recent changes, after its toast is gone
 
 test("an undo's toast leads to the recent changes", async ({ page }) => {
   await signIn(page)
-  const name = `Lentil soup ${String(Date.now())}`
+  const name = `Miso broth ${String(Date.now())}`
   const logged = await page.request.post('/api/v1/meals', {
     data: {
       description: name,

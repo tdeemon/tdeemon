@@ -307,6 +307,13 @@ export function DayPage() {
     />
   )
 
+  // A new user's first steps, in place of the hero before a plan.
+  const hero = (
+    <FirstSteps day={day.data}>
+      <DaySummary day={day.data} />
+    </FirstSteps>
+  )
+
   return (
     <div className="max-w-3xl space-y-4 md:max-w-none">
       {keys}
@@ -321,16 +328,19 @@ export function DayPage() {
       >
         {/* A desktop's columns: the hero, what the hour asks and the
             meals, a table, and beside them the week, the body and the
-            check-in. A tablet's, from 768 px: the hero, the week, what
-            the hour asks and the meals, and beside them the body and the
-            check-in. A phone has them one after the other, the hero and
-            the week first, on its first screen. */}
+            check-in. A tablet's, from 768 px: the hero and the week
+            across both columns, then what the hour asks and the meals,
+            and beside them the body and the check-in. A phone has them
+            one after the other, the hero and the week first, on its
+            first screen. */}
+        {!desktop && (
+          <div className="space-y-4 md:col-span-2">
+            {hero}
+            {week}
+          </div>
+        )}
         <div className="space-y-4 lg:col-span-7 xl:col-span-8">
-          {/* A new user's first steps, in place of the hero before a plan. */}
-          <FirstSteps day={day.data}>
-            <DaySummary day={day.data} />
-          </FirstSteps>
-          {!desktop && week}
+          {desktop && hero}
           {/* The morning's weigh-in, a proposal that waits, or the
               evening's end of the day. */}
           <DayNow day={day.data} />
