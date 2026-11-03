@@ -13,6 +13,7 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/domain/user"
 	"github.com/zarnautovic/tdeemon/internal/notify"
 	"github.com/zarnautovic/tdeemon/internal/push"
+	"github.com/zarnautovic/tdeemon/internal/server"
 	"github.com/zarnautovic/tdeemon/internal/store"
 )
 
@@ -482,7 +483,7 @@ func (s *sessions) tellHousehold(ctx context.Context, to []user.User, words map[
 // afterAnswerTimeout bounds the work a request leaves for after its
 // answer: no longer than a server's shutdown waits for its requests, as
 // the server waits for it too before the database closes.
-const afterAnswerTimeout = 15 * time.Second
+const afterAnswerTimeout = server.ShutdownTimeout
 
 // afterAnswer runs f apart from the request, which answers without
 // waiting for it, of ctx's values but not its end, within
