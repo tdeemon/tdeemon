@@ -52,7 +52,8 @@ func householdMates(ctx context.Context, tx *sql.Tx, userID uuid.UUID) (map[uuid
 // householdSeats gives each other member of userID's household a seat
 // in the group of userID's food f, which it makes when there is none, in
 // a household seat: the seat they have, brought back if they left it, or
-// a new food of theirs of f's name, brand, basis and source, which the
+// a new food of theirs of f's name, brand, basis and source, archived as
+// f is, which the
 // save then writes whole. It returns the group, "" when userID is in no
 // household or left the food, and the members it seated (fresh), whose
 // food is to be written whole. A food of the name and brand that is
