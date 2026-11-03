@@ -54,8 +54,8 @@ test('a recipe is written, read, cooked again and edited', async ({ page }) => {
   await expect(recipe.getByText('kcal per portion')).toBeVisible()
 
   // Cooked again, weighed from the pot.
-  await recipe.getByRole('button', { name: 'Cooked again' }).click()
-  const pot = page.getByRole('dialog', { name: 'Cooked again' })
+  await recipe.getByRole('button', { name: 'Cook again' }).click()
+  const pot = page.getByRole('dialog', { name: 'Cook again' })
   await pot.getByLabel(`Amount: Split peas ${tag}`).fill('500')
   await pot.getByRole('button', { name: 'From the pot' }).click()
   await pot.getByLabel('Full pot').fill('2600')
@@ -67,7 +67,7 @@ test('a recipe is written, read, cooked again and edited', async ({ page }) => {
   await expect(recipe.getByText('Weighed: 1,500 g')).toBeVisible()
 
   // Edited: the empty pot is remembered, and an ingredient removed.
-  await recipe.getByRole('link', { name: 'Edit' }).click()
+  await recipe.getByRole('link', { name: 'Edit the recipe' }).click()
   await expect(page.getByRole('heading', { name: 'Edit the recipe' })).toBeVisible()
   await expect(page.getByLabel('Empty pot · remembered')).toHaveValue('1100')
   await page.getByRole('button', { name: `More: Smoked tofu ${tag}` }).click()

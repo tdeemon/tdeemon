@@ -60,9 +60,17 @@ function listOf(foods: Food[]) {
   }
 }
 
-// markOf is the classes of a food's mark, the first thing in its row.
-function markOf(row: HTMLElement | undefined): string {
-  return row?.firstElementChild?.className ?? ''
+// shown is what a food's row shows the eye: its words but those for a
+// screen reader alone.
+function shown(row: HTMLElement | undefined): string {
+  const copy = row?.cloneNode(true)
+  if (!(copy instanceof HTMLElement)) {
+    return ''
+  }
+  for (const hidden of copy.querySelectorAll('.sr-only')) {
+    hidden.remove()
+  }
+  return copy.textContent
 }
 
 function asked(fetch: ReturnType<typeof fakeServer>, path: string): URL[] {
@@ -89,8 +97,11 @@ test('the foods in use are listed by name, a page at a time', async () => {
   const list = await screen.findByRole('list', { name: 'In use' })
   expect(within(list).getAllByRole('listitem')).toHaveLength(50)
   const first = within(list).getAllByRole('link')[0]
-  // Its initials, name and brand, macros, and kcal for its basis.
-  expect(first?.textContent).toBe('RORolled oats · MillP 13 · C 60 · F 7370 kcal/100 g')
+  // Its name and brand, and its kcal and protein for its basis: no
+  // initials, no bar of the macros.
+  expect(shown(first)).toBe('Rolled oats · Mill370 kcal · 13 g P /100 g')
+  expect(first?.textContent).toContain('370 kcal and 13 g of protein per 100 g')
+  expect(first?.querySelector('[style]')).toBeNull()
   expect(first?.getAttribute('href')).toBe(`/foods/${oats.id}?order=name`)
   expect(screen.getByText('50 of 53')).toBeDefined()
 
@@ -121,31 +132,16 @@ test('by how many meals had them, the foods eaten this week come first', async (
   renderAt('/foods')
 
   const week = await screen.findByRole('list', { name: 'In use: This week' })
-  expect(
-    within(week)
-      .getAllByRole('link')
-      .map((a) => a.textContent),
-  ).toEqual([
-    'RORolled oats · MillP 13 · C 60 · F 7370 kcal/100 g',
+  expect(within(week).getAllByRole('link').map(shown)).toEqual([
+    'Rolled oats · Mill370 kcal · 13 g P /100 g',
     // An estimate says so.
-    'GYGreek yoghurtestimateP 5 · C 10 · F 3102 kcal/100 g',
+    'Greek yoghurtestimate102 kcal · 5 g P /100 g',
   ])
   const earlier = screen.getByRole('list', { name: 'In use: Earlier' })
-  expect(
-    within(earlier)
-      .getAllByRole('link')
-      .map((a) => a.textContent),
-  ).toEqual([
-    // How long ago it was eaten, when not this week.
-    'BRBasmati riceP 5 · C 10 · F 3 · 7 days ago103 kcal/100 g',
-    'CSChia seedsP 5 · C 10 · F 3104 kcal/100 g',
+  expect(within(earlier).getAllByRole('link').map(shown)).toEqual([
+    'Basmati rice103 kcal · 5 g P /100 g',
+    'Chia seeds104 kcal · 5 g P /100 g',
   ])
-  // The mark of a food eaten this week is in colour, of the others grey.
-  expect(markOf(within(week).getAllByRole('link')[0])).toContain('bg-primary-soft')
-  for (const row of within(earlier).getAllByRole('link')) {
-    expect(markOf(row)).toContain('bg-surface-2')
-    expect(markOf(row)).not.toContain('bg-primary-soft')
-  }
   expect(screen.getByRole('heading', { name: 'This week' })).toBeDefined()
   expect(asked(fetch, '/api/v1/foods/list')[0]?.searchParams.get('order')).toBe('frequent')
   expect(screen.getByRole('button', { name: 'Order: Most eaten' })).toBeDefined()
@@ -169,17 +165,17 @@ test('the list chosen says how many foods it has, its order is a menu, in Croati
     'checked',
     true,
   )
-  // Short to the eye, whole to a screen reader.
-  const added = screen.getByRole('button', { name: 'Nova namirnica ili recept' })
-  expect(added.textContent).toBe('Nova')
+  // A food and a recipe, each a button of its own, which says what it adds.
+  expect(screen.getByRole('link', { name: 'Nova namirnica' }).getAttribute('href')).toBe(
+    '/foods/new',
+  )
+  expect(screen.getByRole('link', { name: 'Novi recept' }).getAttribute('href')).toBe(
+    '/foods/new-recipe',
+  )
   const earlier = screen.getByRole('list', { name: 'U upotrebi: Ranije' })
-  expect(within(earlier).getByRole('link', { name: /^Basmati riža/ }).textContent).toContain(
-    'M 3 · prije 9 dana',
-  )
-  // Past two weeks, in weeks.
-  expect(within(earlier).getByRole('link', { name: /^Ječmena kaša/ }).textContent).toContain(
-    'M 3 · prije 6 tjedana',
-  )
+  const rice = within(earlier).getByRole('link', { name: /^Basmati riža/ })
+  expect(shown(rice)).toBe('Basmati riža102 kcal · 5 g P /100 g')
+  expect(rice.textContent).toContain('102 kcal i 5 g proteina na 100 g')
 
   fireEvent.click(screen.getByRole('button', { name: 'Redoslijed: Najčešće' }))
   const menu = within(await screen.findByRole('menu'))
@@ -205,14 +201,16 @@ test('the archived foods, and the order of the last use, are in the address', as
       'No foods yet. They appear when your AI coach logs a meal, or add one here.',
     ),
   ).toBeDefined()
-  // The one action of an empty list: the header has none beside it.
+  // The one way to add a food of an empty list: the header has none
+  // beside it, but a recipe's.
   expect(screen.getByRole('link', { name: 'Add a food' }).getAttribute('href')).toBe('/foods/new')
-  expect(screen.queryByRole('button', { name: 'New food or recipe' })).toBeNull()
+  expect(screen.queryByRole('link', { name: 'New food' })).toBeNull()
+  expect(screen.getByRole('link', { name: 'New recipe' })).toBeDefined()
   fireEvent.click(screen.getByRole('radio', { name: 'Archive' }))
   expect(await screen.findByText('No archived foods.')).toBeDefined()
   // The archive's list adds none, and the header does.
   expect(screen.queryByRole('link', { name: 'Add a food' })).toBeNull()
-  expect(screen.getByRole('button', { name: 'New food or recipe' })).toBeDefined()
+  expect(screen.getByRole('link', { name: 'New food' })).toBeDefined()
   fireEvent.click(screen.getByRole('button', { name: 'Order: Most eaten' }))
   fireEvent.click(
     within(await screen.findByRole('menu')).getByRole('menuitemradio', {

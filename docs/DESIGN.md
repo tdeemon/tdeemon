@@ -223,11 +223,16 @@ corrects it, as a food's does; the save is one event (`recipe.save`)
 with the recipe whole before and after, and the new foods it brings are
 part of it, so undo takes it back whole, its food kept, archived, while
 a meal or another recipe has it. Tracking what is left of the pot is
-for later. The web app has the recipes as a list of the foods' own; a
+for later. The web app has the recipes as a list of the foods' own (a
+row of the foods says its kcal and protein for its basis, a recipe's
+for a portion, and is marked only as a recipe or an estimate; where
+the energy comes from, as a bar, is the food's page's alone); a
 recipe's page says a portion's energy, and whether the dish was weighed
 (≈ on its grams, and on what is per gram, when not, never on a portion
-or a share); its editor is a page, its ingredients found as Log a meal
-finds foods; "Cooked again" changes only the amounts, the weight (from
+or a share); its actions are "Log 1 portion" (the amount eaten last, as
+the verb's object in the language's case: "Upiši 1 porciju"), "Cook
+again" and an Edit icon; its editor is a page, its ingredients found
+as Log a meal finds foods; "Cook again" changes only the amounts, the weight (from
 the pot, the empty pot remembered) and the portions, the last weight
 never taken over. Log a meal finds a recipe as any food, marked, with a
 portion's energy; its amount is a portion (when divided), a share of

@@ -79,12 +79,12 @@ test('a household: invited, what joining does seen, joined, the kitchen shared, 
   await expect(members.getByText(miaEmail)).toBeVisible()
   await expect(members.getByText(leoEmail)).toBeVisible()
 
-  // Mia's drink is his too, and its page says a change is the household's.
+  // Mia's drink is his too, and its page's card says the household's
+  // members and that a change is every member's.
   await leo.goto('/foods')
   await leo.getByRole('link', { name: new RegExp(`Oat drink ${tag}`) }).click()
-  await expect(
-    leo.getByText('Your household shares this food: a change here is every member’s.'),
-  ).toBeVisible()
+  await expect(leo.getByRole('heading', { name: 'Household · Mia and you' })).toBeVisible()
+  await expect(leo.getByText('A change here is every member’s.')).toBeVisible()
 
   // He leaves, keeping it; Mia is in no household then.
   await leo.goto('/settings/household')

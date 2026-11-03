@@ -8,6 +8,7 @@ import {
 } from '@/components/recipes/share'
 import type { Messages } from '@/i18n/en'
 import type { useFormat } from '@/i18n/format'
+import type { Case } from '@/i18n/plural'
 import limits from '@/lib/limits.json'
 import { nameKey } from '@/lib/name-key'
 import { uuidv7 } from '@/lib/uuid'
@@ -537,13 +538,19 @@ export function servingsOf(n: string, servings: number, serving: string): string
 
 // lastAmountOf is how much of a food was eaten last, as it was given: "2
 // slice", "1.5 portions", "200 g", of a recipe "⅒ of the recipe" or "1
-// portion" (recipeQuantity); undefined for a food not eaten yet.
-export function lastAmountOf(food: Food, t: Messages, f: Format): string | undefined {
+// portion" (recipeQuantity); undefined for a food not eaten yet. In the
+// accusative, as a verb's object: Upiši 1 porciju.
+export function lastAmountOf(
+  food: Food,
+  t: Messages,
+  f: Format,
+  grammaticalCase: Case = 'nominative',
+): string | undefined {
   const last = food.last_use
   if (last === undefined) {
     return undefined
   }
-  const ofRecipe = recipeQuantity(food.source, last.quantity, t, f.number)
+  const ofRecipe = recipeQuantity(food.source, last.quantity, t, f.number, grammaticalCase)
   if (ofRecipe !== undefined) {
     return ofRecipe
   }
@@ -552,7 +559,7 @@ export function lastAmountOf(food: Food, t: Messages, f: Format): string | undef
     return servingsOf(f.number(servings, 2), servings, serving)
   }
   return last.unit === 'portion'
-    ? t.day.portions(f.number(last.amount, 2), last.amount)
+    ? t.recipes.portions(f.number(last.amount, 2), last.amount, grammaticalCase)
     : t.unit[last.unit](f.number(last.amount))
 }
 

@@ -102,14 +102,18 @@ fraction, ⅒ of the recipe, and its portions in the language's plural,
 wherever an item's amount is),
 the foods (their list by how often they are eaten, grouped by this
 week and earlier, in use, the recipes, archived or the estimates,
-searched within the list chosen, a recipe marked and its kcal a
-portion's, a new food or recipe a choice of a menu, and before a recipe
-what one is for; a recipe's page with a portion's energy, 100 g's and
+searched within the list chosen, a row its kcal and protein for its
+basis and no initials, marked only as a recipe or an estimate, a
+recipe's a portion's, a new food and a new recipe each a button, and
+before a recipe what one is for; a recipe's page with a portion's
+energy and its split, 100 g's and
 the whole dish's, whether it was weighed said plainly, ≈ on its grams
 alone, its ingredients as given, one whose food changed since marked
-with its new values a tap away, logged, cooked again in a sheet of only
+with its new values a tap away, logged (Log 1 portion, in the
+language's case), cooked again in a sheet of only
 its amounts, its weight from the pot whose empty weight is remembered
-and its portions, weighed in one, archived with Undo, and edited in a
+and its portions, weighed in one, archived with Undo, a household's
+card of its members, and edited (an icon beside them) in a
 page of its own, its ingredients found in a sheet as a meal's are, each
 in its unit, moved or removed, its weight, from the pot or "I can't
 weigh it", warned of when far off its raw ingredients', its portions
@@ -120,7 +124,9 @@ logged, logged again from its last amount, changed first, archived
 with Undo, and corrected in its own form, which warns when the kcal
 and the macros disagree and adds a barcode, scanned or typed, or takes
 one away;
-beside the list on a desktop), the progress (the phase's verdict as its
+beside the list on a desktop, each scrolled on its own, the page not,
+its title staying at the top and its cards in two columns), the
+progress (the phase's verdict as its
 hero, or until the TDEE is reliable calibration on its way to it, its
 counts against what it needs and about when a first comes; the weight,
 its goal drawn only near it, and the TDEE against intake, the space between them

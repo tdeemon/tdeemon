@@ -1,7 +1,7 @@
 import { Menu } from '@base-ui/react/menu'
 import { Link, useLocation, useNavigate, useSearch } from '@tanstack/react-router'
-import { Check, ChevronDown, CookingPot, Plus, Search, Utensils } from 'lucide-react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { Check, ChevronDown, CookingPot, Plus, Search } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
 import { $api } from '@/api/client'
 import { useFindFoods, useFindOfList, useFoodList, type FoodFilter } from '@/api/foods'
@@ -13,9 +13,10 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { ChipGroup } from '@/components/ui/chip-group'
 import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
+import { cn } from '@/lib/utils'
 import type { FoodsSearch } from '@/router'
 
-const filters = ['inUse', 'recipes', 'archived', 'estimates'] as const
+const filters = ['inUse', 'recipes', 'estimates', 'archived'] as const
 
 // The orders of the list, the first when the address names none.
 const orders = ['frequent', 'use', 'name'] as const
@@ -25,15 +26,17 @@ type Order = (typeof orders)[number]
 const card = 'divide-y overflow-hidden rounded-lg bg-card shadow-card'
 
 // FoodBrowser is the user's foods: a search of them, or a list (those in
-// use, the recipes, the archived ones, the estimates in use, as chips, the one chosen
-// with how many foods it has), by how many of the latest meals had them
-// (those eaten this week first), by when they were eaten last or by name
-// (a menu beside the chips), a page at a time; and a way to add one, or
-// a recipe (a menu of both, but in the recipes, which add a recipe). A
-// search is of the list chosen. What it shows is in the address (q,
-// filter, order), which a food opened from it keeps, so the list beside a
-// food, and back from it, is as it was.
-export function FoodBrowser() {
+// use, the recipes, the estimates in use, the archived ones, as chips,
+// the one chosen with how many foods it has), by how many of the latest
+// meals had them (those eaten this week first), by when they were eaten
+// last or by name (a menu beside the chips), a page at a time; and a way
+// to add a food or a recipe, each a button of its own (on a phone the
+// list's own: a recipe in the recipes, else a food). A search is of the
+// list chosen. What it shows is in the address (q, filter, order), which
+// a food opened from it keeps, so the list beside a food, and back from
+// it, is as it was. With detail (a desktop's), the list and the detail
+// are two panes under the title, each scrolled on its own, the page not.
+export function FoodBrowser({ detail }: { detail?: ReactNode }) {
   const t = useMessages()
   const f = useFormat()
   const id = useId()
@@ -78,24 +81,9 @@ export function FoodBrowser() {
   // request), a search of it too.
   const total = useFoodList(filter, order).data?.pages.at(-1)?.total
 
-  return (
-    <section aria-labelledby={`${id}-title`} className="min-w-0 space-y-3">
-      <header className="flex items-center justify-between gap-2">
-        <h1 id={`${id}-title`} className="mr-auto text-title">
-          {t.foods.title}
-        </h1>
-        {/* Without a food in use, the list's own button is the one way to
-            add one. */}
-        {filter === 'recipes'
-          ? total !== 0 && (
-              <Link to="/foods/new-recipe" search={from} className={buttonVariants({ size: 'sm' })}>
-                <Plus aria-hidden />
-                {t.recipes.new}
-              </Link>
-            )
-          : !(filter === 'inUse' && total === 0) && <NewMenu from={from} />}
-        <SettingsAvatar className="-my-1.5 -ml-1" />
-      </header>
+  // The search and the list chosen.
+  const list = (
+    <>
       <label className="flex h-12 items-center gap-2.5 rounded-lg border border-input bg-card px-3.5 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
         <Search aria-hidden className="size-4.5 shrink-0 text-muted-foreground" />
         <span className="sr-only">{t.foods.search}</span>
@@ -167,7 +155,98 @@ export function FoodBrowser() {
       ) : (
         <Listed filter={filter} order={order} from={from} />
       )}
+    </>
+  )
+
+  return (
+    <section
+      aria-labelledby={`${id}-title`}
+      className={
+        detail === undefined
+          ? 'min-w-0 space-y-3'
+          : // The page's height, but the main's top padding: its bottom's
+            // is the panes' own.
+            '-mb-12 flex h-[calc(100dvh-2rem)] min-w-0 flex-col'
+      }
+    >
+      <header
+        className={cn(
+          'flex items-center justify-between gap-2',
+          detail !== undefined && 'border-b pb-4',
+        )}
+      >
+        <h1 id={`${id}-title`} className="mr-auto text-title">
+          {t.foods.title}
+        </h1>
+        <NewButtons filter={filter} total={total} from={from} />
+        <SettingsAvatar className="-my-1.5 -ml-1" />
+      </header>
+      {detail === undefined ? (
+        list
+      ) : (
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,25rem)_minmax(0,1fr)]">
+          {/* Each pane its own scroll, which holds what is placed in it (a
+              screen reader's words); its focus rings clear of its edge. */}
+          <div className="relative min-h-0 space-y-3 overflow-y-auto border-r py-4 pr-5 pl-1">
+            {list}
+          </div>
+          <div className="@container relative min-h-0 overflow-y-auto pt-4 pb-6 pl-8">{detail}</div>
+        </div>
+      )}
     </section>
+  )
+}
+
+// NewButtons are the ways to add a food and a recipe, each a button of
+// its own; the list's own first, the other beside it from a tablet up (a
+// phone has it in its list). A list without foods has its own button,
+// the one way there to add one.
+function NewButtons({
+  filter,
+  total,
+  from,
+}: {
+  filter: FoodFilter
+  total: number | undefined
+  from: FoodsSearch
+}) {
+  const t = useMessages()
+  const recipes = filter === 'recipes'
+  const food = (
+    <Link
+      to="/foods/new"
+      search={from}
+      className={buttonVariants({
+        size: 'sm',
+        variant: recipes ? 'outline' : 'default',
+        className: recipes ? 'max-sm:hidden' : undefined,
+      })}
+    >
+      <Plus aria-hidden />
+      {t.foods.new}
+    </Link>
+  )
+  const recipe = (
+    <Link
+      to="/foods/new-recipe"
+      search={from}
+      className={buttonVariants({
+        size: 'sm',
+        variant: recipes ? 'default' : 'outline',
+        className: recipes ? undefined : 'max-sm:hidden',
+      })}
+    >
+      <Plus aria-hidden />
+      {t.recipes.new}
+    </Link>
+  )
+  const empty = total === 0 && (recipes || filter === 'inUse')
+  // The list's own last, nearest the hand.
+  return (
+    <>
+      {recipes ? food : recipe}
+      {!empty && (recipes ? recipe : food)}
+    </>
   )
 }
 
@@ -219,49 +298,6 @@ function OrderMenu({ order, onChange }: { order: Order; onChange: (order: Order)
   )
 }
 
-// NewMenu is the way to add a food or a recipe, as a menu whose button
-// is short to the eye and whole to a screen reader.
-function NewMenu({ from }: { from: FoodsSearch }) {
-  const t = useMessages()
-  const navigate = useNavigate()
-  const item =
-    'flex h-11 cursor-default items-center gap-2 rounded-md px-3 text-sm outline-none select-none data-highlighted:bg-muted'
-
-  return (
-    <Menu.Root>
-      <Menu.Trigger aria-label={t.recipes.newChoice} className={buttonVariants({ size: 'sm' })}>
-        <Plus aria-hidden />
-        {t.recipes.newShort}
-        <ChevronDown aria-hidden />
-      </Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Positioner sideOffset={6} align="end" className="z-40">
-          <Menu.Popup className="min-w-44 rounded-lg border bg-card p-1 shadow-sheet outline-none">
-            <Menu.Item
-              className={item}
-              onClick={() => {
-                void navigate({ to: '/foods/new', search: from })
-              }}
-            >
-              <Utensils aria-hidden className="size-4" />
-              {t.recipes.food}
-            </Menu.Item>
-            <Menu.Item
-              className={item}
-              onClick={() => {
-                void navigate({ to: '/foods/new-recipe', search: from })
-              }}
-            >
-              <CookingPot aria-hidden className="size-4" />
-              {t.recipes.recipe}
-            </Menu.Item>
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
-  )
-}
-
 // listName is a list's name, as its chip says it.
 function listName(filter: FoodFilter, t: ReturnType<typeof useMessages>): string {
   return filter === 'recipes' ? t.recipes.list : t.foods.filter[filter]
@@ -271,7 +307,6 @@ function listName(filter: FoodFilter, t: ReturnType<typeof useMessages>): string
 // those in use, all, their estimates or their recipes.
 function Found({ query, filter, from }: { query: string; filter: FoodFilter; from: FoodsSearch }) {
   const t = useMessages()
-  const today = $api.useQuery('get', '/api/v1/me').data?.today
   const own = filter === 'estimates' || filter === 'recipes' ? filter : undefined
   // The estimates and the recipes are searched in their own list: a
   // search of all the foods finds 50 at most, which may leave them out.
@@ -303,7 +338,7 @@ function Found({ query, filter, from }: { query: string; filter: FoodFilter; fro
   return (
     <ul aria-label={t.foods.found} className={card}>
       {foods.map((food) => (
-        <FoodRow key={food.id} food={food} from={from} today={today} />
+        <FoodRow key={food.id} food={food} from={from} />
       ))}
     </ul>
   )
@@ -371,7 +406,7 @@ function Listed({ filter, order, from }: { filter: FoodFilter; order: Order; fro
             className={card}
           >
             {group.foods.map((food) => (
-              <FoodRow key={food.id} food={food} from={from} today={today} />
+              <FoodRow key={food.id} food={food} from={from} />
             ))}
           </ul>
         </section>
@@ -464,8 +499,7 @@ function Skeleton() {
       <output className="sr-only">{t.loading}</output>
       <ul aria-hidden className={card}>
         {[0, 1, 2, 3, 4].map((i) => (
-          <li key={i} className="flex min-h-16 items-center gap-3 px-3 py-2.5 lg:px-4">
-            <span className="size-10 shrink-0 animate-pulse rounded-md bg-surface-2 motion-reduce:animate-none" />
+          <li key={i} className="flex min-h-14 items-center gap-3 px-4 py-2">
             <span className="flex-1 space-y-2">
               <span className="block h-3.5 w-2/3 animate-pulse rounded-sm bg-surface-2 motion-reduce:animate-none" />
               <span className="block h-2.5 w-1/2 animate-pulse rounded-sm bg-surface-2 motion-reduce:animate-none" />

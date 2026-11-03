@@ -1,4 +1,5 @@
 import type { Messages } from '@/i18n/en'
+import type { Case } from '@/i18n/plural'
 
 // The servings of a recipe's food, by their names (package recipe): the
 // whole dish, and one of its portions when it is divided.
@@ -97,12 +98,14 @@ export function shareField(x: number, field: (n: number, digits?: number) => str
 // say it: a share of the whole dish ("⅒ of the recipe", or "2 recipes"
 // whole), or portions ("2 portions", in the language's plural); undefined
 // for another food's serving, or another quantity. The share and the
-// portions are exact, whether the dish was weighed or not.
+// portions are exact, whether the dish was weighed or not. In the
+// accusative, a verb's object: Upiši 1 porciju.
 export function recipeQuantity(
   source: string | undefined,
   quantity: { servings?: number | undefined; serving?: string | undefined },
   t: Messages,
   number: (n: number, digits?: number) => string,
+  grammaticalCase: Case = 'nominative',
 ): string | undefined {
   const { servings, serving } = quantity
   if (source !== 'recipe' || servings === undefined) {
@@ -116,7 +119,7 @@ export function recipeQuantity(
   if (serving === portionServing) {
     // The word's form follows the number shown: 0.999 is "1 portion".
     const shown = Math.round(servings * 100) / 100
-    return t.recipes.portions(number(shown, 2), shown)
+    return t.recipes.portions(number(shown, 2), shown, grammaticalCase)
   }
   return undefined
 }

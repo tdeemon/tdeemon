@@ -9,8 +9,8 @@ test('a food is made, logged, found, corrected, archived and brought back', asyn
     .getByRole('link', { name: 'Foods' })
     .click()
 
-  await page.getByRole('button', { name: 'New food or recipe' }).click()
-  await page.getByRole('menuitem', { name: 'Food' }).click()
+  // The header's, or an empty list's own.
+  await page.getByRole('link', { name: /^(New food|Add a food)$/ }).click()
   await page.getByLabel('Name', { exact: true }).fill('Buckwheat')
   // A slip of the energy, which the macros tell, and their energy taken.
   await page.getByLabel('Energy (kcal)').fill('34')
@@ -98,4 +98,57 @@ test("a food's servings of long names fit a phone's width", async ({ page }) => 
   await page.getByText('half a loaf of rye bread (250 g)', { exact: true }).click()
   await expect(half).toBeChecked()
   await expect(page.getByRole('cell', { name: '625 kcal' })).toBeVisible()
+})
+
+test("a desktop's foods and food scroll on their own, the food's end in reach and its title in view", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await signIn(page)
+  const tag = String(Date.now())
+  // A recipe of many ingredients, taller than the screen.
+  const made = await Promise.all(
+    Array.from({ length: 14 }, (_, i) =>
+      page.request.post('/api/v1/foods', {
+        data: {
+          name: `Ingredient ${String(i)} ${tag}`,
+          basis: '100g',
+          source: 'label',
+          nutrients: { kcal: 100 + i, protein: 5, carbs: 10, fat: 3 },
+        },
+      }),
+    ),
+  )
+  const ids = await Promise.all(
+    made.map(async (answer) => {
+      const body: unknown = await answer.json()
+      return typeof body === 'object' && body !== null && 'id' in body ? String(body.id) : ''
+    }),
+  )
+  const answer = await page.request.post('/api/v1/recipes/new', {
+    data: {
+      name: `Stew ${tag}`,
+      items: ids.map((id) => ({ food_id: id, amount: 100, unit: 'g' })),
+      yield_g: 1200,
+      portions: 4,
+    },
+  })
+  const saved: unknown = await answer.json()
+  const food =
+    typeof saved === 'object' && saved !== null && 'food' in saved ? saved.food : undefined
+  const id = typeof food === 'object' && food !== null && 'id' in food ? String(food.id) : ''
+  await page.goto(`/foods/${id}`)
+  const title = page.getByRole('heading', { name: `Stew ${tag}`, level: 1 })
+  await expect(title).toBeVisible()
+
+  // The page itself does not scroll: each pane does.
+  const height = await page.evaluate<number>('document.documentElement.scrollHeight')
+  expect(height).toBeLessThanOrEqual(900)
+  const end = page.getByText('Values from')
+  await end.scrollIntoViewIfNeeded()
+  await expect(end).toBeInViewport()
+  // The title stays at the top of its pane.
+  await expect(title).toBeInViewport()
+  // The list beside it, its search at the top of its own pane.
+  await expect(page.getByLabel('Search the foods')).toBeInViewport()
 })
