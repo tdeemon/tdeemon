@@ -1542,8 +1542,8 @@ the first spec.
     takes back that change only (`last`, §5); a delete asks nothing first,
     and its toast stays 10 s, as one that warns, 6 s the others; none goes
     while the pointer or the focus is on the toasts, or a finger touched
-    them last. After the toast, the recent changes (a sheet from the day's
-    header and from the settings) list the latest changes, made by the
+    them last. After the toast, the recent changes (a sheet from the
+    settings, and from an undo's toast) list the latest changes, made by the
     user, their AI coach or a device, each said as its toast said it, with
     Undo on the one undo takes back next. The toasts are over a sheet too,
     so a change made in one is taken back there, and clear of its buttons,
@@ -1559,18 +1559,28 @@ the first spec.
     own, in the search's place, with Add to meal alone. The quick add's
     search takes the focus as it opens, but on a touch screen (`pointer:
     coarse`), whose keyboard would cover what it lists, only when tapped.
+  - The day's header is one row at every width: ‹ its title › (Today,
+    its date under it, or another day's date), a Today pill back to
+    today on another day, and the user's mark, to the settings, where a
+    phone has them. The day's type is a small picker in the hero, and
+    the history of changes is the settings' and an undo's toast's.
   - The day judges nothing it shows (§8: logging is never judged; the
-    plan works on the week's average). It has what was eaten against
-    its target in a ring and the macros' bars, beside the TDEE and what
-    is left of it after what was eaten, live through the day (a day
-    before: how far under or over it); until there is a TDEE, in its
-    place, calibration's counts against what it needs and about when a
-    first comes (§7). Within 5 % of the kcal target
+    plan works on the week's average). Its hero has what is left of its
+    target in a ring, the one number of what is left on the screen, and
+    beside it what was eaten, the target and its arithmetic ("Target
+    2,150 = TDEE 2,679 − 529 deficit", or + a surplus), the TDEE a link
+    to the progress; until there is a TDEE, in its place, calibration's
+    counts against what it needs and about when a first comes (§7); the
+    day's type and the phase under it; and the macros' bars. Under the
+    hero, by the time of day: the morning's weigh-in, a proposal that
+    waits (at any hour, in the coach's colour: "Claude proposes 2 plan
+    changes", what they are and when it expires), or in the evening how
+    the week ends if today ends there. Within 5 % of the kcal target
     either way, and 100 kcal at least, a day is on it, in the brand's
-    colour; past that, the ring, and the week's mini rings and bars
-    above the target's line, run on in a warm neutral (`--over`),
-    thinner, so it shows without the colour too, with the words "+180
-    over target": red is for errors and deletes. Protein's target is a
+    colour; past that, the ring, and the week's columns above the
+    target's tick, run on in a warm neutral (`--over`), thinner, so it
+    shows without the colour too, with the words "+180 over target": red
+    is for errors and deletes. Protein's target is a
     floor, said reached; carbs and fat past theirs say only how far. A
     day before over its target says it in a sentence beside its TDEE
     ("680 over target, still 500 under TDEE"). The plan says the deficit
@@ -1579,8 +1589,10 @@ the first spec.
     the deficit and the verdict are each an ⓘ (`InfoTip`) away from what
     they are, in two or three plain sentences drawn from §7.
   - The day's week is the calendar week, Monday to Sunday, as the
-    progress's weeks are: its days, each what it ate against its
-    target, and a line of their average over the days logged, as
+    progress's weeks are: its days as columns at every width, each as
+    high as what it ate (so a day before any target shows too), its
+    target a tick across and today outlined, and a line of their
+    average over the days logged, as
     calibration counts them (a day without a meal, one left out, and
     today while it is open are not), against their target ("This week:
     average 1,905 of 2,079 · 174 under a day · 5 days logged"). The
@@ -1588,17 +1600,23 @@ the first spec.
     left, today's among them, can eat on average and keep the week on
     its target, by the plan's targets of the days to come; below the
     plan's kcal floor, the day's target is said instead. A phone has
-    the week above the day. A desktop has the day in 8 of 12 columns,
-    the hero's numbers side by side and the meals a table of their kcal
-    and macros with the day's total, and beside it the week as bars with
-    the target and the average, the body, the check-in and the phase.
+    the week under the hero, both on its first screen at 390 px, then
+    the meals, the body and the check-in, a row that opens. A desktop
+    has the day in 8 of 12 columns, the macros beside the ring and the
+    meals a table of their kcal and macros with the day's total, and
+    beside it the week, the body and the check-in, open. A check-in's
+    scale is five steps, each a number named with its word, the step
+    chosen said under it in a word. A body's tile without a value is a
+    dash, said in words ("none yet today"); the chips that add to today
+    in a tap are under the meals, their row fading at a phone's edge.
+    A day that does not come keeps its header and its week.
   - A new user's first steps take the place of the day's hero until
     there is a plan, or a proposal of one: a card of four, each ticked
     once done (the profile; a first weigh-in, in the card; an AI coach
     or a phone that called with its access key; a first meal), and,
     once the first three are, what to ask the AI coach for a plan, to
     copy. Put off for later, in the browser, the plan's page brings it
-    back. Until the user has measured anything, the check-in is a line
+    back. Until the user has measured anything, the check-in is a row
     that asks how the day was, and the body has no empty tiles, only the
     way to a first weigh-in. A day before the plan's first target says
     when the plan starts, not to set one up.
@@ -1606,7 +1624,7 @@ the first spec.
     measurement (the weight in a field in its place, hinting with the
     day before's; the others in the measurements' sheet, at their own),
     the quick add has a Weigh-in chip, and in the morning, while today
-    has none, the hero asks for it in a line, unless the day before's
+    has none, a card under the hero asks for it, unless the day before's
     came from a device (a smart scale's user is not asked).
   - Connecting an AI coach or a phone is a guided sheet: what it is,
     its access key (an API token; the web never says "token") with the

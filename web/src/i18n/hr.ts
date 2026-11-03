@@ -171,11 +171,6 @@ export const hr: Messages = {
       title: 'Trend kilaže',
       text: 'Trend kilaže je kilaža bez dnevnih skokova vode i soli. Svako ga vaganje pomakne za desetinu razlike, pa prati smjer, a ne pojedini dan. Za vagom kasni oko 9 dana.',
     },
-    left: {
-      label: 'Što je do TDEE-a',
-      title: 'Do TDEE-a',
-      text: 'TDEE manje ono što je pojedeno tog dana: koliko još možeš pojesti, a da ne uneseš više nego što trošiš. Iznad toga dan je u suficitu. Plan gleda tjedni prosjek, pa jedan dan preko malo mijenja.',
-    },
     deficit: {
       label: 'Što je planirani deficit',
       title: 'Planirani deficit',
@@ -192,6 +187,7 @@ export const hr: Messages = {
     previous: 'Dan prije',
     next: 'Dan poslije',
     toToday: 'Natrag na danas',
+    todayPill: 'Danas',
     morning: {
       title: 'Jutarnji sažetak',
       open: 'Jutarnji sažetak',
@@ -215,9 +211,12 @@ export const hr: Messages = {
       ringUnder: (kcal: string) => `${kcal} ispod cilja`,
       target: 'Cilj',
       tdee: 'TDEE',
-      leftToTdee: 'Do TDEE-a',
-      underTdee: 'Ispod TDEE-a',
-      overTdee: 'Iznad TDEE-a',
+      equation: {
+        target: (kcal: string) => `Cilj ${kcal}`,
+        tdee: (kcal: string) => `TDEE ${kcal}`,
+        deficit: (kcal: string) => `− ${kcal} deficit`,
+        surplus: (kcal: string) => `+ ${kcal} suficit`,
+      },
       overUnderTdee: (over: string, under: string) =>
         `${over} iznad cilja, i dalje ${under} ispod TDEE-a.`,
       overOverTdee: (over: string, tdee: string) => `${over} iznad cilja i ${tdee} iznad TDEE-a.`,
@@ -242,6 +241,7 @@ export const hr: Messages = {
       label: 'Tjedan',
       day: (date: string, said: string) => `${date}: ${said}`,
       eatenOf: (eaten: string, target: string) => `${eaten} od ${target} kcal`,
+      eatenOver: (eaten: string, target: string) => `${eaten} od ${target} kcal, iznad cilja`,
       eaten: (eaten: string) => `${eaten} kcal`,
       nothing: 'ništa upisano',
       toCome: 'tek dolazi',
@@ -267,7 +267,15 @@ export const hr: Messages = {
       keep: (kcal: string) => `Tjedan je ${kcal} iznad cilja. Do nedjelje se drži dnevnog cilja.`,
       keepToday: (kcal: string) => `Tjedan je ${kcal} iznad cilja. Danas se drži dnevnog cilja.`,
       legendTarget: 'cilj',
-      legendAverage: 'prosjek',
+      legendToday: 'danas',
+    },
+    ending: {
+      title: 'Kako dan završava',
+      under: (kcal: string, under: string) =>
+        `Ako ovdje staneš, tjedan je u prosjeku ${kcal} na dan, ${under} ispod cilja.`,
+      over: (kcal: string, over: string) =>
+        `Ako ovdje staneš, tjedan je u prosjeku ${kcal} na dan, ${over} iznad cilja.`,
+      on: (kcal: string) => `Ako ovdje staneš, tjedan je u prosjeku ${kcal} na dan, na cilju.`,
     },
     columns: { time: 'Vrijeme', meal: 'Obrok', kcal: 'kcal', total: 'Zbroj' },
     phase: 'Faza',
@@ -300,6 +308,13 @@ export const hr: Messages = {
     checkInAsk: 'Kako je bilo danas?',
     checkInAdd: 'Dodaj',
     checkInAddOf: 'Dodaj check-in',
+    checkInHint: 'Osjećaj, glad, napomena · ulazi u kalibraciju',
+    checkInChange: 'Promijeni',
+    checkInChangeOf: 'Promijeni check-in',
+    said: (what: string, word: string) => `${what}: ${word}`,
+    withNote: 'napomena',
+    scaleChosen: (n: number, word: string) => `${String(n)} · ${word}`,
+    scaleEnds: (low: string, high: string) => `1 ${low} · 5 ${high}`,
     savedAsYouGo: 'sprema se sam',
     addNote: 'Dodaj napomenu',
     mood: 'Osjećaj',
@@ -321,6 +336,8 @@ export const hr: Messages = {
       all: 'Sva mjerenja',
       trend: (kg: string) => `trend ${kg} kg`,
       none: '—',
+      noneToday: 'još nema danas',
+      noneThatDay: 'nema tog dana',
       addWeight: 'Dodaj vaganje',
     },
     weighIn: {
@@ -1541,9 +1558,12 @@ export const hr: Messages = {
     },
     byUser: 'ti',
     nudge: {
-      coach: (what: string) => `AI trener predlaže: ${what}`,
-      yours: (what: string) => `Promjena čeka tvoj odgovor: ${what}`,
-      review: 'Pogledaj',
+      coach: 'Tvoj AI trener',
+      autopilot: 'Autopilot',
+      proposes: (who: string, n: number) =>
+        `${who} predlaže ${String(n)} ${plural('hr', n, { one: 'promjenu', few: 'promjene', other: 'promjena' })} plana`,
+      yours: (n: number) =>
+        `Čeka tvoj odgovor: ${String(n)} ${plural('hr', n, { one: 'promjena', few: 'promjene', other: 'promjena' })} plana`,
     },
     edit: {
       phase: 'Uredi fazu',
@@ -1743,7 +1763,6 @@ export const hr: Messages = {
       `Na autopilotu bi se ovaj korak primijenio sam, ali odstupanje bi bilo ${drift} kcal, preko tvoje granice. Prihvaćen postaje dogovoreni cilj, a odstupanje kreće od 0.`,
     line: (what: string) => `Autopilot: ${what}`,
     why: 'Zašto',
-    nudge: (what: string) => `Autopilot predlaže: ${what}`,
     say: {
       lowered: (kcal: string) => `Spustio je cilj za ${kcal} kcal dnevno`,
       raised: (kcal: string) => `Podigao je cilj za ${kcal} kcal dnevno`,

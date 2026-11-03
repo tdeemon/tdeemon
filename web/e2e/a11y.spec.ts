@@ -210,10 +210,26 @@ const screens: Screen[] = [
       await settled(page)
     },
   },
+  // A phone's check-in, a row, opened.
+  {
+    name: 'check-in',
+    open: async (page) => {
+      await page.goto('/')
+      await settled(page)
+      const row = page.getByRole('button', {
+        name: /^(Add a check-in|Change the check-in|Dodaj check-in|Promijeni check-in)$/,
+      })
+      if ((await row.count()) > 0) {
+        await row.click()
+      }
+      await expect(page.getByRole('group', { name: /^(Mood|Osjećaj)$/ })).toBeVisible()
+      await settled(page)
+    },
+  },
   {
     name: 'changes',
     open: async (page) => {
-      await page.goto('/')
+      await page.goto('/settings')
       await settled(page)
       await page.getByRole('button', { name: /^(Recent changes|Zadnje promjene)$/ }).click()
       await expect(page.getByRole('dialog').getByRole('listitem').first()).toBeVisible()

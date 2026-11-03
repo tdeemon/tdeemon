@@ -20,9 +20,9 @@ import { cn } from '@/lib/utils'
 // BodyToday is what the day measured at a glance, in four tiles: the
 // weight (and the trend calibration smooths it to: today's, the
 // summary's; of a day before, the one it had then, from the history of
-// its week, which the week strip has asked for), the night's sleep, the
-// steps and the resting heart rate, each a dash while the day has none.
-// A tile is a tap from changing its measurement: the weight in a field in
+// its week, which the week has asked for), the night's sleep, the steps
+// and the resting heart rate, each a dash while the day has none, and
+// that in words (none yet today). A tile is a tap from changing its measurement: the weight in a field in
 // its place, hinting with the day before's, and the others in the sheet
 // of all the measurements, open at theirs. All of them, to correct,
 // delete or add, are a sheet away too. A day to come takes none (canLog).
@@ -133,6 +133,7 @@ export function BodyToday({
                 label={t.day.metric[tile.kind]}
                 value={tile.value}
                 note={tile.note}
+                none={date === today ? t.day.body.noneToday : t.day.body.noneThatDay}
                 buttonRef={tile.kind === 'weight' ? opener : undefined}
                 onOpen={
                   canLog
@@ -190,19 +191,21 @@ export function BodyToday({
 
 const tileClass = 'block h-full w-full space-y-0.5 rounded-md bg-surface-2 p-3 text-left'
 
-// Tile is a measurement of the day's in short: its name, its value or a
-// dash, and a note under it (the trend). With onOpen, a button that opens
-// its change.
+// Tile is a measurement of the day's in short: its name, its value, and a
+// note under it (the trend); without a value, a dash to the eye and what
+// it means in words (none). With onOpen, a button that opens its change.
 function Tile({
   label,
   value,
   note,
+  none,
   buttonRef,
   onOpen,
 }: {
   label: string
   value: string | undefined
   note: string | undefined
+  none: string
   buttonRef: Ref<HTMLButtonElement> | undefined
   onOpen: (() => void) | undefined
 }) {
@@ -210,7 +213,16 @@ function Tile({
   const content = (
     <>
       <span className="block text-caption text-muted-foreground">{label}</span>
-      <span className="block text-h2">{value ?? t.day.body.none}</span>
+      {value === undefined ? (
+        <>
+          <span aria-hidden className="block text-h2">
+            {t.day.body.none}
+          </span>
+          <span className="block text-caption text-muted-foreground">{none}</span>
+        </>
+      ) : (
+        <span className="block text-h2">{value}</span>
+      )}
       {note !== undefined && <span className="block text-caption text-success">{note}</span>}
     </>
   )

@@ -43,10 +43,11 @@ test('a proposed change is accepted in the app, and taken back from its history'
 }) => {
   await signIn(page)
   const rationale = await propose(page)
-  // The day says it waits, and so does the plan's section.
+  // The day says it waits, in the coach's colour, and so does the plan's
+  // section.
   await page.reload()
   await expect(
-    page.getByRole('link', { name: /^Your AI coach suggests: new target/ }),
+    page.getByRole('link', { name: /^Claude proposes 1 plan change New target/ }),
   ).toBeVisible()
   const plan = page
     .getByRole('navigation', { name: 'Sections' })

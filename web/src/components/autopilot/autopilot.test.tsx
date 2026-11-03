@@ -251,7 +251,7 @@ test("today says this morning's step in a line to the plan, and nothing on anoth
   expect(screen.queryByRole('link', { name: /^Autopilot: / })).toBeNull()
 })
 
-test('today says a hold plainly, and a proposal of its own as the autopilot suggests it', async () => {
+test('today says a hold plainly, and a proposal of its own as the autopilot proposes it', async () => {
   serve(cut, {
     ...onAutopilot,
     last: review({ outcome: 'hold', reason: 'on_target', step_kcal: 0 }),
@@ -271,9 +271,9 @@ test('today says a hold plainly, and a proposal of its own as the autopilot sugg
     { ...onAutopilot, last: review({ outcome: 'proposed' }) },
   )
   renderAt('/')
-  const nudge = await screen.findByRole('link', { name: /^The autopilot suggests: / })
-  expect(nudge.textContent).toBe(
-    'The autopilot suggests: training days 2,350 → 2,250 kcal, rest days 2,050 → 1,950 kcalReview',
+  const nudge = await screen.findByRole('link', { name: /^The autopilot proposes 1 plan change / })
+  expect(nudge.textContent).toMatch(
+    /^The autopilot proposes 1 plan change Training days 2,350 → 2,250 kcal, rest days 2,050 → 1,950 kcal · expires in \d+ days?$/,
   )
   expect(screen.queryByRole('link', { name: /^Autopilot: / })).toBeNull()
 })

@@ -7,6 +7,7 @@ import {
   plannedTarget,
   weekAverage,
   weekDates,
+  weekEnding,
   weekOf,
 } from '@/components/day/week'
 import { planBody } from '@/test/plan'
@@ -145,4 +146,26 @@ test('a day to come has the target of its weekday, of the targets in force then'
 test("the week's floor is the higher of the plan's kcal floors", () => {
   expect(floorOf(plan)).toBe(1500)
   expect(floorOf(undefined)).toBe(0)
+})
+
+// If today ends with what it ate, it counts as a day over: with the days
+// counted so far, against their targets; an open day's meals so far
+// counted with them. With none eaten, or left out, today is not.
+test('the week as it ends if today ends here counts today with the days before', () => {
+  const days = [
+    dayOf('2026-10-19', 1850),
+    dayOf('2026-10-20', 1960),
+    dayOf('2026-10-21', undefined),
+    dayOf('2026-10-23', 900, { status: 'open' }),
+  ]
+  expect(weekEnding(days, '2026-10-23', 1500, 2079)).toEqual({
+    days: 3,
+    kcal: 1770,
+    target: 2079,
+  })
+  expect(weekEnding(days, '2026-10-23', 0, 2079)).toEqual({ days: 2, kcal: 1905, target: 2079 })
+  const out = [...days.slice(0, 3), dayOf('2026-10-23', 900, { status: 'excluded' })]
+  expect(weekEnding(out, '2026-10-23', 1500, 2079)).toEqual({ days: 2, kcal: 1905, target: 2079 })
+  // Today's target unknown: the average alone.
+  expect(weekEnding(days, '2026-10-23', 1500, undefined)).toEqual({ days: 3, kcal: 1770 })
 })

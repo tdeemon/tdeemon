@@ -431,8 +431,9 @@ test('an invite come since the household was kept is on the day as it shows, not
   await waitFor(() => {
     expect(release).toBeDefined()
   })
-  // The day and all else above its meals came; the household not yet.
-  expect(await screen.findByRole('button', { name: /^Type of day: / })).toBeDefined()
+  // The day and all else above its meals came; the household not yet:
+  // the day waits in its skeleton.
+  expect(await screen.findByText('Loading…')).toBeDefined()
   await new Promise((resolve) => setTimeout(resolve, 50))
   expect(screen.queryByRole('region', { name: 'Meals' })).toBeNull()
   release?.()

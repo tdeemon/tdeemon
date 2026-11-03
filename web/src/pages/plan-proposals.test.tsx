@@ -1003,15 +1003,43 @@ test('a proposal that waits marks the plan in the sections, and none does not', 
   expect(plan.getAttribute('aria-describedby')).toBeNull()
 })
 
-test('today says that a proposal waits, its gist, and leads to it', async () => {
+test('today says who proposes how many changes, what they are, and leads to them', async () => {
   planPage({ targets: [splitTarget], training_weekdays: ['monday'], pending: fewerOnRest })
   const router = renderAt('/')
-  const line = await screen.findByRole('link', { name: /^Your AI coach suggests/ })
-  expect(line.textContent).toBe('Your AI coach suggests: rest days 1,950 → 1,850 kcalReview')
+  const line = await screen.findByRole('link', { name: /^Claude proposes 1 plan change / })
+  expect(line.textContent).toMatch(
+    /^Claude proposes 1 plan change Rest days 1,950 → 1,850 kcal · expires in \d+ days?$/,
+  )
+  // In the coach's colour, as what an AI coach did.
+  expect(line.className).toContain('bg-coach-soft')
   fireEvent.click(line)
   await waitFor(() => {
     expect(router.state.location.pathname).toBe('/plan')
   })
+})
+
+// In Croatian the count takes its case: predlaže 1 promjenu, 2 promjene,
+// 5 promjena.
+test("in Croatian today's banner counts the changes in their case", async () => {
+  const two: Proposal = {
+    ...fewerOnRest,
+    changes: {
+      ...fewerOnRest.changes,
+      training_weekdays: { before: ['monday'], after: ['monday', 'thursday'] },
+    },
+  }
+  fakeServer({
+    ...signedIn('hr'),
+    'GET /api/v1/plan': () =>
+      Response.json(
+        planBody({ targets: [splitTarget], training_weekdays: ['monday'], pending: two }),
+      ),
+  })
+  renderAt('/')
+  const line = await screen.findByRole('link', { name: /^Claude predlaže 2 promjene plana / })
+  expect(line.textContent).toMatch(
+    /^Claude predlaže 2 promjene plana Dani odmora .* · Dani treninga: /,
+  )
 })
 
 test('in Croatian the proposal says who made it, when, and how long it waits', async () => {

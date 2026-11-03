@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import { createMemoryHistory } from '@tanstack/react-router'
-import { act, render } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { vi } from 'vitest'
 
 import type { components } from '@/api/schema'
@@ -132,4 +132,17 @@ export const signedOut: Record<string, Handler> = {
       password: true,
       oidc: { name: 'Authentik', login_url: '/api/v1/auth/oidc/login' },
     }),
+}
+
+// openCheckIn opens a phone's check-in, a row until it is opened, once
+// it shows, and returns it.
+export async function openCheckIn(): Promise<HTMLElement> {
+  const region = await screen.findByRole('region', { name: 'Check-in' })
+  const open = within(region).queryByRole('button', {
+    name: /^(Add|Change) the check-in$|^Add a check-in$/,
+  })
+  if (open !== null) {
+    fireEvent.click(open)
+  }
+  return screen.getByRole('region', { name: 'Check-in' })
 }

@@ -38,7 +38,7 @@ test('the day shows what was logged, and the days before it', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
 })
 
-test("another day's date is on a line between the arrows, the way back to today under it", async ({
+test("another day's header is one row: ‹ its date ›, the Today pill and the user's mark", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -48,28 +48,50 @@ test("another day's date is on a line between the arrows, the way back to today 
   const date = page.getByRole('heading', { level: 1 })
   const back = page.getByRole('link', { name: 'Back to today' })
   await expect(back).toBeVisible()
-  const [before, title, after, pill, week] = await Promise.all([
-    page.getByRole('link', { name: 'The day before' }).boundingBox(),
-    date.boundingBox(),
-    page.getByRole('link', { name: 'The day after' }).boundingBox(),
-    back.boundingBox(),
-    page.getByRole('navigation', { name: 'The week' }).boundingBox(),
+  await expect(back).toHaveText('Today')
+  const [header, before, title, after, pill, mark] = await Promise.all([
+    boxOf(page.getByRole('main').locator('header').first()),
+    boxOf(page.getByRole('link', { name: 'The day before' })),
+    boxOf(date),
+    boxOf(page.getByRole('link', { name: 'The day after' })),
+    boxOf(back),
+    boxOf(page.getByRole('link', { name: 'Settings and account' })),
   ])
-  if (!before || !title || !after || !pill || !week) {
-    throw new Error('a part of the header is not shown')
-  }
-  // The date's text on one line.
-  const lines = await date.evaluate((h) => {
-    const range = document.createRange()
-    range.selectNodeContents(h)
-    return new Set(Array.from(range.getClientRects(), (r) => Math.round(r.top))).size
-  })
-  expect(lines).toBe(1)
-  // The arrows either side of it, the way back under it, above the week.
+  // One row, no higher than two lines of the date: the arrows either side
+  // of it, then the pill and the mark, each in it.
+  expect(header.height).toBeLessThanOrEqual(64)
   expect(before.x + before.width).toBeLessThanOrEqual(title.x)
   expect(after.x).toBeGreaterThanOrEqual(title.x + title.width)
-  expect(pill.y).toBeGreaterThan(title.y + title.height)
-  expect(pill.y + pill.height).toBeLessThanOrEqual(week.y)
+  expect(pill.x).toBeGreaterThanOrEqual(after.x + after.width)
+  expect(mark.x).toBeGreaterThanOrEqual(pill.x + pill.width)
+  for (const part of [before, title, after, pill, mark]) {
+    expect(part.y).toBeGreaterThanOrEqual(header.y - 1)
+    expect(part.y + part.height).toBeLessThanOrEqual(header.y + header.height + 1)
+  }
+  // Nothing of the history there: it is the settings' and the undo's.
+  await expect(page.getByRole('main').locator('header').first().getByRole('button')).toHaveCount(0)
+})
+
+test('at 390 px the hero and the week are on the first screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await signIn(page)
+  await withTarget(page)
+  await page.goto('/')
+  const [hero, week, bar] = await Promise.all([
+    boxOf(page.getByRole('region', { name: 'Energy and macros' })),
+    boxOf(page.getByRole('region', { name: /^This week$/ })),
+    boxOf(page.getByRole('navigation', { name: 'Sections' })),
+  ])
+  expect(week.y).toBeGreaterThan(hero.y + hero.height - 1)
+  // Above the bar at the bottom, without a scroll.
+  expect(week.y + week.height).toBeLessThanOrEqual(bar.y)
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  // The one number of what is left: the ring's; the target's arithmetic
+  // beside it.
+  await expect(page.getByText('Left to TDEE')).toHaveCount(0)
+  await expect(
+    page.getByRole('region', { name: 'Energy and macros' }).getByRole('link', { name: /^TDEE / }),
+  ).toBeVisible()
 })
 
 test("a meal's row gives its name the room, and its values stay with their labels", async ({
@@ -330,44 +352,44 @@ test("a phone's day is one column as before, today's Croatian date on one line",
     await withTarget(page)
     await page.goto('/')
 
-    // The date under "Danas", the user's mark beside the title and the
-    // day's type under the date: the date on a line of its own.
+    // The date under "Danas", on a line of its own, and the user's mark
+    // at the row's end; the day's type is the hero's.
     const title = page.getByRole('heading', { level: 1, name: 'Danas' })
     await expect(title).toBeVisible()
     const date = page.locator('header').filter({ has: title }).locator('p')
     expect(await linesOf(date)).toBe(1)
-    const [heading, when, type] = await Promise.all([
+    const [heading, when, type, hero] = await Promise.all([
       boxOf(title),
       boxOf(date),
       boxOf(page.getByRole('button', { name: /^Tip dana: / })),
+      boxOf(page.getByRole('region', { name: 'Energija i makroi' })),
     ])
     expect(when.y).toBeGreaterThanOrEqual(heading.y + heading.height - 1)
-    expect(type.y).toBeGreaterThanOrEqual(when.y + when.height - 1)
+    expect(type.y).toBeGreaterThan(hero.y)
+    expect(type.y + type.height).toBeLessThan(hero.y + hero.height)
     const mark = await boxOf(page.getByRole('link', { name: 'Postavke i račun' }))
-    expect(mark.y).toBeLessThan(when.y)
     expect(mark.x).toBeGreaterThan(heading.x + heading.width)
 
-    // The week above the day; then the day, its meals' cards, the
-    // check-in and the body, one under another, as wide.
-    const [week, summary, meals, checkIn, body] = await Promise.all([
-      boxOf(page.getByRole('navigation', { name: 'Tjedan' })),
+    // The day, then its week; its meals' cards, the body and the
+    // check-in, one under another, as wide.
+    const [summary, week, meals, body, checkIn] = await Promise.all([
       boxOf(page.getByRole('region', { name: 'Energija i makroi' })),
+      boxOf(page.getByRole('region', { name: 'Ovaj tjedan' })),
       boxOf(page.getByRole('region', { name: 'Obroci' })),
-      boxOf(page.getByRole('region', { name: 'Check-in' })),
       boxOf(page.getByRole('region', { name: 'Tijelo danas' })),
+      boxOf(page.getByRole('region', { name: 'Check-in' })),
     ])
-    expect(summary.y).toBeGreaterThan(week.y + week.height - 1)
-    expect(meals.y).toBeGreaterThan(summary.y + summary.height)
-    expect(checkIn.y).toBeGreaterThan(meals.y + meals.height)
-    expect(body.y).toBeGreaterThan(checkIn.y + checkIn.height)
-    for (const box of [summary, meals, checkIn, body]) {
+    expect(week.y).toBeGreaterThan(summary.y + summary.height - 1)
+    expect(meals.y).toBeGreaterThan(week.y + week.height)
+    expect(body.y).toBeGreaterThan(meals.y + meals.height)
+    expect(checkIn.y).toBeGreaterThan(body.y + body.height)
+    for (const box of [summary, week, meals, body, checkIn]) {
       expect(box.x).toBe(summary.x)
       expect(box.width).toBe(summary.width)
     }
     // Its meals are cards, with no table's heads nor total.
     await expect(page.getByRole('article').filter({ hasText: 'Kajgana' })).toBeVisible()
     await expect(page.getByText('Zbroj', { exact: true })).toHaveCount(0)
-    await expect(page.getByRole('region', { name: 'Ovaj tjedan' })).toHaveCount(0)
 
     // A week with a day logged says its average in a line under its
     // days, which opens them: a week long past, which the other tests
@@ -388,7 +410,13 @@ test("a phone's day is one column as before, today's Croatian date on one line",
       boxOf(page.getByRole('region', { name: 'Pojedeno' })),
     ])
     expect(said.y).toBeGreaterThan(days.y + days.height - 1)
-    expect(day.y).toBeGreaterThan(said.y + said.height - 1)
+    expect(days.y).toBeGreaterThan(day.y + day.height - 1)
+    // A day before the plan is a column of what it ate.
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Tjedan' })
+        .getByRole('link', { name: 'sri 19: 640 kcal' }),
+    ).toBeVisible()
     await line.click()
     const sheet = page.getByRole('dialog', { name: 'Taj tjedan' })
     await expect(sheet.getByRole('row', { name: /^sri 19/ })).toContainText('640')

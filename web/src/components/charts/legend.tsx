@@ -1,11 +1,11 @@
 import { cn } from '@/lib/utils'
 
-// A mark is how a series is drawn: a line, a dashed line, a band, dots or
-// bars. Its colour is a class of the token the series is drawn in: bg-…,
-// or border-… of a dashed line.
+// A mark is how a series is drawn: a line, a dashed line, a band, dots,
+// bars, or an outline around one. Its colour is a class of the token the
+// series is drawn in: bg-…, or border-… of a dashed line or an outline.
 export interface Mark {
   name: string
-  mark: 'line' | 'dashed' | 'band' | 'dot' | 'bar'
+  mark: 'line' | 'dashed' | 'band' | 'dot' | 'bar' | 'outline'
   color: string
 }
 
@@ -16,6 +16,7 @@ const shapes: Record<Mark['mark'], string> = {
   band: 'h-2.5 w-4 rounded-xs opacity-25',
   dot: 'size-2 rounded-full',
   bar: 'size-2 rounded-xs',
+  outline: 'size-2.5 rounded-xs border-2',
 }
 
 // Legend says what a chart's colours and marks mean, each with its name:

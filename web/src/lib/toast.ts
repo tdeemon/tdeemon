@@ -25,6 +25,9 @@ export interface Said {
   // A button of the toast's own, other than Undo: its words and what it
   // does.
   action?: { label: string; run: () => void } | undefined
+  // A way to the recent changes, after an undo: the history the day's
+  // header no longer has.
+  changes?: boolean | undefined
 }
 
 // toasts is the app's toast manager: what any code adds, the Toasts

@@ -1,26 +1,18 @@
-import { $api } from '@/api/client'
 import { Legend } from '@/components/charts/legend'
-import { weekAverage, weekDates, weekOf } from '@/components/day/week'
+import { weekDates } from '@/components/day/week'
+import { WeekBars } from '@/components/day/week-bars'
 import { WeekLine } from '@/components/day/week-line'
-import { WeekStrip } from '@/components/day/week-strip'
 import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
 
-// WeekCard is a desktop's week, beside the day: its days as bars of what
-// each ate, with its target a dashed tick, and the average of the days
-// logged a line across them (WeekStrip); then the week in a line, which
-// opens its days and what the days left can eat (WeekLine).
+// WeekCard is the day's week, at every width: its days as columns of what
+// each ate, its target a tick across them and today outlined (WeekBars),
+// what the marks mean, and the week in a line, which opens its days and
+// what the days left can eat (WeekLine). Under the hero on a phone, a
+// tablet's too; beside the day on a desktop.
 export function WeekCard({ date, today }: { date: string; today: string }) {
   const t = useMessages()
   const f = useFormat()
-  const query = weekOf(date, today)
-  const history = $api.useQuery(
-    'get',
-    '/api/v1/history',
-    { params: { query } },
-    { enabled: query.from <= query.to },
-  )
-  const average = history.data === undefined ? undefined : weekAverage(history.data.days).kcal
   const dates = weekDates(date)
   const w = t.day.week
 
@@ -34,13 +26,13 @@ export function WeekCard({ date, today }: { date: string; today: string }) {
           {w.span(f.short(dates[0] ?? date), f.short(dates[6] ?? date))}
         </span>
       </div>
-      <WeekStrip date={date} today={today} average={average} />
+      <WeekBars date={date} today={today} />
       <Legend
         marks={[
-          { name: w.legendTarget, mark: 'dashed', color: 'border-foreground/60' },
-          ...(average === undefined
-            ? []
-            : [{ name: w.legendAverage, mark: 'line' as const, color: 'bg-muted-foreground' }]),
+          { name: w.legendTarget, mark: 'line', color: 'bg-foreground/60' },
+          ...(dates.includes(today)
+            ? [{ name: w.legendToday, mark: 'outline' as const, color: 'border-foreground' }]
+            : []),
         ]}
       />
       <WeekLine date={date} today={today} />

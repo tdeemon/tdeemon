@@ -27,15 +27,18 @@ function Arc({ share, width, className }: { share: number; width: number; classN
 
 // The middle's number fits within the ring: smaller the more characters
 // it has (+1,210 is six), and never under 24 px, large text, as the
-// over colour keeps only 3:1.
+// over colour keeps only 3:1; a desktop's ring is larger, and so is it.
 function sizeOf(n: string): string {
   if (n.length <= 5) {
-    return 'text-[2.125rem] leading-[2.375rem]'
+    return 'text-[2.125rem] leading-[2.375rem] lg:text-[2.75rem] lg:leading-[3rem]'
   }
-  return n.length === 6 ? 'text-[1.75rem] leading-8' : 'text-2xl'
+  return n.length === 6
+    ? 'text-[1.75rem] leading-8 lg:text-[2.25rem] lg:leading-10'
+    : 'text-2xl lg:text-[1.875rem] lg:leading-9'
 }
 
-// EnergyRing is the day's energy against its target: the ring filled to
+// EnergyRing is the day's energy against its target, the one number of
+// what is left the day shows (132 px, 168 on a desktop): the ring filled to
 // what was eaten, its middle what is left (kcalLeft). Past the target by
 // more than the week takes in its stride (kcalStanding), the ring is
 // full in the brand's colour, a thinner arc in the over colour, a warm
@@ -85,7 +88,7 @@ export function EnergyRing({
   }
 
   return (
-    <div className="relative size-34 shrink-0">
+    <div className="relative size-33 shrink-0 lg:size-42">
       <p className="sr-only">{`${s.ring(f.number(eaten), f.number(target))}, ${said}`}</p>
       <svg aria-hidden viewBox="0 0 132 132" className="size-full -rotate-90">
         <circle
@@ -106,7 +109,7 @@ export function EnergyRing({
         <span className={cn('font-semibold tracking-tight', sizeOf(shown), over && 'text-over')}>
           {shown}
         </span>
-        <span className="text-caption text-muted-foreground">{words}</span>
+        <span className="text-caption text-muted-foreground lg:text-small">{words}</span>
       </div>
     </div>
   )

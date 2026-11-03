@@ -1,11 +1,24 @@
 import { focusManager } from '@tanstack/react-query'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 import { setLocale } from '@/i18n/locale'
 import { day, fakeServer, me, problem, renderAt, signedIn, today } from '@/test/app'
 import { dayServer } from '@/test/day-server'
 import { dayWithoutTarget, newUser, summaryOfNothing } from '@/test/new-user'
+
+// A desktop's window, where the check-in is open: a phone has it as a
+// row that opens, which the tests of the row say.
+function desktop() {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query === '(min-width: 64rem)',
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }))
+}
+
+beforeEach(desktop)
 
 afterEach(() => {
   cleanup()
@@ -419,8 +432,8 @@ test('until the app knows which day today is, a day an address names takes no mo
   renderAt('/?date=2026-10-21')
 
   // The day waits for it, in its skeleton: nothing of it to change yet.
-  expect(await screen.findByRole('button', { name: /^Type of day: / })).toBeDefined()
-  expect(screen.getByText('Loading…')).toBeDefined()
+  expect(await screen.findByText('Loading…')).toBeDefined()
+  expect(screen.queryByRole('button', { name: /^Type of day: / })).toBeNull()
   expect(screen.queryByRole('group', { name: 'Mood' })).toBeNull()
   expect(screen.queryByRole('button', { name: 'All measurements' })).toBeNull()
 
@@ -545,4 +558,53 @@ test('a user who measured before, or said something of the day, has the whole ch
   renderAt('/')
   expect(await screen.findByRole('group', { name: 'Hunger' })).toBeDefined()
   expect(screen.queryByText('How was today?')).toBeNull()
+})
+
+// A phone's check-in is a row: what was said of the day, or what it
+// takes, and a button that opens it, its heading taking the focus.
+test("a phone's check-in is a row of what was said, which opens", async () => {
+  vi.unstubAllGlobals()
+  fakeServer({
+    ...signedIn(),
+    ...dayServer(day({ mood: 4, hunger: 2, note: 'long walk' })).routes,
+  })
+  renderAt('/')
+
+  const row = await screen.findByRole('region', { name: 'Check-in' })
+  expect(within(row).getByText('Mood: good · Hunger: a bit hungry · a note')).toBeDefined()
+  expect(within(row).queryByRole('group', { name: 'Mood' })).toBeNull()
+  const open = within(row).getByRole('button', { name: 'Change the check-in' })
+  expect(open.textContent).toBe('Change')
+  fireEvent.click(open)
+  expect(document.activeElement).toBe(within(checkIn()).getByRole('heading', { name: 'Check-in' }))
+  expect(within(checkIn()).getByRole('group', { name: 'Mood' })).toBeDefined()
+  cleanup()
+
+  fakeServer({ ...signedIn(), ...dayServer().routes })
+  renderAt('/')
+  const said = await screen.findByRole('region', { name: 'Check-in' })
+  expect(within(said).getByText('Mood, hunger, a note · counts in calibration')).toBeDefined()
+  expect(within(said).getByRole('button', { name: 'Add a check-in' })).toBeDefined()
+})
+
+// A scale is five steps, each a number named with its word, and under
+// it the step chosen and its word; until one is, what its ends mean.
+test('a scale says the step chosen in a word under it, or what its ends mean', async () => {
+  const server = dayServer(day({ hunger: 2 }))
+  fakeServer({ ...signedIn(), ...server.routes })
+  renderAt('/')
+
+  const mood = await screen.findByRole('group', { name: 'Mood' })
+  expect(
+    within(mood)
+      .getAllByRole('button')
+      .map((b) => b.textContent),
+  ).toEqual(['1 bad', '2 low', '3 okay', '4 good', '5 great'])
+  expect(mood.nextElementSibling?.textContent).toBe('1 bad · 5 great')
+  const hunger = screen.getByRole('group', { name: 'Hunger' })
+  expect(hunger.nextElementSibling?.textContent).toBe('2 · a bit hungry')
+  fireEvent.click(within(mood).getByRole('button', { name: '3 okay' }))
+  await waitFor(() => {
+    expect(mood.nextElementSibling?.textContent).toBe('3 · okay')
+  })
 })

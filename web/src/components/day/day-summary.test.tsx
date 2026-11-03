@@ -111,9 +111,10 @@ async function summaryRegion() {
   return screen.findByRole('region', { name: 'Energy and macros' })
 }
 
-// termOf is the value of a term of the summary's list.
-function termOf(summary: HTMLElement, term: string): string | null {
-  return within(summary).getByText(term).nextElementSibling?.textContent ?? null
+// equationOf is the target's arithmetic, as it reads, once it shows.
+async function equationOf(summary: HTMLElement): Promise<string> {
+  const tdee = await within(summary).findByRole('link', { name: /^TDEE / })
+  return (tdee.parentElement?.textContent ?? '').trim()
 }
 
 // Within 5 % of the target, and 100 kcal at least, a day over it is on
@@ -163,19 +164,29 @@ test("a long number in the ring's middle is smaller, to fit within it", async ()
   expect(within(await summaryRegion()).getByText('1,120').className).toContain('text-[2.125rem]')
 })
 
-// The TDEE row is the same on a training day as on a rest day, of what
-// was eaten: its target, larger, changes nothing of it.
-test("what is left to the TDEE is of what was eaten, whatever the day's target", async () => {
+// The target's arithmetic: the TDEE less the planned deficit, or plus a
+// surplus, its TDEE a link to the progress; and only the ring says what
+// is left.
+test("the target's arithmetic is the TDEE less the deficit, or plus the surplus", async () => {
+  serve(eaten(1136), 2409)
+  renderAt('/')
+  let summary = await summaryRegion()
+  expect(await equationOf(summary)).toBe('Target 2,250 = TDEE 2,409 − 159 deficit')
+  expect(within(summary).getByRole('link', { name: 'TDEE 2,409' }).getAttribute('href')).toBe(
+    '/progress',
+  )
+  // What the TDEE leaves after what was eaten is no number of its own.
+  expect(within(summary).queryByText('Left to TDEE')).toBeNull()
+  expect(within(summary).queryByText('1,273')).toBeNull()
+  cleanup()
+
   serve(
     eaten(1136, { type: 'training', target: { kcal: 2800, protein: 160, carbs: 330, fat: 70 } }),
     2409,
   )
   renderAt('/')
-
-  const summary = await summaryRegion()
-  await waitFor(() => {
-    expect(termOf(summary, 'Left to TDEE')).toBe('1,273')
-  })
+  summary = await summaryRegion()
+  expect(await equationOf(summary)).toBe('Target 2,800 = TDEE 2,409 + 391 surplus')
 })
 
 // countsOf are calibration's counts in the summary, each as it reads.
@@ -207,7 +218,7 @@ test.each([
     'Weigh-ins30/6enough',
   ])
   expect(within(summary).getByText('First TDEE around Nov 2 if you keep this up.')).toBeDefined()
-  expect(within(summary).queryByText('Left to TDEE')).toBeNull()
+  expect(within(summary).queryByRole('link', { name: /^TDEE / })).toBeNull()
 })
 
 test("a day before says nothing of calibration now, nor a TDEE's day of one", async () => {
@@ -217,9 +228,7 @@ test("a day before says nothing of calibration now, nor a TDEE's day of one", as
   renderAt(`/?date=${before}`)
 
   const summary = await summaryRegion()
-  await waitFor(() => {
-    expect(termOf(summary, 'TDEE')).toBe('2,450')
-  })
+  expect(await equationOf(summary)).toBe('Target 2,250 = TDEE 2,450 − 200 deficit')
   expect(within(summary).queryByText('Calibration')).toBeNull()
 })
 
@@ -234,10 +243,7 @@ test('a day before under its target says how far under, not what is left', async
   expect(within(summary).getByText('under target')).toBeDefined()
   expect(within(summary).queryByText('kcal left')).toBeNull()
   // The TDEE it had then, from its week's history, not today's.
-  await waitFor(() => {
-    expect(termOf(summary, 'Under TDEE')).toBe('449')
-  })
-  expect(termOf(summary, 'TDEE')).toBe('2,450')
+  expect(await equationOf(summary)).toBe('Target 2,250 = TDEE 2,450 − 200 deficit')
 })
 
 test('a day before over its target says it in a sentence, beside its TDEE', async () => {
@@ -248,7 +254,7 @@ test('a day before over its target says it in a sentence, beside its TDEE', asyn
 
   const summary = await summaryRegion()
   expect(await within(summary).findByText('680 over target, still 500 under TDEE.')).toBeDefined()
-  expect(termOf(summary, 'Under TDEE')).toBe('500')
+  expect(within(summary).getByText('over target')).toBeDefined()
 })
 
 test('a day before over its target and its TDEE says both, and no number below 0', async () => {
@@ -259,7 +265,7 @@ test('a day before over its target and its TDEE says both, and no number below 0
 
   const summary = await summaryRegion()
   expect(await within(summary).findByText('680 over target and 200 over TDEE.')).toBeDefined()
-  expect(termOf(summary, 'Over TDEE')).toBe('200')
+  expect(within(summary).queryByText(/-\d/)).toBeNull()
 })
 
 // A day before on its target, or without a TDEE then, has no sentence.
@@ -271,9 +277,7 @@ test('a day before on its target, or with no TDEE then, says nothing more', asyn
 
   let summary = await summaryRegion()
   expect(within(summary).getByText('on target')).toBeDefined()
-  await waitFor(() => {
-    expect(termOf(summary, 'Under TDEE')).toBe('300')
-  })
+  expect(await equationOf(summary)).toBe('Target 2,250 = TDEE 2,600 − 350 deficit')
   expect(within(summary).queryByText(/over target/)).toBeNull()
   cleanup()
 
@@ -282,7 +286,7 @@ test('a day before on its target, or with no TDEE then, says nothing more', asyn
   summary = await summaryRegion()
   expect(within(summary).getByText('over target')).toBeDefined()
   expect(within(summary).queryByText(/TDEE\.$/)).toBeNull()
-  expect(within(summary).queryByText('TDEE')).toBeNull()
+  expect(within(summary).queryByRole('link', { name: /^TDEE / })).toBeNull()
 })
 
 test('the day speaks Croatian, over its target and beside its TDEE', async () => {
@@ -300,18 +304,17 @@ test('the day speaks Croatian, over its target and beside its TDEE', async () =>
   expect(
     await within(summary).findByText('180 iznad cilja, i dalje 500 ispod TDEE-a.'),
   ).toBeDefined()
-  expect(within(summary).getByText('Ispod TDEE-a')).toBeDefined()
+  expect(await equationOf(summary)).toBe('Cilj 2.250 = TDEE 2.930 − 680 deficit')
 })
 
-// What the TDEE is, and what is left of it, a tap away: a dialog named
-// by the number, its sentences its description; Escape closes it.
-test('the TDEE and what is left of it each say what they are, an ⓘ away', async () => {
+// What the TDEE is a tap away: a dialog named by the number, its
+// sentences its description; Escape closes it.
+test('the TDEE says what it is, an ⓘ away', async () => {
   serve(eaten(1136), 2409)
   renderAt('/')
 
   const summary = await summaryRegion()
   const tip = await within(summary).findByRole('button', { name: 'What TDEE is' })
-  expect(within(summary).getByRole('button', { name: 'What left to TDEE is' })).toBeDefined()
   fireEvent.click(tip)
   const dialog = await screen.findByRole('dialog', { name: 'TDEE' })
   expect(dialog.textContent).toContain('with 80% probability, your real TDEE is within that range')

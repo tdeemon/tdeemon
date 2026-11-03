@@ -128,7 +128,7 @@ test('the next change is taken back from the list, after its toast is gone, and 
       })
     },
   )
-  renderAt('/')
+  renderAt('/settings')
 
   fireEvent.click(await screen.findByRole('button', { name: 'Recent changes' }))
   const sheet = within(await screen.findByRole('dialog', { name: 'Recent changes' }))
@@ -224,7 +224,7 @@ test('with no change yet, the list says so', async () => {
     () => [],
     () => problem(404),
   )
-  renderAt('/')
+  renderAt('/settings')
 
   fireEvent.click(await screen.findByRole('button', { name: 'Recent changes' }))
   const sheet = within(await screen.findByRole('dialog', { name: 'Recent changes' }))

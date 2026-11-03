@@ -63,6 +63,29 @@ export function weekAverage(days: readonly HistoryDay[]): WeekAverage {
   return { days: counted.length, kcal, target }
 }
 
+// weekEnding is the average of today's week as it ends if today ends
+// with what it ate (kcal) against its target: the days the week counts
+// so far (weekAverage), today counted with them as one that is over.
+// Today with no meal, or left out, is not counted.
+export function weekEnding(
+  days: readonly HistoryDay[],
+  today: string,
+  kcal: number,
+  target: number | undefined,
+): WeekAverage {
+  const before = days.filter((day) => day.date !== today)
+  const excluded = days.some((day) => day.date === today && day.status === 'excluded')
+  const ended: HistoryDay = {
+    date: today,
+    status: excluded ? 'excluded' : 'complete',
+    type: 'rest',
+    meals: kcal > 0 ? 1 : 0,
+    ...(kcal > 0 && { intake: { kcal, protein: 0, carbs: 0, fat: 0 } }),
+    ...(target !== undefined && { target: { kcal: target, protein: 0, carbs: 0, fat: 0 } }),
+  }
+  return weekAverage([...before, ended])
+}
+
 // plannedTarget is the kcal the plan sets a day to come: of the target in
 // force on it, by the type its weekday has. A workout or the day's own
 // type may change it on the day.

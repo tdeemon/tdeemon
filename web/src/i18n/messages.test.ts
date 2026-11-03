@@ -87,3 +87,18 @@ test('what is wrong with an amount is said in 15 words at most', () => {
     Math.max(...counts(textsOf(en.log.wrong)), ...counts(textsOf(hr.log.wrong))),
   ).toBeLessThanOrEqual(15)
 })
+
+// The day's banner of a proposal counts its changes in the case the verb
+// takes: predlaže 1 promjenu, 2 promjene, 5 promjena.
+test("the proposal's banner counts its changes in each language's forms", () => {
+  expect([1, 2, 5, 21].map((n) => hr.plan.nudge.proposes('Claude', n))).toEqual([
+    'Claude predlaže 1 promjenu plana',
+    'Claude predlaže 2 promjene plana',
+    'Claude predlaže 5 promjena plana',
+    'Claude predlaže 21 promjenu plana',
+  ])
+  expect([1, 2].map((n) => en.plan.nudge.proposes('Claude', n))).toEqual([
+    'Claude proposes 1 plan change',
+    'Claude proposes 2 plan changes',
+  ])
+})

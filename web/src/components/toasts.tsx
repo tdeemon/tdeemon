@@ -1,11 +1,12 @@
 import { Toast, type ToastObject } from '@base-ui/react/toast'
 import { Link } from '@tanstack/react-router'
 import { X } from 'lucide-react'
-import type { ComponentProps } from 'react'
+import { useState, type ComponentProps } from 'react'
 
 import { $api } from '@/api/client'
 import { statusOf } from '@/api/errors'
 import { useUndo } from '@/api/meals'
+import { RecentChanges } from '@/components/recent-changes'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
@@ -22,9 +23,11 @@ import { cn } from '@/lib/utils'
 // above the sheet, and beside the panel on a desktop. A sheet keeps Tab
 // within it, and F6 takes the focus to them (Base UI), as a sheet leaves
 // them out of what it hides. Rendered within the router, so a toast
-// links a day.
+// links a day. An undo's toast leads to the recent changes, in their
+// sheet.
 export function Toasts() {
   const t = useMessages()
+  const [changes, setChanges] = useState(false)
 
   return (
     <Toast.Provider toastManager={toasts}>
@@ -33,19 +36,24 @@ export function Toasts() {
           aria-label={t.toast.region}
           className="fixed inset-x-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-60 mx-auto flex max-w-md flex-col gap-2 outline-none lg:right-8 lg:left-auto lg:mx-0 lg:w-96 sheet-open:max-lg:top-[max(0.5rem,env(safe-area-inset-top))] sheet-open:max-lg:bottom-auto sheet-open:lg:right-[calc(var(--container-md)+2rem)] tablet:bottom-8"
         >
-          <List />
+          <List
+            onChanges={() => {
+              setChanges(true)
+            }}
+          />
         </Toast.Viewport>
       </Toast.Portal>
+      <RecentChanges open={changes} onOpenChange={setChanges} />
     </Toast.Provider>
   )
 }
 
-function List() {
+function List({ onChanges }: { onChanges: () => void }) {
   const { toasts: shown } = Toast.useToastManager<Said>()
-  return shown.map((toast) => <Item key={toast.id} toast={toast} />)
+  return shown.map((toast) => <Item key={toast.id} toast={toast} onChanges={onChanges} />)
 }
 
-function Item({ toast }: { toast: ToastObject<Said> }) {
+function Item({ toast, onChanges }: { toast: ToastObject<Said>; onChanges: () => void }) {
   const t = useMessages()
   const said = toast.data
 
@@ -68,6 +76,7 @@ function Item({ toast }: { toast: ToastObject<Said> }) {
         {said?.to !== undefined && <DayLink date={said.to} />}
       </Toast.Content>
       {said?.undo !== undefined && <UndoAction undo={said.undo} />}
+      {said?.changes === true && <ToastButton onClick={onChanges}>{t.changes.title}</ToastButton>}
       {said?.action !== undefined && (
         <ToastButton onClick={said.action.run}>{said.action.label}</ToastButton>
       )}
@@ -119,6 +128,7 @@ function UndoAction({ undo }: { undo: NonNullable<Said['undo']> }) {
           sayUndone({
             title: t.undo.done(t.undo.actions[undone.action] ?? t.undo.change),
             to: undone.days.find((d) => d !== shown),
+            changes: true,
           })
         },
         onError: (error) => {

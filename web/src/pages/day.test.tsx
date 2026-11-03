@@ -71,11 +71,6 @@ function macroOf(summary: HTMLElement, name: string): string | null {
   return within(summary).getByText(name).closest('p')?.textContent ?? null
 }
 
-// termOf is the value of a term of the summary's list.
-function termOf(summary: HTMLElement, term: string): string | null {
-  return within(summary).getByText(term).nextElementSibling?.textContent ?? null
-}
-
 // summaryOf is calibration's summary of nothing measured yet.
 function summaryOf() {
   return {
@@ -197,8 +192,9 @@ test("the body's tiles: the weight with its trend, the night's sleep, a dash for
   })
   // 7.999 hours are 8 h, not 7 h 60.
   expect(tile('Sleep')).toBe('Sleep8 h 00')
-  expect(tile('Steps')).toBe('Steps—')
-  expect(tile('Resting heart rate')).toBe('Resting heart rate—')
+  // A dash to the eye, and what it means in words.
+  expect(tile('Steps')).toBe('Steps—none yet today')
+  expect(tile('Resting heart rate')).toBe('Resting heart rate—none yet today')
 })
 
 test("a day before's body is the day's: the weight's trend of that day, which a weigh-in changed moves", async () => {
@@ -526,9 +522,9 @@ test('a few grams keep their decimal, many are whole', async () => {
   expect(macroOf(summary, 'Fat')).toBe('Fat1.5 / 80 g · 79 to go')
 })
 
-// What is left to the TDEE is of what was eaten, live, not of the target:
-// 2,950 less 1,136, though the target is 2,500.
-test('the TDEE calibration measures, and what is left of it after what was eaten', async () => {
+// The target's arithmetic: the TDEE calibration measures, and the
+// deficit the target plans under it; what is left is the ring's alone.
+test("the TDEE calibration measures is in the target's arithmetic, and no second number left", async () => {
   fakeServer({
     ...signedIn(),
     'GET /api/v1/days/today': () =>
@@ -548,13 +544,13 @@ test('the TDEE calibration measures, and what is left of it after what was eaten
   renderAt('/')
 
   const summary = await screen.findByRole('region', { name: 'Energy and macros' })
-  expect(await within(summary).findByText('TDEE')).toBeDefined()
-  expect(termOf(summary, 'TDEE')).toBe('2,950')
-  expect(termOf(summary, 'Left to TDEE')).toBe('1,814')
-  expect(within(summary).queryByText('Deficit')).toBeNull()
+  const tdee = await within(summary).findByRole('link', { name: 'TDEE 2,950' })
+  expect(tdee.parentElement?.textContent.trim()).toBe('Target 2,500 = TDEE 2,950 − 450 deficit')
+  expect(within(summary).queryByText('Left to TDEE')).toBeNull()
+  expect(within(summary).queryByText('1,814')).toBeNull()
 })
 
-test('a TDEE not trusted yet is about so much, and a day past it says how far, never below 0', async () => {
+test('a TDEE not trusted yet is about so much', async () => {
   fakeServer({
     ...signedIn(),
     'GET /api/v1/days/today': () =>
@@ -574,9 +570,8 @@ test('a TDEE not trusted yet is about so much, and a day past it says how far, n
   renderAt('/')
 
   const summary = await screen.findByRole('region', { name: 'Energy and macros' })
-  expect(await within(summary).findByText('Over TDEE')).toBeDefined()
-  expect(termOf(summary, 'TDEE')).toBe('≈2,300')
-  expect(termOf(summary, 'Over TDEE')).toBe('300')
+  const tdee = await within(summary).findByRole('link', { name: 'TDEE ≈2,300' })
+  expect(tdee.parentElement?.textContent.trim()).toBe('Target 2,500 = TDEE ≈2,300 + 200 surplus')
 })
 
 test('the phase of the day, its week, and the rate against the phase', async () => {
@@ -790,7 +785,7 @@ test('the days move back and ahead, up to today', async () => {
   expect(screen.getByRole('link', { name: 'Back to today' }).getAttribute('href')).toBe('/')
 })
 
-test("another day's header has its date between the arrows, its type and the way back under it", async () => {
+test("another day's header is one row: its date between the arrows, the way back to today, the user's mark", async () => {
   fakeServer({
     ...signedIn('hr'),
     'GET /api/v1/days/2026-10-20': () => Response.json(day({ date: '2026-10-20' })),
@@ -803,21 +798,22 @@ test("another day's header has its date between the arrows, its type and the way
   if (header === null) {
     throw new Error('the date is in no header')
   }
-  // In the order they are read and shown: the arrow back, the date, its
-  // type and the recent changes, the way back to today under them, then
-  // the arrow ahead, and the user's mark, to the settings.
+  // In the order they are read and shown: the arrow back, the date, the
+  // arrow ahead, the way back to today, its pill "Danas", and the user's
+  // mark, to the settings. The day's type is the hero's, and the recent
+  // changes the settings' and the undo's.
   const parts = Array.from(header.querySelectorAll('a, h1, button')).map(
     (e) => e.getAttribute('aria-label') ?? e.textContent,
   )
   expect(parts).toEqual([
     'Dan prije',
     'utorak, 20. listopada',
-    'Tip dana: Dan odmora',
-    'Zadnje promjene',
-    'Natrag na danas',
     'Dan poslije',
+    'Natrag na danas',
     'Postavke i račun',
   ])
+  expect(within(header).getByRole('link', { name: 'Natrag na danas' }).textContent).toBe('Danas')
+  expect(within(header).queryByRole('button')).toBeNull()
   // Once, there: not at the page's foot too.
   expect(screen.getAllByRole('link', { name: 'Natrag na danas' })).toHaveLength(1)
   // The body is the day's, not today's.
@@ -907,6 +903,12 @@ test('a day that did not come says why in its place, under its header, and asks 
     '/?date=2026-10-22',
   )
   expect(screen.getByRole('navigation', { name: 'Sections' })).toBeDefined()
+  // And the week, whose days came apart from the day's.
+  expect(
+    within(await screen.findByRole('region', { name: 'This week' })).getByRole('navigation', {
+      name: 'The week',
+    }),
+  ).toBeDefined()
 
   up = true
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
@@ -950,8 +952,7 @@ test.each([
   })
   renderAt('/')
 
-  // The day came, the other not yet.
-  expect(await screen.findByRole('button', { name: 'Type of day: Rest day' })).toBeDefined()
+  // The other has not come yet.
   await waitFor(() => {
     expect(waiting.length).toBeGreaterThan(0)
   })

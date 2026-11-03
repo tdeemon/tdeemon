@@ -67,6 +67,7 @@ export function useUndoLatest() {
     sayUndone({
       title: t.undo.done(t.undo.actions[undone.action] ?? t.undo.change),
       to: undone.days.find((d) => d !== shown),
+      changes: true,
     })
   }
 

@@ -4,36 +4,30 @@ import { $api } from '@/api/client'
 import type { Day } from '@/api/types'
 import { CalibrationRow } from '@/components/day/calibration-row'
 import { DayPhase } from '@/components/day/day-phase'
+import { DayTypeChip } from '@/components/day/day-type-chip'
 import { EnergyRing } from '@/components/day/energy-ring'
 import { kcalLeft, kcalStanding } from '@/components/day/left'
 import { MacroBar, type Macro } from '@/components/day/macro-bar'
-import { MorningWeighIn } from '@/components/day/morning-weigh-in'
 import { weekOf } from '@/components/day/week'
 import { buttonVariants } from '@/components/ui/button'
 import { InfoTip } from '@/components/ui/info-tip'
-import { useFormat } from '@/i18n/format'
+import { rounded, useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
 
 const macros: readonly Macro[] = ['protein', 'carbs', 'fat']
 
-// A term of the numbers beside the ring and its value: in two columns on
-// a phone, the term and its value on a row; on a desktop, each a column
-// of its own, the value under the term.
-const term = 'contents lg:flex lg:flex-col lg:gap-1'
-const value = 'text-right font-semibold lg:text-left lg:text-h2'
-
-// DaySummary is the day at a glance: what is left of its target in a ring,
-// with what was eaten, the target, the TDEE calibration measures and what
-// is left of it after what was eaten, live through the day (or, of a day
-// before, how far under it the day stayed), each an ⓘ away from what it
-// is, and until calibration has a TDEE, how far it is from a first; each
-// macro against its target; and the phase the day is in, which leads to
-// the progress, unless the page shows it elsewhere (phase: a desktop's,
-// beside the day). A desktop has the numbers side by side beside the
-// ring, and the macros in three columns. A day before that went over its
-// target says it in a sentence beside the TDEE, not in an error's colour.
-// A day before any target shows what was eaten, and the way to a plan.
-export function DaySummary({ day, phase = true }: { day: Day; phase?: boolean }) {
+// DaySummary is the day at a glance, its hero: what is left of its
+// target in the ring, the one number of what is left on the day; beside
+// it what was eaten and the target, the target's arithmetic (the TDEE
+// calibration measures, which leads to the progress, less the planned
+// deficit or plus the surplus, an ⓘ away from what the TDEE is), or
+// until calibration has a TDEE, how far it is from a first; the day's
+// type, a small picker, and the phase the day is in under it; then each
+// macro against its target, beside the ring on a desktop. A day before
+// that went over its target says it in a sentence, beside its TDEE, not
+// in an error's colour. A day before any target shows what was eaten,
+// and the way to a plan.
+export function DaySummary({ day }: { day: Day }) {
   const t = useMessages()
   const f = useFormat()
   const { total, target } = day
@@ -42,7 +36,7 @@ export function DaySummary({ day, phase = true }: { day: Day; phase?: boolean })
   const today = me.data?.today
   const past = today !== undefined && day.date < today
   // A day before's TDEE is the one it had then, from the history of its
-  // week, which the week strip has asked for; today's, the summary's.
+  // week, which the week has asked for; today's, the summary's.
   const history = $api.useQuery(
     'get',
     '/api/v1/history',
@@ -52,6 +46,13 @@ export function DaySummary({ day, phase = true }: { day: Day; phase?: boolean })
   // Calibration on its way to a first TDEE, in the TDEE's place: now's,
   // so not of a day before.
   const calibrating = !past && summary.data?.tdee.measured === false ? summary.data.tdee : undefined
+  // The day's type, and the phase under it.
+  const kind = (
+    <div className="flex flex-col items-start gap-2">
+      <DayTypeChip key={`type ${day.date}`} day={day} />
+      <DayPhase date={day.date} />
+    </div>
+  )
 
   if (target === undefined) {
     return (
@@ -68,6 +69,7 @@ export function DaySummary({ day, phase = true }: { day: Day; phase?: boolean })
             <CalibrationRow tdee={calibrating} />
           </dl>
         )}
+        {kind}
         <NoTarget date={day.date} />
       </section>
     )
@@ -81,68 +83,55 @@ export function DaySummary({ day, phase = true }: { day: Day; phase?: boolean })
       : undefined
   const measured = tdee?.kcal
   // What the TDEE leaves after what was eaten, both as shown; below 0
-  // past it.
+  // past it: said of a day before over its target, never as a number of
+  // what is left.
   const left = measured === undefined ? undefined : kcalLeft(total.kcal, measured)
   const over = -kcalLeft(total.kcal, target.kcal)
-  let leftTerm = s.leftToTdee
-  if (left !== undefined && left < 0) {
-    leftTerm = s.overTdee
-  } else if (past) {
-    leftTerm = s.underTdee
-  }
 
   return (
     <section
       aria-labelledby="day-summary"
-      className="space-y-4 rounded-lg border bg-card p-4 lg:p-6"
+      className="space-y-4 rounded-lg border bg-card p-4 lg:p-5"
     >
       <h2 id="day-summary" className="sr-only">
         {s.title}
       </h2>
-      <MorningWeighIn day={day} />
-      <div className="flex items-center gap-4 lg:gap-8">
-        <EnergyRing eaten={total.kcal} target={target.kcal} past={past} />
-        <dl className="grid max-w-72 flex-1 grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 text-small lg:max-w-none lg:grid-cols-4 lg:items-start lg:gap-x-6">
-          <div className={term}>
-            <dt className="text-muted-foreground">{t.day.eaten}</dt>
-            <dd className={value}>{f.number(total.kcal)}</dd>
-          </div>
-          <div className={term}>
-            <dt className="text-muted-foreground">{s.target}</dt>
-            <dd className={value}>{f.number(target.kcal)}</dd>
-          </div>
-          {measured !== undefined && left !== undefined && (
-            <>
-              <div className={term}>
-                <dt className="flex items-center gap-1 text-muted-foreground">
-                  {s.tdee}
-                  <InfoTip label={t.info.tdee.label} title={t.info.tdee.title}>
-                    {t.info.tdee.text}
-                  </InfoTip>
-                </dt>
-                <dd className={value}>
-                  {/* A TDEE calibration does not trust yet is about so much. */}
-                  {tdee?.trusted === true ? '' : '≈'}
-                  {f.number(measured)}
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-4 lg:gap-x-7">
+        <div className="lg:row-span-2">
+          <EnergyRing eaten={total.kcal} target={target.kcal} past={past} />
+        </div>
+        <div className="flex min-w-0 flex-col items-start gap-2 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between lg:gap-x-6">
+          <div className="space-y-1.5">
+            <dl className="flex gap-5 lg:gap-7">
+              <div>
+                <dt className="text-caption text-muted-foreground">{t.day.eaten}</dt>
+                <dd className="text-h3 font-semibold tabular-nums lg:text-h2">
+                  {f.number(total.kcal)}
                 </dd>
               </div>
-              <div className={term}>
-                <dt className="flex items-center gap-1 text-muted-foreground">
-                  {leftTerm}
-                  <InfoTip label={t.info.left.label} title={t.info.left.title}>
-                    {t.info.left.text}
-                  </InfoTip>
-                </dt>
-                <dd className={value}>{f.number(Math.abs(left))}</dd>
+              <div>
+                <dt className="text-caption text-muted-foreground">{s.target}</dt>
+                <dd className="text-h3 font-semibold tabular-nums lg:text-h2">
+                  {f.number(target.kcal)}
+                </dd>
               </div>
-            </>
-          )}
-          {calibrating !== undefined && (
-            <div className="col-span-2 space-y-1">
-              <CalibrationRow tdee={calibrating} />
-            </div>
-          )}
-        </dl>
+            </dl>
+            {measured !== undefined && (
+              <Equation target={target.kcal} tdee={measured} trusted={tdee?.trusted === true} />
+            )}
+            {calibrating !== undefined && (
+              <dl className="space-y-0.5 text-small">
+                <CalibrationRow tdee={calibrating} />
+              </dl>
+            )}
+          </div>
+          {kind}
+        </div>
+        <div className="col-span-2 space-y-3 lg:col-span-1 lg:col-start-2 lg:grid lg:grid-cols-3 lg:gap-6 lg:space-y-0">
+          {macros.map((m) => (
+            <MacroBar key={m} macro={m} eaten={total[m]} target={target[m]} />
+          ))}
+        </div>
       </div>
       {past && left !== undefined && kcalStanding(total.kcal, target.kcal) === 'over' && (
         <p className="text-small">
@@ -151,13 +140,35 @@ export function DaySummary({ day, phase = true }: { day: Day; phase?: boolean })
             : s.overUnderTdee(f.number(over), f.number(left))}
         </p>
       )}
-      <div className="space-y-3 lg:grid lg:grid-cols-3 lg:gap-6 lg:space-y-0">
-        {macros.map((m) => (
-          <MacroBar key={m} macro={m} eaten={total[m]} target={target[m]} />
-        ))}
-      </div>
-      {phase && <DayPhase date={day.date} />}
     </section>
+  )
+}
+
+// Equation is the target's arithmetic, in a line: "Target 2,150 = TDEE
+// 2,679 − 529 deficit", or + a surplus, or the TDEE alone at maintenance;
+// the TDEE about so much (≈) while calibration does not trust it, a link
+// to the progress, where it is drawn, and an ⓘ away from what it is.
+function Equation({ target, tdee, trusted }: { target: number; tdee: number; trusted: boolean }) {
+  const t = useMessages()
+  const f = useFormat()
+  const e = t.day.summary.equation
+  const gap = rounded(tdee) - rounded(target)
+
+  return (
+    <p className="text-caption text-muted-foreground">
+      {e.target(f.number(target))} ={' '}
+      <Link
+        to="/progress"
+        className="font-semibold text-foreground underline decoration-muted-foreground/50 underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {e.tdee(`${trusted ? '' : '≈'}${f.number(tdee)}`)}
+      </Link>
+      {gap > 0 && ` ${e.deficit(f.number(gap))}`}
+      {gap < 0 && ` ${e.surplus(f.number(-gap))}`}{' '}
+      <InfoTip label={t.info.tdee.label} title={t.info.tdee.title} className="align-text-bottom">
+        {t.info.tdee.text}
+      </InfoTip>
+    </p>
   )
 }
 

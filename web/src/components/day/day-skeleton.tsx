@@ -9,15 +9,16 @@ const week = [0, 1, 2, 3, 4, 5, 6]
 const meals = [0, 1, 2]
 
 // DaySkeleton stands in for a day under its header while what it shows
-// comes (DayPage), in its shape: on a phone the week above the hero, its
-// ring, numbers and macros, and three meals' rows; from a tablet's 768
-// px, the check-in and the body beside them; on a desktop (columns) the
-// hero and the meals' table, and beside them the week, the body and the
-// check-in. A screen reader hears that it loads.
+// comes (DayPage), in its shape: on a phone the hero, its ring, numbers
+// and macros, the week under it, and three meals' rows; from a tablet's
+// 768 px, the body and the check-in beside them; on a desktop (columns)
+// the hero and the meals' table, and beside them the week, the body and
+// the check-in. A screen reader hears that it loads.
 export function DaySkeleton({ columns }: { columns: boolean }) {
   const t = useMessages()
-  const phoneWeek = (
-    <div className="space-y-2">
+  const weekCard = (
+    <div className="space-y-3 rounded-lg border bg-card p-4">
+      <Skeleton className="h-5.5 w-28" />
       <WeekDays />
       <Skeleton className="h-11" />
     </div>
@@ -41,10 +42,10 @@ export function DaySkeleton({ columns }: { columns: boolean }) {
   return (
     <div aria-busy className="space-y-4">
       <output className="sr-only">{t.loading}</output>
-      {!columns && phoneWeek}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start lg:grid-cols-12">
         <div className="space-y-4 lg:col-span-7 xl:col-span-8">
-          <Hero columns={columns} />
+          <Hero />
+          {!columns && weekCard}
           <div className="space-y-2">
             <Skeleton className="h-6.5 w-24" />
             {columns ? <MealTable /> : <MealCards />}
@@ -52,19 +53,15 @@ export function DaySkeleton({ columns }: { columns: boolean }) {
         </div>
         {columns ? (
           <div className="space-y-4 lg:col-span-5 xl:col-span-4">
-            <div className="space-y-3 rounded-lg border bg-card p-4">
-              <Skeleton className="h-5.5 w-28" />
-              <WeekDays bars />
-              <Skeleton className="h-11" />
-            </div>
+            {weekCard}
             {body}
             {checkIn}
           </div>
         ) : (
           // A phone's come after the meals, the day's skeleton enough.
           <div className="hidden space-y-4 md:block">
-            {checkIn}
             {body}
+            {checkIn}
           </div>
         )}
       </div>
@@ -72,15 +69,15 @@ export function DaySkeleton({ columns }: { columns: boolean }) {
   )
 }
 
-// WeekDays are the week's days: each a weekday, its mini ring on a phone
-// or its bar on a desktop, and its number.
-function WeekDays({ bars = false }: { bars?: boolean }) {
+// WeekDays are the week's days: each its column, its weekday and its
+// number.
+function WeekDays() {
   return (
-    <div className="grid grid-cols-7 gap-1">
+    <div className="grid grid-cols-7 gap-1.5 lg:gap-2">
       {week.map((d) => (
-        <div key={d} className="flex flex-col items-center gap-1 py-1.5">
+        <div key={d} className="flex flex-col items-center gap-1.5 px-0.5 pt-1 pb-0.5">
+          <Skeleton className="h-16 w-full rounded-md lg:h-24" />
           <Skeleton className="h-4 w-6" />
-          <Skeleton className={bars ? 'h-20 w-6 rounded-sm' : 'size-7 rounded-full'} />
           <Skeleton className="h-4 w-4" />
         </div>
       ))}
@@ -88,31 +85,23 @@ function WeekDays({ bars = false }: { bars?: boolean }) {
   )
 }
 
-// Hero is the day's hero: the ring and the numbers beside it, in two
-// columns on a phone and side by side on a desktop, the macros' bars,
-// and on a phone the phase's line.
-function Hero({ columns }: { columns: boolean }) {
+// Hero is the day's hero: the ring, the numbers, the arithmetic, the
+// day's type and the phase beside it, and the macros' bars, beside the
+// ring too on a desktop.
+function Hero() {
   return (
-    <div className="space-y-4 rounded-lg border bg-card p-4 lg:p-6">
-      <div className="flex items-center gap-4 lg:gap-8">
-        <Skeleton className="size-34 shrink-0 rounded-full" />
-        <div className="grid max-w-72 flex-1 grid-cols-[1fr_auto] gap-x-3 gap-y-2 lg:max-w-none lg:grid-cols-4 lg:gap-x-6">
-          {[0, 1, 2, 3].map((i) =>
-            columns ? (
-              <div key={i} className="space-y-1">
-                <Skeleton className="h-4.5 w-16" />
-                <Skeleton className="h-6.5 w-20" />
-              </div>
-            ) : (
-              <div key={i} className="contents">
-                <Skeleton className="h-4.5 w-20" />
-                <Skeleton className="h-4.5 w-12" />
-              </div>
-            ),
-          )}
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 rounded-lg border bg-card p-4 lg:gap-x-7 lg:p-5">
+      <Skeleton className="size-33 shrink-0 rounded-full lg:row-span-2 lg:size-42" />
+      <div className="space-y-2">
+        <div className="flex gap-5">
+          <Skeleton className="h-10 w-14" />
+          <Skeleton className="h-10 w-14" />
         </div>
+        <Skeleton className="h-8 w-full max-w-60" />
+        <Skeleton className="h-8 w-24" />
+        <Skeleton className="h-4 w-28" />
       </div>
-      <div className="space-y-3 lg:grid lg:grid-cols-3 lg:gap-6 lg:space-y-0">
+      <div className="col-span-2 space-y-3 lg:col-span-1 lg:col-start-2 lg:grid lg:grid-cols-3 lg:gap-6 lg:space-y-0">
         {[0, 1, 2].map((i) => (
           <div key={i} className="space-y-1.5">
             <Skeleton className="h-4.5 w-28" />
@@ -120,7 +109,6 @@ function Hero({ columns }: { columns: boolean }) {
           </div>
         ))}
       </div>
-      {!columns && <Skeleton className="h-9.5" />}
     </div>
   )
 }

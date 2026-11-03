@@ -2,7 +2,16 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import { setLocale } from '@/i18n/locale'
-import { day, fakeServer, problem, renderAt, signedIn, today, type Handler } from '@/test/app'
+import {
+  day,
+  fakeServer,
+  openCheckIn,
+  problem,
+  renderAt,
+  signedIn,
+  today,
+  type Handler,
+} from '@/test/app'
 import { dayServer } from '@/test/day-server'
 
 afterEach(() => {
@@ -28,6 +37,7 @@ async function tapMood(undo: Handler) {
     },
   })
   renderAt('/')
+  await openCheckIn()
   const mood = within(await screen.findByRole('group', { name: 'Mood' }))
   fireEvent.click(mood.getByRole('button', { name: '4 good' }))
   expect(await screen.findByText('Check-in saved')).toBeDefined()
@@ -54,6 +64,11 @@ test('a change is taken back from its toast, and the toast says so', async () =>
   expect(screen.queryByRole('link', { name: /^See/ })).toBeNull()
   expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
   expect(undos).toEqual([{ id: expect.any(String) as unknown, last: checkIn }])
+
+  // The history of the changes is a tap from it, the day's header having
+  // none.
+  fireEvent.click(screen.getByRole('button', { name: 'Recent changes' }))
+  expect(await screen.findByRole('dialog', { name: 'Recent changes' })).toBeDefined()
 })
 
 test.each([
