@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import { $api } from '@/api/client'
@@ -405,6 +405,37 @@ test('today has a line while an invite waits, which opens the household', async 
 
   server(withZoe)
   renderAt('/')
-  expect(await screen.findByRole('heading', { name: 'Today', level: 1 })).toBeDefined()
+  expect(await screen.findByRole('region', { name: 'Meals' })).toBeDefined()
   expect(screen.queryByRole('link', { name: /invites you into/ })).toBeNull()
+})
+
+test('an invite come since the household was kept is on the day as it shows, not after', async () => {
+  let household: Household = none
+  let release: (() => void) | undefined
+  server(none, {
+    'GET /api/v1/household': () =>
+      household === none
+        ? Response.json(none)
+        : new Promise<Response>((resolve) => {
+            release = () => {
+              resolve(Response.json(household))
+            }
+          }),
+  })
+  // The settings keep the household, with no invite.
+  const router = renderAt('/settings')
+  expect(await screen.findByText('Share every food with the people you cook with')).toBeDefined()
+
+  household = { ...none, received: [fromMia] }
+  await act(() => router.navigate({ to: '/' }))
+  await waitFor(() => {
+    expect(release).toBeDefined()
+  })
+  // The day and all else above its meals came; the household not yet.
+  expect(await screen.findByRole('button', { name: /^Type of day: / })).toBeDefined()
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(screen.queryByRole('region', { name: 'Meals' })).toBeNull()
+  release?.()
+  expect(await screen.findByRole('region', { name: 'Meals' })).toBeDefined()
+  expect(screen.getByRole('link', { name: /Mia invites you into their household/ })).toBeDefined()
 })

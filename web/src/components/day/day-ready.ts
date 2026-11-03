@@ -55,7 +55,7 @@ export function useDayReady(date: string | undefined, day: Day | undefined): boo
     plan.data.pending === undefined
   const keys = $api.useQuery('get', '/api/v1/tokens', undefined, { enabled: steps })
 
-  return ![
+  const loading = [
     me,
     summary,
     plan,
@@ -67,4 +67,8 @@ export function useDayReady(date: string | undefined, day: Day | undefined): boo
     recent,
     keys,
   ].some((q) => q.isLoading)
+  // The household's invites are often kept from another page: its line
+  // waits for them asked again, not for those kept. Only the first paint
+  // waits, which the day keeps once shown.
+  return !loading && !household.isFetching
 }

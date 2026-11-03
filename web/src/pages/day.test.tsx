@@ -916,8 +916,8 @@ test('a day that did not come says why in its place, under its header, and asks 
 
 // What the day shows above its meals, each held back in turn: who the
 // user is, the summary (the hero's TDEE), the plan (the phase, a
-// proposal), the week's history, and today's chips' (the day before, the
-// foods logged most, the meals of before).
+// proposal), the week's history, today's chips' (the day before, the
+// foods logged most, the meals of before) and an invite into a household.
 test.each([
   'GET /api/v1/me',
   'GET /api/v1/summary',
@@ -926,6 +926,7 @@ test.each([
   'GET /api/v1/days/2026-10-22',
   'GET /api/v1/foods/list',
   'GET /api/v1/meals/recent',
+  'GET /api/v1/household',
 ])('while %s comes, the day is a skeleton under its header, then shows at once', async (held) => {
   const routes: Record<string, Handler> = {
     ...signedIn(),
