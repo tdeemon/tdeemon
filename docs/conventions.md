@@ -505,7 +505,25 @@ in `web/`.
     export hold those two ids, and nothing else of the other's.
     `newIsolationEnv` gives the owner a recipe shared with the other, and
     `TestIsolation` holds the other's operations to changing nothing of
-    the owner's;
+    the owner's (but the version of that recipe's group, which a join of
+    the other's household moves on, `ownerRowsMayChange`);
+  - a household (docs/DESIGN.md §4, "A household") widens that exception
+    to every food and recipe of its members: a member's save writes the
+    shared fields into each member's copy, and the members see one
+    another's names and addresses (`get-household`), nothing else of one
+    another's: no meal, metric, plan, note, change, event, device or
+    token. A refusal over another member's food names none of theirs.
+    `newIsolationEnv` puts each party in a household of their own with a
+    third user, with an invite of a guest waiting, so a case runs inside
+    a household. `TestHouseholdSharesTheKitchenAlone` joins the two
+    parties in one: their rows out of the kitchen and the household are
+    as before, numbers too (but a session's and a token's last use, the
+    join's and the leave's events, and when a device was told), no other
+    row of one holds a value of the other's, and no answer of a GET of
+    no parameters, the export among them, shows one, to them or to a
+    third user. `TestMCPHouseholdSharesTheKitchenAlone` holds MCP's read
+    tools to the same, weights included, and a correction to reaching
+    the other member;
   - a handler takes the user from the request's principal
     (`auth.PrincipalFrom`), never from the path, the query or the body
     (the sign-in, which finds the user by the address it is given,
