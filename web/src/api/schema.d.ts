@@ -2089,7 +2089,7 @@ export interface components {
             days: components["schemas"]["IngestDay"][];
             /** @description Metric names tdeemon does not read. */
             ignored: string[];
-            /** @description Values out of their bounds, or of a date that has begun nowhere yet, left out; the others are stored. */
+            /** @description Values out of their bounds, or of a date after today in your time zone, left out; the others are stored. */
             rejected: components["schemas"]["IngestRejected"][];
         };
         IngestChange: {

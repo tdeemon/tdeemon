@@ -152,9 +152,9 @@ func TestIngestMetrics(t *testing.T) {
 	}
 }
 
-// A value of a day that has begun nowhere yet is rejected, from Health
-// Auto Export and the simple form alike: a phone's clock set wrong puts
-// no weighing on a day to come. Today's is kept.
+// A value of a date after today's in the user's time zone is rejected,
+// from Health Auto Export and the simple form alike: a phone's clock set
+// wrong puts no weighing on a day to come. Today's is kept.
 func TestIngestRejectsDaysToCome(t *testing.T) {
 	t.Parallel()
 
@@ -198,22 +198,36 @@ func TestIngestRejectsDaysToCome(t *testing.T) {
 	}
 }
 
-// A value of today's calendar date is kept before the user's day starts
-// (at 4 in Zagreb), and one of a date that has begun somewhere ahead, a
-// traveller's: the latest date anywhere is the bound, the day after it
-// is not.
+// The bound is today's calendar date in the user's time zone (Zagreb,
+// whose day starts at 4): today's values are kept before the day starts,
+// and tomorrow's rejected at any hour, in the night and at noon.
 func TestIngestKeepsTheCalendarDateBeforeTheDayStarts(t *testing.T) {
 	t.Parallel()
 
 	in := newInstance(t, "http://localhost", "")
 	tok := ingestToken(t, in, `"ingest"`)
-	// 01:30 on October 22 in Zagreb; 13:30 that day at UTC+14.
-	in.clock.Set(time.Date(2026, 10, 21, 23, 30, 0, 0, time.UTC))
-	for date, kept := range map[string]bool{"2026-10-22": true, "2026-10-23": false} {
-		rec := in.do(t, http.MethodPost, "/api/v1/ingest/metrics", `{"date": "`+date+`", "metrics": {"steps": 500}}`, nil, tok)
-		got := decodeJSON[ingestResponse](t, rec.Body.Bytes())
-		if stored := len(got.Days) == 1 && len(got.Rejected) == 0; rec.Code != http.StatusOK || stored != kept {
-			t.Errorf("steps of %s: %d %s, want kept %v", date, rec.Code, rec.Body.String(), kept)
+	for _, c := range []struct {
+		now  time.Time
+		date string
+		kept bool
+	}{
+		// 01:30 on October 22 in Zagreb.
+		{time.Date(2026, 10, 21, 23, 30, 0, 0, time.UTC), "2026-10-22", true},
+		{time.Date(2026, 10, 21, 23, 30, 0, 0, time.UTC), "2026-10-23", false},
+		// 12:30 on October 22.
+		{time.Date(2026, 10, 22, 10, 30, 0, 0, time.UTC), "2026-10-23", false},
+	} {
+		in.clock.Set(c.now)
+		for _, req := range []struct{ path, body string }{
+			{"/api/v1/ingest/metrics", `{"date": "` + c.date + `", "metrics": {"steps": 500}}`},
+			{"/api/v1/ingest/hae", `{"data": {"metrics": [{"name": "step_count", "units": "count", "data": [
+				{"date": "` + c.date + ` 00:00:00 +0200", "qty": 500}]}]}}`},
+		} {
+			rec := in.do(t, http.MethodPost, req.path, req.body, nil, tok)
+			got := decodeJSON[ingestResponse](t, rec.Body.Bytes())
+			if stored := len(got.Days) == 1 && len(got.Rejected) == 0; rec.Code != http.StatusOK || stored != c.kept {
+				t.Errorf("%s at %s, steps of %s: %d %s, want kept %v", req.path, c.now, c.date, rec.Code, rec.Body.String(), c.kept)
+			}
 		}
 	}
 }

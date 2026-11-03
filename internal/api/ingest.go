@@ -61,7 +61,7 @@ type ingestRejected struct {
 
 type ingestBody struct {
 	Days     []ingestDay      `json:"days" nullable:"false"`
-	Rejected []ingestRejected `json:"rejected" nullable:"false" doc:"Values out of their bounds, or of a date that has begun nowhere yet, left out; the others are stored."`
+	Rejected []ingestRejected `json:"rejected" nullable:"false" doc:"Values out of their bounds, or of a date after today in your time zone, left out; the others are stored."`
 	Ignored  []string         `json:"ignored" nullable:"false" doc:"Metric names tdeemon does not read."`
 }
 
@@ -268,12 +268,16 @@ func (s *sessions) ingestMetrics(ctx context.Context, in *ingestMetricsInput) (*
 }
 
 // store merges r's days into the user's, as an import of client's, and
-// says what changed; a value of a day that has begun nowhere yet is
-// rejected (latestDate). A day stored before a later day fails stays: a retry
+// says what changed; a value of a date after the user's calendar date
+// is rejected (calendarToday). A day stored before a later day fails stays: a retry
 // of the whole body changes nothing more for it.
 func (s *sessions) store(ctx context.Context, p auth.Principal, client string, r ingest.Result) (*ingestOutput, error) {
 	a := event.Actor{Kind: event.Import, Client: client}
-	r = r.UpTo(latestDate(s.now()))
+	today, err := calendarToday(p, s.now())
+	if err != nil {
+		return nil, internalError("importing the metrics failed", err)
+	}
+	r = r.UpTo(today)
 	out := &ingestOutput{Body: ingestBody{Days: []ingestDay{}, Rejected: []ingestRejected{}, Ignored: []string{}}}
 	for _, d := range r.Days {
 		changes, err := s.db.MergeMetrics(ctx, p.User.ID, a, d.Date, d.Values, s.now())
@@ -303,11 +307,16 @@ func (s *sessions) store(ctx context.Context, p auth.Principal, client string, r
 	return out, nil
 }
 
-// latestDate is the latest calendar date anywhere at now, the date of
-// the time zone furthest ahead (UTC+14): an import dates a value by its
-// point's own calendar date, in the offset its device had, so no clock
-// set right dates one later, at home or abroad, before the user's day
-// starts or after.
-func latestDate(now time.Time) day.Date {
-	return day.DateOf(now.In(time.FixedZone("UTC+14", 14*60*60)))
+// calendarToday is the user's calendar date at now, in their time zone,
+// whatever hour their day starts: an import dates a value by its point's
+// calendar date, so today's count in the hours before the day starts.
+// A day after it is a clock or a time zone set wrong; a traveller ahead
+// of home has those values when home's date reaches them, as a sync
+// sends its range again.
+func calendarToday(p auth.Principal, now time.Time) (day.Date, error) {
+	c, err := day.NewCalendar(p.User.TimeZone, 0)
+	if err != nil {
+		return day.Date{}, fmt.Errorf("the user's calendar: %w", err)
+	}
+	return c.DayOf(now), nil
 }
