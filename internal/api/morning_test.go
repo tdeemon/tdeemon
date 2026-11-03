@@ -93,7 +93,7 @@ func TestMorningSummaryJob(t *testing.T) {
 		t.Fatalf("sent = %v, want one message to Ana's chat", sent)
 	}
 	text, _ := sent[0]["text"].(string)
-	for _, want := range []string{"Jutarnji sažetak, petak 23. 10.", "San: 7 h 30 min", "Težina: 81,2 kg", "Jučer: ništa upisano", "koraci 9100", "Kalibracija: nema plana", "Plan: prijedlog promjene čeka tvoj odgovor, do 30. 10."} {
+	for _, want := range []string{"Jutarnji sažetak, petak 23. 10.", "San: 7 h 30 min", "Težina: 81,2 kg", "Jučer: ništa upisano", "koraci 9.100", "Kalibracija: nema plana", "Plan: prijedlog promjene čeka tvoj odgovor, do 30. 10."} {
 		if !strings.Contains(text, want) {
 			t.Errorf("no %q in\n%s", want, text)
 		}

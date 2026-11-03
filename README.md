@@ -318,8 +318,10 @@ came:
 - yesterday against its target: kcal, protein, carbs and fat, the day's
   type, and whether it is excluded; or that nothing was logged;
 - yesterday's steps, active kcal and exercise;
-- calibration's verdict in a line: why there is none, or the rate
-  against the target and what it proposes;
+- calibration's verdict in a line: the rate against the target and
+  what it proposes, or else the TDEE measured and why there is no
+  verdict yet (no plan, a phase just begun with about when its first
+  comes, a TDEE not trusted yet), or about when a first estimate comes;
 - recovery's flags, with their averages.
 
 A value that did not come is left out; nothing is guessed.
