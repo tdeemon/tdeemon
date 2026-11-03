@@ -152,6 +152,86 @@ func TestIngestMetrics(t *testing.T) {
 	}
 }
 
+// A value of a date after today's in the user's time zone is rejected,
+// from Health Auto Export and the simple form alike: a phone's clock set
+// wrong puts no weighing on a day to come. Today's is kept.
+func TestIngestRejectsDaysToCome(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	tok := ingestToken(t, in, `"ingest"`)
+	today := in.clock.Now().UTC().Format(time.DateOnly)
+	for _, c := range []struct{ path, body, date string }{
+		{"/api/v1/ingest/metrics", `{"date": "2027-01-15", "metrics": {"weight": 70, "steps": 4000}}`, "2027-01-15"},
+		{"/api/v1/ingest/hae", `{"data": {"metrics": [{"name": "step_count", "units": "count", "data": [
+			{"date": "` + today + ` 00:00:00 +0000", "qty": 5}, {"date": "2026-12-31 00:00:00 +0100", "qty": 7}]}]}}`, "2026-12-31"},
+	} {
+		rec := in.do(t, http.MethodPost, c.path, c.body, nil, tok)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", c.path, rec.Code, rec.Body.String())
+		}
+		got := decodeJSON[ingestResponse](t, rec.Body.Bytes())
+		for _, d := range got.Days {
+			if d.Date == c.date {
+				t.Errorf("%s stored the day to come: %+v", c.path, d)
+			}
+		}
+		if len(got.Rejected) == 0 {
+			t.Fatalf("%s rejected nothing: %s", c.path, rec.Body.String())
+		}
+		for _, r := range got.Rejected {
+			if r.Date != c.date || r.Reason != "a measurement is of today or a day before" {
+				t.Errorf("%s rejected %+v, want the day to come's values", c.path, r)
+			}
+		}
+		d, err := day.ParseDate(c.date)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ms, err := in.db.Metrics(t.Context(), in.user.ID, d, d); err != nil || len(ms[d]) != 0 {
+			t.Errorf("the day to come = %+v, %v; want nothing", ms[d], err)
+		}
+	}
+	d, _ := day.ParseDate(today)
+	if ms, err := in.db.Metrics(t.Context(), in.user.ID, d, d); err != nil || len(ms[d]) != 1 {
+		t.Errorf("today = %+v, %v; want its steps", ms[d], err)
+	}
+}
+
+// The bound is today's calendar date in the user's time zone (Zagreb,
+// whose day starts at 4): today's values are kept before the day starts,
+// and tomorrow's rejected at any hour, in the night and at noon.
+func TestIngestKeepsTheCalendarDateBeforeTheDayStarts(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	tok := ingestToken(t, in, `"ingest"`)
+	for _, c := range []struct {
+		now  time.Time
+		date string
+		kept bool
+	}{
+		// 01:30 on October 22 in Zagreb.
+		{time.Date(2026, 10, 21, 23, 30, 0, 0, time.UTC), "2026-10-22", true},
+		{time.Date(2026, 10, 21, 23, 30, 0, 0, time.UTC), "2026-10-23", false},
+		// 12:30 on October 22.
+		{time.Date(2026, 10, 22, 10, 30, 0, 0, time.UTC), "2026-10-23", false},
+	} {
+		in.clock.Set(c.now)
+		for _, req := range []struct{ path, body string }{
+			{"/api/v1/ingest/metrics", `{"date": "` + c.date + `", "metrics": {"steps": 500}}`},
+			{"/api/v1/ingest/hae", `{"data": {"metrics": [{"name": "step_count", "units": "count", "data": [
+				{"date": "` + c.date + ` 00:00:00 +0200", "qty": 500}]}]}}`},
+		} {
+			rec := in.do(t, http.MethodPost, req.path, req.body, nil, tok)
+			got := decodeJSON[ingestResponse](t, rec.Body.Bytes())
+			if stored := len(got.Days) == 1 && len(got.Rejected) == 0; rec.Code != http.StatusOK || stored != c.kept {
+				t.Errorf("%s at %s, steps of %s: %d %s, want kept %v", req.path, c.now, c.date, rec.Code, rec.Body.String(), c.kept)
+			}
+		}
+	}
+}
+
 func TestIngestMetricsRefuses(t *testing.T) {
 	t.Parallel()
 
@@ -384,6 +464,8 @@ func TestIngestHAEUnsummarizedSleep(t *testing.T) {
 
 	in := newInstance(t, "http://localhost", "")
 	tok := ingestToken(t, in, `"ingest"`)
+	// The payload's day is the 22nd: today, not a day to come.
+	in.clock.Set(time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC))
 	rec := in.do(t, http.MethodPost, "/api/v1/ingest/hae", haePayload(t, "unsummarized-sleep.json"), nil, tok)
 	got := decodeJSON[ingestResponse](t, rec.Body.Bytes())
 	if rec.Code != http.StatusOK || len(got.Rejected) != 1 || !strings.Contains(got.Rejected[0].Reason, "Summarize Data") ||
