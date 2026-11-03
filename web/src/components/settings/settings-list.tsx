@@ -30,16 +30,10 @@ function householdSummary(s: Messages['settings'], household: Household): string
 // SettingsList is the user's settings, each a row to its page with its
 // value in short: this browser's theme, the account's language, time zone
 // and day's start, the devices and AI clients with a token, the
-// household; for the admin, the users; the recent changes, in a sheet; then signing out, as whom, and what the
-// server is. On the plan's page it has its heading; the settings' page is
-// its title.
-export function SettingsList({
-  titled = false,
-  className,
-}: {
-  titled?: boolean
-  className?: string
-}) {
+// household; for the admin, the users; the recent changes, in a sheet;
+// then signing out, as whom, and what the server is. The settings' page
+// is its title.
+export function SettingsList() {
   const t = useMessages()
   const theme = useTheme()
   const session = useQuery(sessionQuery)
@@ -70,8 +64,6 @@ export function SettingsList({
 
   return (
     <ListGroup
-      title={titled ? s.title : undefined}
-      className={className}
       foot={
         <div className="space-y-1 px-1 text-small">
           {signOut.isError && (

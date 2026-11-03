@@ -390,8 +390,9 @@ function Form({
           </div>
           <p className="text-caption text-muted-foreground">{t.recipes.savesNow}</p>
         </div>
-        {/* In view as the page scrolls: above a phone's bar of sections. */}
-        <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 space-y-2 rounded-lg border bg-card p-3 shadow-sheet lg:bottom-0">
+        {/* In view as the page scrolls, at the screen's end: a form's page
+            has no bar of sections. */}
+        <div className="sticky bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-10 space-y-2 rounded-lg border bg-card p-3 shadow-sheet tablet:bottom-0">
           <DishSummary dish={dish} />
           {!conflict && refused !== undefined ? (
             <p role="alert" className="text-sm text-destructive">

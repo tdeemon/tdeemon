@@ -75,6 +75,14 @@
 }
 
 @theme {
+  /*
+    tablet: from 600 px, a window of Material's medium class: the
+    sections in a rail at the left. md (768 px) has the day in two
+    columns, lg (1024 px) a sheet come in at the right, and xl (1280 px)
+    the sidebar.
+  */
+  --breakpoint-tablet: 37.5rem;
+
   /* Radii: a chip's, an input's or a button's, a card's, a sheet's. */
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;

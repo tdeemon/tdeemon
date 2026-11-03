@@ -9,6 +9,7 @@ import { HouseholdMark } from '@/components/household/household-mark'
 import { LoadError } from '@/components/load-error'
 import { RecipeDetail } from '@/components/recipes/recipe-detail'
 import { RecipeEditor } from '@/components/recipes/recipe-editor'
+import { SettingsAvatar } from '@/components/settings-avatar'
 import { Button } from '@/components/ui/button'
 import { useMessages } from '@/i18n/messages'
 import type { FoodsSearch } from '@/router'
@@ -87,7 +88,14 @@ export function FoodPage() {
 
   return (
     <div className="space-y-3">
-      {!edit && <BackToFoods />}
+      {!edit && (
+        // The way back, on a desktop beside the list and none; on a phone
+        // the user's mark at its other end.
+        <div className="flex items-center justify-between gap-2 lg:hidden">
+          <BackToFoods />
+          <SettingsAvatar />
+        </div>
+      )}
       {food.data !== undefined && <HouseholdMark />}
       {body}
     </div>

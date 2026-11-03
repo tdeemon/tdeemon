@@ -29,6 +29,7 @@ import { HouseholdNudge } from '@/components/household/household-nudge'
 import { LoadError } from '@/components/load-error'
 import { ProposalNudge } from '@/components/plan/proposal-nudge'
 import { Skeleton } from '@/components/progress/skeleton'
+import { SettingsAvatar } from '@/components/settings-avatar'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { addDays, useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
@@ -234,7 +235,9 @@ export function DayPage() {
   let header
   if (isToday) {
     // Today's: the day's type beside the title, and the date under both
-    // on a line of its own, which a phone's width keeps whole.
+    // on a line of its own, which a phone's width keeps whole. A phone
+    // has the user's mark beside the title, and the day's type on a line
+    // under the date.
     header = (
       <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2">
         <div className="row-span-2 flex shrink-0 items-center">
@@ -249,7 +252,10 @@ export function DayPage() {
             {dated}
           </p>
         )}
-        <div className="col-start-3 row-start-1">{dayType}</div>
+        <SettingsAvatar className="col-start-3 row-start-1" />
+        <div className="col-span-3 row-start-3 mt-2 justify-self-start tablet:col-span-1 tablet:col-start-3 tablet:row-start-1 tablet:mt-0">
+          {dayType}
+        </div>
       </header>
     )
   } else if (desktop) {
@@ -269,7 +275,7 @@ export function DayPage() {
   } else {
     // Another day's on a phone: its date between the arrows, on a line
     // of its own, its type under it, and the way back to today right
-    // there.
+    // there; the user's mark at the end.
     header = (
       <header className="flex items-start gap-2">
         {previous}
@@ -279,6 +285,7 @@ export function DayPage() {
           {toToday}
         </div>
         {next}
+        <SettingsAvatar />
       </header>
     )
   }
@@ -303,7 +310,7 @@ export function DayPage() {
   // not come, with a way to ask again.
   if (day.data === undefined) {
     return (
-      <div className="max-w-3xl space-y-4 lg:max-w-none">
+      <div className="max-w-3xl space-y-4 md:max-w-none">
         {keys}
         {header}
         {day.isError ? (
@@ -339,11 +346,12 @@ export function DayPage() {
   )
 
   return (
-    <div className="max-w-3xl space-y-4 lg:max-w-none">
+    <div className="max-w-3xl space-y-4 md:max-w-none">
       {keys}
       {header}
       {hide && <DaySkeleton columns={desktop} />}
-      {/* A phone's week, above the day; a desktop's is beside it. */}
+      {/* A phone's week, above the day, and a tablet's; a desktop's is
+          beside it. */}
       {!desktop && shown !== undefined && todayDate !== undefined && (
         <div hidden={hide} className="space-y-2">
           <WeekStrip date={shown} today={todayDate} />
@@ -355,13 +363,14 @@ export function DayPage() {
         aria-busy={waiting}
         // What is changed while it waits would be the day before's.
         inert={waiting}
-        className={`grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start ${waiting ? 'opacity-60' : ''}`}
+        className={`grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start lg:grid-cols-12 ${waiting ? 'opacity-60' : ''}`}
       >
         {/* A desktop's columns: the day and its meals, a table, and
             beside them the week, the body, the check-in and the phase. A
-            phone has them one after the other, the phase in the day's
-            hero. */}
-        <div className="space-y-4 lg:col-span-8">
+            tablet's, from 768 px: the day and its meals, and beside them
+            the check-in and the body. A phone has them one after the
+            other, the phase in the day's hero. */}
+        <div className="space-y-4 lg:col-span-7 xl:col-span-8">
           {/* A new user's first steps, in place of the hero before a plan. */}
           <FirstSteps day={day.data}>
             <DaySummary day={day.data} phase={!desktop} />
@@ -447,7 +456,7 @@ export function DayPage() {
             )}
           </section>
         </div>
-        <div className="space-y-4 lg:col-span-4">
+        <div className="space-y-4 lg:col-span-5 xl:col-span-4">
           {desktop ? (
             <>
               {shown !== undefined && todayDate !== undefined && (

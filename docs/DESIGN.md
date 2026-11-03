@@ -1504,18 +1504,25 @@ the first spec.
     (`web/src/tokens.test.ts`), and Geist,
     self-hosted (Fontsource). The sections (today, the foods, the
     progress, the plan) are a bar at the bottom on a phone, with Log a
-    meal in its middle, and a sidebar from 1024 px, with the settings at
-    its foot. Log a meal (and its key, N) opens the meal to log on today
+    meal in its middle, which a form's page (a food's or a recipe's, the
+    profile, the limits, the notes) has none of and which steps down
+    under a sheet; a rail of 72 px at the left from 600 px, Log a meal
+    first and the settings at its foot; and a sidebar of 240 px from
+    1280 px, with a way to search (the foods', for now), Log a meal and
+    the settings at its foot. From 768 px the day is in two columns.
+    Log a meal (and its key, N) opens the meal to log on today
     over the screen shown, which stays as it was, and the toast of the meal
     logged leads to the day; on today's page it is the page's own, so the
-    meal's row takes the focus. On a phone the settings are a list under the
-    plan, beside what a plan rests on of the user's (the profile, the
-    limits, the notes for a coach), each row with its value in short and a
-    page of its own. The keyboard has shortcuts (`?` lists them): N logs a
-    meal, / finds a food, ⌘Z or Ctrl+Z outside a field takes back the
-    latest change (made anywhere, which its toast says), G and a letter
-    goes to a section (D, F, P, L, S, which the sidebar shows as the
-    pointer or the focus is on one), and ← → to the day before or after;
+    meal's row takes the focus. On a phone the settings are the user's
+    mark at the end of a page's header (an avatar); they are a list,
+    each row with its value in short and a page of its own, as is what a
+    plan rests on of the user's (the profile, the limits, the notes for a
+    coach), under the plan. The keyboard has shortcuts (`?` lists
+    them): N logs a meal, / finds a food, ⌘Z or Ctrl+Z outside a field
+    takes back the latest change (made anywhere, which its toast says),
+    G and a letter goes to a section (D, F, P, L, S, which the sidebar
+    shows as the pointer or the focus is on one), and ← → to the day
+    before or after;
     the first stop of Tab skips the sections to the page. On a desktop, the
     day's meals are one stop of Tab (a roving tabindex): ↑ ↓ Home End move
     between the rows, and on a row Enter opens its editor (a click or Space

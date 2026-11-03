@@ -8,6 +8,7 @@ import { useFindFoods, useFindOfList, useFoodList, type FoodFilter } from '@/api
 import { eatenThisWeek } from '@/components/foods/eaten'
 import { FoodRow } from '@/components/foods/food-row'
 import { LoadError } from '@/components/load-error'
+import { SettingsAvatar } from '@/components/settings-avatar'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { ChipGroup } from '@/components/ui/chip-group'
 import { useFormat } from '@/i18n/format'
@@ -80,7 +81,7 @@ export function FoodBrowser() {
   return (
     <section aria-labelledby={`${id}-title`} className="min-w-0 space-y-3">
       <header className="flex items-center justify-between gap-2">
-        <h1 id={`${id}-title`} className="text-title">
+        <h1 id={`${id}-title`} className="mr-auto text-title">
           {t.foods.title}
         </h1>
         {/* Without a food in use, the list's own button is the one way to
@@ -93,6 +94,7 @@ export function FoodBrowser() {
               </Link>
             )
           : !(filter === 'inUse' && total === 0) && <NewMenu from={from} />}
+        <SettingsAvatar className="-my-1.5 -ml-1" />
       </header>
       <label className="flex h-12 items-center gap-2.5 rounded-lg border border-input bg-card px-3.5 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
         <Search aria-hidden className="size-4.5 shrink-0 text-muted-foreground" />

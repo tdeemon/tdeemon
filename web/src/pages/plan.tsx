@@ -7,7 +7,7 @@ import { PhaseCard } from '@/components/plan/phase-card'
 import { Revisions } from '@/components/plan/revisions'
 import { TargetsCard } from '@/components/plan/targets-card'
 import { YouList } from '@/components/plan/you-list'
-import { SettingsList } from '@/components/settings/settings-list'
+import { SettingsAvatar } from '@/components/settings-avatar'
 import { Skeleton } from '@/components/skeleton'
 import { useMessages } from '@/i18n/messages'
 
@@ -17,8 +17,8 @@ import { useMessages } from '@/i18n/messages'
 // moves; the targets by type of day against the TDEE; and the history of the
 // plan's changes. Before a plan, how one comes. Beside it on a desktop,
 // under it on a phone, what a plan rests on of the user's (the profile,
-// the limits, the notes for a coach), each a row to its page; and on a
-// phone, whose bar has no room for them, the settings.
+// the limits, the notes for a coach), each a row to its page. The
+// settings are not the plan's: a phone's header leads to them.
 export function PlanPage() {
   const t = useMessages()
   const plan = $api.useQuery('get', '/api/v1/plan')
@@ -78,12 +78,14 @@ export function PlanPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-title">{t.plan.title}</h1>
+      <header className="flex items-center justify-between gap-2">
+        <h1 className="text-title">{t.plan.title}</h1>
+        <SettingsAvatar className="-my-1.5" />
+      </header>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
         <div className="space-y-3 lg:col-span-8 lg:space-y-4">{body}</div>
         <div className="space-y-6 lg:sticky lg:top-8 lg:col-span-4">
           <YouList />
-          <SettingsList titled className="lg:hidden" />
         </div>
       </div>
     </div>

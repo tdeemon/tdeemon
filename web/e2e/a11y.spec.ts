@@ -7,18 +7,38 @@ import { expect, test, type Page, type TestInfo } from '@playwright/test'
 import { invite, openMeal, signIn, user } from './user.ts'
 
 // The checks of every screen of the app, on a phone and a desktop, in
-// the light and the dark theme, in English and Croatian: axe finds
-// nothing serious; on a phone, what a finger taps is 44 px or more; what
-// the keyboard reaches shows it has the focus. Each screen is
+// the light and the dark theme, in English and Croatian, and between them
+// on a tablet and a laptop: axe finds nothing serious; on a phone or a
+// tablet, what a finger taps is 44 px or more; what the keyboard reaches
+// shows it has the focus. Each screen is
 // photographed too, to set beside the design: a phone's in Croatian and
 // a desktop's in English, as the design has them.
 
-const sizes = [
-  { name: 'phone', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
-  { name: 'desktop', viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false },
-] as const
 const themes = ['light', 'dark'] as const
 const locales = ['en', 'hr'] as const
+// A tablet upright, a finger's, and a laptop's, between a phone and a
+// desktop, where the sections are a rail: each in one theme and language,
+// the other's in the other.
+const sizes = [
+  { name: 'phone', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
+  {
+    name: 'tablet',
+    viewport: { width: 768, height: 1024 },
+    isMobile: true,
+    hasTouch: true,
+    themes: ['light'],
+    locales: ['hr'],
+  },
+  {
+    name: 'laptop',
+    viewport: { width: 1024, height: 768 },
+    isMobile: false,
+    hasTouch: false,
+    themes: ['dark'],
+    locales: ['en'],
+  },
+  { name: 'desktop', viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false },
+] as const
 
 // What the screens show: a food, a meal of it and an estimate, a recipe
 // of the food, and a weigh-in, made up, under names of their own each
@@ -614,8 +634,8 @@ async function photograph(page: Page, testInfo: TestInfo, name: string) {
 }
 
 for (const size of sizes) {
-  for (const theme of themes) {
-    for (const locale of locales) {
+  for (const theme of 'themes' in size ? size.themes : themes) {
+    for (const locale of 'locales' in size ? size.locales : locales) {
       test.describe(`${size.name}, ${theme}, ${locale}`, () => {
         test.use({
           viewport: size.viewport,
@@ -647,7 +667,7 @@ for (const size of sizes) {
             await screen.open(page, made)
             const problems = [
               ...(await serious(page)),
-              ...(size.name === 'phone' ? await smallTargets(page) : await unfocused(page)),
+              ...(size.hasTouch ? await smallTargets(page) : await unfocused(page)),
             ]
             if (problems.length > 0) {
               found[screen.name] = problems

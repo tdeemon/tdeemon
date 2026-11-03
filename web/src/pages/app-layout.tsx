@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Outlet, useNavigate } from '@tanstack/react-router'
+import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 
 import { pushDeviceQuery } from '@/api/push'
@@ -8,14 +8,17 @@ import { LogToday } from '@/components/day/log-today'
 import { ShortcutsDialog } from '@/components/shortcuts-dialog'
 import { StaleBar } from '@/components/stale-bar'
 import { useMessages } from '@/i18n/messages'
+import { formPage } from '@/lib/form-page'
 import { LogHereContext, type LogHere } from '@/lib/log-here'
 import { useShortcuts } from '@/lib/shortcuts'
 import { useUndoLatest } from '@/lib/undo'
+import { cn } from '@/lib/utils'
 
 // The frame of the app's sections: the navigation between them (a bar at
-// the bottom on a phone, a sidebar on a desktop) and the page, whose end
-// keeps clear of the bar and whose sides of a phone's notch in landscape
-// (viewport-fit=cover in index.html gives the page the whole screen);
+// the bottom on a phone, none on a form's page; a rail on a tablet; a
+// sidebar on a desktop) and the page, whose end keeps clear of the bar
+// and whose sides of a phone's notch in landscape (viewport-fit=cover in
+// index.html gives the page the whole screen);
 // over the page, a bar while what it shows could not be asked for again.
 // The keyboard's first stop skips the sections to the page. Log a meal
 // opens the meal to log on today over the page, which stays as it was;
@@ -32,6 +35,7 @@ export function AppLayout() {
   // This device's notifications, told to the server again as the app
   // opens: iOS can drop a subscription without a word.
   useQuery(pushDeviceQuery)
+  const form = useRouterState({ select: (state) => formPage(state.location) })
   const [logging, setLogging] = useState(false)
   // What opened the meal to log, which the focus goes back to.
   const opener = useRef<HTMLElement | null>(null)
@@ -49,19 +53,20 @@ export function AppLayout() {
     opener.current = from
     setLogging(true)
   }
+  // find takes the foods' search, there already or once there.
+  const find = () => {
+    const field = globalThis.document.querySelector<HTMLElement>('[data-find]')
+    if (field) {
+      field.focus()
+    } else {
+      void navigate({ to: '/foods', state: { find: true } })
+    }
+  }
   useShortcuts({
     n: () => {
       log(null)
     },
-    '/': () => {
-      // The foods' search, there already or once there.
-      const field = globalThis.document.querySelector<HTMLElement>('[data-find]')
-      if (field) {
-        field.focus()
-      } else {
-        void navigate({ to: '/foods', state: { find: true } })
-      }
-    },
+    '/': find,
     'Mod+z': () => {
       latest.undo()
     },
@@ -102,9 +107,17 @@ export function AppLayout() {
       >
         {t.nav.skip}
       </a>
-      <AppNav onLog={log} />
-      <main id="content" ref={main} tabIndex={-1} className="pb-28 outline-none lg:pb-12 lg:pl-60">
-        <div className="mx-auto w-full max-w-300 pt-6 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] lg:px-10 lg:pt-8">
+      <AppNav onLog={log} onSearch={find} bar={!form} />
+      <main
+        id="content"
+        ref={main}
+        tabIndex={-1}
+        className={cn(
+          'outline-none tablet:pb-12 tablet:pl-[calc(4.5rem+env(safe-area-inset-left))] xl:pl-60',
+          form ? 'pb-[max(1.5rem,env(safe-area-inset-bottom))]' : 'pb-28',
+        )}
+      >
+        <div className="mx-auto w-full max-w-300 pt-6 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] tablet:pr-[max(1.5rem,env(safe-area-inset-right))] tablet:pl-6 lg:pt-8 xl:px-10">
           <StaleBar />
           <LogHereContext value={setLogHere}>
             <Outlet />
