@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils'
 // the same, its icon over its name; on a desktop a row of the sidebar.
 // TanStack Router's Link marks the current one aria-current="page".
 const sectionClass =
-  'group flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-md text-caption text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:font-semibold aria-[current=page]:text-primary tablet:min-h-14 tablet:hover:text-foreground tablet:aria-[current=page]:hover:text-primary xl:h-10 xl:min-h-0 xl:flex-row xl:justify-start xl:gap-2.5 xl:px-3 xl:text-sm xl:font-medium xl:text-foreground xl:hover:bg-muted xl:aria-[current=page]:bg-primary-soft xl:aria-[current=page]:text-primary'
+  'group flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-md text-caption text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:font-semibold aria-[current=page]:text-primary tablet:min-h-14 tablet:hover:text-foreground tablet:aria-[current=page]:hover:text-primary sidebar:h-10 sidebar:min-h-0 sidebar:flex-row sidebar:justify-start sidebar:gap-2.5 sidebar:px-3 sidebar:text-sm sidebar:font-medium sidebar:text-foreground sidebar:hover:bg-muted sidebar:aria-[current=page]:bg-primary-soft sidebar:aria-[current=page]:text-primary'
 
 // A section's dot says something waits there: on the icon in the bar and
 // the rail, after the name in the sidebar; to a screen reader, mark
@@ -61,25 +61,28 @@ function Section({
         <Icon
           aria-hidden
           strokeWidth={1.75}
-          className="size-5.5 xl:size-4.5 xl:text-muted-foreground xl:group-aria-[current=page]:text-primary"
+          className="size-5.5 sidebar:size-4.5 sidebar:text-muted-foreground sidebar:group-aria-[current=page]:text-primary"
         />
         {mark !== undefined && (
           <span
             aria-hidden
-            className="absolute -top-0.5 -right-1 size-2.5 rounded-full bg-primary ring-2 ring-card xl:hidden"
+            className="absolute -top-0.5 -right-1 size-2.5 rounded-full bg-primary ring-2 ring-card sidebar:hidden"
           />
         )}
       </span>
       {children}
       <kbd
         aria-hidden
-        className="ml-auto hidden rounded-[5px] border px-1.5 font-mono text-caption text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 xl:inline"
+        className="ml-auto hidden rounded-[5px] border px-1.5 font-mono text-caption text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 sidebar:inline"
       >
         G {letter}
       </kbd>
       {mark !== undefined && (
         <>
-          <span aria-hidden className="ml-auto hidden size-2 rounded-full bg-primary xl:block" />
+          <span
+            aria-hidden
+            className="ml-auto hidden size-2 rounded-full bg-primary sidebar:block"
+          />
           <span id={markId} hidden>
             {mark}
           </span>
@@ -97,9 +100,11 @@ const logFab =
 // AppNav is the navigation between the app's sections, one for every
 // width. On a phone it is a bar at the bottom, in reach of a thumb, with
 // Log a meal in its middle; the settings are a phone's header's, the
-// user's mark (SettingsAvatar). From 600 px it is a rail of 72 px at the
-// left: Log a meal first, the sections, and the settings and the user at
-// its foot. From 1280 px it is a sidebar of 240 px: the brand, the way to
+// user's mark (SettingsAvatar). From 600 px wide (and 480 px high, or it
+// would not hold them: index.css's tablet) it is a rail of 72 px at the
+// left, which scrolls if it must: Log a meal first, the sections, and the
+// settings and the user at its foot. From 1280 px it is a sidebar of
+// 240 px: the brand, the way to
 // search, Log a meal with its key, the sections with theirs, and at its
 // foot the settings, the user and the theme. Each hides what is the
 // others'. Log a meal is no section: it asks onLog for the meal to log
@@ -130,12 +135,12 @@ export function AppNav({
         'fixed inset-x-0 bottom-0 z-30 border-t bg-card/95 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] backdrop-blur-md transition-[translate,opacity] duration-(--duration-slow) ease-sheet motion-reduce:transition-opacity sheet-open:max-tablet:translate-y-full motion-reduce:sheet-open:max-tablet:translate-y-0 motion-reduce:sheet-open:max-tablet:opacity-0',
         !bar && 'max-tablet:hidden',
         // A tablet's rail.
-        'tablet:inset-y-0 tablet:right-auto tablet:flex tablet:w-[calc(4.5rem+env(safe-area-inset-left))] tablet:flex-col tablet:gap-4 tablet:border-t-0 tablet:border-r tablet:bg-card tablet:pt-4 tablet:pr-1 tablet:pb-[max(1rem,env(safe-area-inset-bottom))] tablet:pl-[calc(0.25rem+env(safe-area-inset-left))] tablet:backdrop-blur-none',
+        'tablet:inset-y-0 tablet:right-auto tablet:flex tablet:w-[calc(4.5rem+env(safe-area-inset-left))] tablet:flex-col tablet:gap-4 tablet:overflow-y-auto tablet:border-t-0 tablet:border-r tablet:bg-card tablet:pt-4 tablet:pr-1 tablet:pb-[max(1rem,env(safe-area-inset-bottom))] tablet:pl-[calc(0.25rem+env(safe-area-inset-left))] tablet:backdrop-blur-none',
         // A desktop's sidebar.
-        'xl:w-60 xl:gap-6 xl:px-4 xl:py-6',
+        'sidebar:w-60 sidebar:gap-6 sidebar:px-4 sidebar:py-6',
       )}
     >
-      <span className="hidden items-center gap-2.5 px-2 text-h3 xl:flex">
+      <span className="hidden items-center gap-2.5 px-2 text-h3 sidebar:flex">
         <BrandMark />
         tdeemon
       </span>
@@ -143,7 +148,8 @@ export function AppNav({
         <button
           type="button"
           // The foods' search for now, as / is.
-          className="hidden h-9 items-center gap-2 rounded-md border border-control-border bg-card px-2.5 text-small text-muted-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring xl:flex"
+          aria-keyshortcuts="/"
+          className="hidden h-9 items-center gap-2 rounded-md border border-control-border bg-card px-2.5 text-small text-muted-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring sidebar:flex"
           onClick={onSearch}
         >
           <Search aria-hidden className="size-4" />
@@ -160,17 +166,17 @@ export function AppNav({
           aria-keyshortcuts="n"
           className={cn(
             logFab,
-            'mx-auto xl:mx-0 xl:h-10 xl:w-full xl:gap-2 xl:rounded-md xl:font-semibold xl:shadow-none',
+            'mx-auto sidebar:mx-0 sidebar:h-10 sidebar:w-full sidebar:gap-2 sidebar:rounded-md sidebar:font-semibold sidebar:shadow-none',
           )}
           onClick={(e) => {
             onLog(e.currentTarget)
           }}
         >
-          <Plus aria-hidden strokeWidth={2.25} className="size-6 xl:size-5" />
-          <span className="sr-only xl:not-sr-only">{t.nav.logMeal}</span>
+          <Plus aria-hidden strokeWidth={2.25} className="size-6 sidebar:size-5" />
+          <span className="sr-only sidebar:not-sr-only">{t.nav.logMeal}</span>
           <kbd
             aria-hidden
-            className="hidden rounded-[5px] border border-primary-foreground/40 px-1.5 font-mono text-caption opacity-80 xl:inline"
+            className="hidden rounded-[5px] border border-primary-foreground/40 px-1.5 font-mono text-caption opacity-80 sidebar:inline"
           >
             N
           </kbd>
@@ -215,12 +221,12 @@ export function AppNav({
         <Section to="/settings" icon={Settings} letter="S">
           {t.nav.settings}
         </Section>
-        <div className="mt-2 flex items-center justify-center gap-2.5 border-t pt-3 xl:justify-start xl:px-3">
-          <span data-testid="user" className="flex min-w-0 items-center gap-2.5 xl:flex-1">
-            <UserMark className="xl:size-8" />
-            <span className="sr-only truncate text-small xl:not-sr-only">{name}</span>
+        <div className="mt-2 flex items-center justify-center gap-2.5 border-t pt-3 sidebar:justify-start sidebar:px-3">
+          <span data-testid="user" className="flex min-w-0 items-center gap-2.5 sidebar:flex-1">
+            <UserMark className="sidebar:size-8" />
+            <span className="sr-only truncate text-small sidebar:not-sr-only">{name}</span>
           </span>
-          <span className="hidden xl:flex">
+          <span className="hidden sidebar:flex">
             <ThemeToggle />
           </span>
         </div>

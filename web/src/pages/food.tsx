@@ -88,9 +88,10 @@ export function FoodPage() {
 
   return (
     <div className="space-y-3">
-      {!edit && (
+      {(!edit || food.data === undefined) && (
         // The way back, on a desktop beside the list and none; on a phone
-        // the user's mark at its other end.
+        // the user's mark at its other end. A food to correct that is not
+        // there (yet) has it too: its page has no bar of sections.
         <div className="flex items-center justify-between gap-2 lg:hidden">
           <BackToFoods />
           <SettingsAvatar />

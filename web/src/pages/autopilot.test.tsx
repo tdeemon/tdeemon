@@ -56,6 +56,18 @@ function autopilotServer(start: Autopilot = autopilotBody(), locale: 'en' | 'hr'
   }
 }
 
+test("the autopilot's page leads back to the plan, and to the settings by the user's mark", async () => {
+  autopilotServer()
+  renderAt('/plan/autopilot')
+  await screen.findByRole('heading', { name: 'Autopilot', level: 1 })
+
+  const main = within(screen.getByRole('main'))
+  expect(main.getByRole('link', { name: 'Plan' }).getAttribute('href')).toBe('/plan')
+  expect(main.getByRole('link', { name: 'Settings and account' }).getAttribute('href')).toBe(
+    '/settings',
+  )
+})
+
 test('turning the autopilot on asks first, with its bounds in numbers, and says it in a toast', async () => {
   const { sent } = autopilotServer()
   renderAt('/plan/autopilot')

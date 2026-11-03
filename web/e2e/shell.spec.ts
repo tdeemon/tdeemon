@@ -96,10 +96,23 @@ test("a phone's form has the whole screen, without the bar of sections", async (
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     await expect(sections).toBeHidden()
   }
+  const food = await page.request.post('/api/v1/foods', {
+    data: {
+      name: `Kefir ${String(Date.now())}`,
+      basis: '100g',
+      source: 'label',
+      nutrients: { kcal: 60, protein: 3.4, carbs: 4.5, fat: 3.2 },
+    },
+  })
+  expect(food.ok()).toBe(true)
+  const body: unknown = await food.json()
+  const id = typeof body === 'object' && body !== null && 'id' in body ? String(body.id) : ''
   await form('/foods/new')
   await form('/foods/new-recipe')
+  await form(`/foods/${id}?edit=true`)
   await form('/plan/profile')
   await form('/plan/limits')
+  await form('/plan/notes')
   // Back on a list, the bar is back.
   await page.getByRole('main').getByRole('link', { name: 'Plan' }).click()
   await expect(page).toHaveURL('/plan')
@@ -122,4 +135,27 @@ test('the addresses of before lead where their pages are now', async ({ page }) 
   await expect(page).toHaveURL('/settings/devices')
   await page.getByRole('main').getByRole('link', { name: 'Settings' }).click()
   await expect(page).toHaveURL('/settings')
+})
+
+test('a window too low for the rail keeps the bar, and the settings a tap away', async ({
+  page,
+}) => {
+  await signIn(page)
+  const sections = page.getByRole('navigation', { name: 'Sections' })
+  const mark = page.getByRole('main').getByRole('link', { name: 'Settings and account' })
+
+  // A phone on its side, and a desktop zoomed in to 200 %: wide, but not
+  // high enough for the rail's sections and settings.
+  const low = async (width: number, height: number) => {
+    await page.setViewportSize({ width, height })
+    await page.goto('/plan')
+    await expect(page.getByRole('heading', { name: 'Plan', level: 1 })).toBeVisible()
+    const bar = await sections.boundingBox()
+    expect(bar && Math.round(bar.y + bar.height)).toBe(height)
+    expect(bar?.width).toBe(width)
+    await mark.click()
+    await expect(page).toHaveURL('/settings')
+  }
+  await low(844, 390)
+  await low(640, 384)
 })

@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { sessionQuery } from '@/api/session'
 import { setLocale } from '@/i18n/locale'
 import { setTheme } from '@/lib/theme'
-import { day, fakeServer, renderAt, signedIn, today, unreachable } from '@/test/app'
+import { day, fakeServer, problem, renderAt, signedIn, today, unreachable } from '@/test/app'
 
 afterEach(() => {
   cleanup()
@@ -169,6 +169,40 @@ test("a phone's page leads to the settings by the user's mark in its header", as
   }
   await hasMark('/', 'Today')
   await hasMark('/plan', 'Plan')
+})
+
+test("a form's page has no bar of sections on a phone, nor the user's mark", async () => {
+  fakeServer({
+    ...signedIn(),
+    'GET /api/v1/foods/0193c3a5-0000-7000-8000-0000000000f1': () => problem(404),
+  })
+  const router = renderAt('/plan/notes')
+  await screen.findByRole('heading', { name: 'Notes for your AI coach', level: 1 })
+
+  // The bar is the phone's (max-tablet:), the rail and the sidebar stay.
+  const bar = await nav()
+  expect(bar.className.split(' ')).toContain('max-tablet:hidden')
+  expect(screen.queryByRole('link', { name: 'Settings and account' })).toBeNull()
+
+  await router.navigate({
+    to: '/foods/$id',
+    params: { id: '0193c3a5-0000-7000-8000-0000000000f1' },
+    search: { edit: true },
+  })
+  await screen.findByText('There is no such food.')
+  expect((await nav()).className.split(' ')).toContain('max-tablet:hidden')
+
+  await router.navigate({ to: '/plan' })
+  await screen.findByRole('heading', { name: 'Plan', level: 1 })
+  expect((await nav()).className.split(' ')).not.toContain('max-tablet:hidden')
+})
+
+test('an address the app has no page of leads home, and a signed-in user to the settings', async () => {
+  fakeServer(signedIn())
+  renderAt('/nowhere')
+
+  expect(await screen.findByRole('link', { name: 'Settings and account' })).toBeDefined()
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Page not found')
 })
 
 test("the sidebar's search finds a food, as / does", async () => {

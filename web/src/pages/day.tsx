@@ -253,9 +253,11 @@ export function DayPage() {
           </p>
         )}
         <SettingsAvatar className="col-start-3 row-start-1" />
-        <div className="col-span-3 row-start-3 mt-2 justify-self-start tablet:col-span-1 tablet:col-start-3 tablet:row-start-1 tablet:mt-0">
-          {dayType}
-        </div>
+        {dayType !== undefined && (
+          <div className="col-span-3 row-start-3 mt-2 justify-self-start tablet:col-span-1 tablet:col-start-3 tablet:row-start-1 tablet:mt-0">
+            {dayType}
+          </div>
+        )}
       </header>
     )
   } else if (desktop) {

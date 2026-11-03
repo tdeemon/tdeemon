@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react'
 
-// A desktop's width, from which the app has its sidebar: Tailwind's lg.
+// A desktop's width, from which a sheet comes in at the right and the
+// foods are beside their list: Tailwind's lg. (The sidebar comes at
+// 1280 px, index.css's sidebar.)
 const desktopQuery = '(min-width: 64rem)'
 
 function desktopMedia(): MediaQueryList | undefined {

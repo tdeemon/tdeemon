@@ -113,11 +113,11 @@ export function AppLayout() {
         ref={main}
         tabIndex={-1}
         className={cn(
-          'outline-none tablet:pb-12 tablet:pl-[calc(4.5rem+env(safe-area-inset-left))] xl:pl-60',
+          'outline-none tablet:pb-12 tablet:pl-[calc(4.5rem+env(safe-area-inset-left))] sidebar:pl-60',
           form ? 'pb-[max(1.5rem,env(safe-area-inset-bottom))]' : 'pb-28',
         )}
       >
-        <div className="mx-auto w-full max-w-300 pt-6 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] tablet:pr-[max(1.5rem,env(safe-area-inset-right))] tablet:pl-6 lg:pt-8 xl:px-10">
+        <div className="mx-auto w-full max-w-300 pt-6 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))] lg:pt-8 tablet:pr-[max(1.5rem,env(safe-area-inset-right))] tablet:pl-6 sidebar:px-10">
           <StaleBar />
           <LogHereContext value={setLogHere}>
             <Outlet />

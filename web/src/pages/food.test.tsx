@@ -478,6 +478,16 @@ test('a food that is not there says so', async () => {
   )
 })
 
+test('a food to correct that is not there has the way back, its page no bar of sections', async () => {
+  fakeServer({ ...signedIn(), [`GET /api/v1/foods/${id}`]: () => problem(404) })
+  renderAt(`/foods/${id}?edit=true`)
+
+  expect(await screen.findByText('There is no such food.')).toBeDefined()
+  expect(screen.getByRole('link', { name: 'Back to the foods' }).getAttribute('href')).toBe(
+    '/foods',
+  )
+})
+
 test('a new food is made, and its page shown', async () => {
   const server = foodServer()
   const router = renderAt('/foods/new')
