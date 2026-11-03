@@ -108,6 +108,40 @@ func TestProductOfADrinkInKJ(t *testing.T) {
 	}
 }
 
+// Open Food Facts answers no product_quantity_unit with the nutriments:
+// a drink is told by the unit its quantity is written in ("330 ml",
+// "1,5 L"), or else its serving's, and its serving in ml is kept.
+func TestProductOfADrinkWithoutItsQuantityUnit(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name, fields string
+		perMl        bool
+	}{
+		{"330 ml", `"quantity": "330 ml"`, true},
+		{"1,5 L", `"quantity": "1,5 L"`, true},
+		{"6 x 33 cl", `"quantity": "6 x 33 cl"`, true},
+		{"no quantity, a serving in ml", `"quantity": ""`, true},
+		{"500 g", `"quantity": "500 g"`, false},
+		{"a word", `"quantity": "one bottle"`, false},
+	} {
+		c := server(t, http.StatusOK, `{"status": 1, "product": {"code": "5449000000996", "product_name": "Cola",
+			`+tc.fields+`, "serving_quantity": 330, "serving_quantity_unit": "ml",
+			"categories_tags": ["en:beverages", "en:carbonated-drinks"],
+			"nutriments": {"energy-kcal_100g": 42, "carbohydrates_100g": 10.6, "proteins_100g": 0, "fat_100g": 0}}}`, nil)
+		p, err := c.Product(t.Context(), "5449000000996", "en")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.PerMilliliter != tc.perMl {
+			t.Errorf("%s: per ml = %v, want %v", tc.name, p.PerMilliliter, tc.perMl)
+		}
+		if want := map[bool]float64{true: 330, false: 0}[tc.perMl]; p.Serving != want {
+			t.Errorf("%s: serving = %v, want %v", tc.name, p.Serving, want)
+		}
+	}
+}
+
 // An ice cream sold by volume is labelled per 100 g: its values are per
 // 100 g, and its serving in ml is no serving of grams. The food keeps the
 // barcode looked up, whatever form Open Food Facts answers under; a value

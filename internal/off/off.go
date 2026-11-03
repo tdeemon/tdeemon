@@ -82,7 +82,44 @@ type Product struct {
 // fields are the product's fields a lookup asks for, besides its name in
 // the language asked for.
 var fields = []string{
-	"product_name", "brands", "categories_tags", "nutriments", "product_quantity_unit", "serving_quantity", "serving_quantity_unit",
+	"product_name", "brands", "categories_tags", "nutriments", "product_quantity_unit", "quantity", "serving_quantity",
+	"serving_quantity_unit",
+}
+
+// volumeUnits are the units of a quantity sold by volume, as Open Food
+// Facts' products write them.
+var volumeUnits = []string{"ml", "cl", "dl", "l"}
+
+// soldByVolume says whether p is sold by volume: its quantity's unit,
+// which Open Food Facts answers as product_quantity_unit only at times
+// (not with the nutriments asked for too), else the unit its quantity
+// is written in ("330 ml", "1,5 L"), else its serving's.
+func soldByVolume(p map[string]any) bool {
+	if unit, _ := p["product_quantity_unit"].(string); unit != "" {
+		return strings.EqualFold(unit, "ml")
+	}
+	if quantity, _ := p["quantity"].(string); strings.TrimSpace(quantity) != "" {
+		return slices.Contains(volumeUnits, unitOfQuantity(quantity))
+	}
+	unit, _ := p["serving_quantity_unit"].(string)
+	return strings.EqualFold(unit, "ml")
+}
+
+// unitOfQuantity is the unit a quantity as written ends in, in lower
+// case: "330 ml" and "0,33L" are of ml and l, "6 x 330 ml" of ml.
+func unitOfQuantity(quantity string) string {
+	q := strings.ToLower(strings.TrimSpace(quantity))
+	end := len(q)
+	for end > 0 && q[end-1] >= 'a' && q[end-1] <= 'z' {
+		end--
+	}
+	unit := q[end:]
+	// The unit follows a number, not a word ("one bottle").
+	before := strings.TrimRight(q[:end], " ")
+	if before == "" || before[len(before)-1] < '0' || before[len(before)-1] > '9' {
+		return ""
+	}
+	return unit
 }
 
 // nutrientNames are the nutrients a food keeps, by their names at Open
@@ -151,9 +188,8 @@ func product(p map[string]any, code, name, base string) Product {
 	brands, _ := p["brands"].(string)
 	brand, _, _ := strings.Cut(brands, ",")
 	out.Brand = clip(brand, food.MaxBrandLen)
-	unit, _ := p["product_quantity_unit"].(string)
 	categories, _ := p["categories_tags"].([]any)
-	out.PerMilliliter = strings.EqualFold(unit, "ml") && slices.Contains(categories, any("en:beverages"))
+	out.PerMilliliter = soldByVolume(p) && slices.Contains(categories, any("en:beverages"))
 	if v, ok := number(p["serving_quantity"]); ok && v > 0 {
 		servingUnit, _ := p["serving_quantity_unit"].(string)
 		if servingUnit == "" || strings.EqualFold(servingUnit, unitOf(out.PerMilliliter)) {
