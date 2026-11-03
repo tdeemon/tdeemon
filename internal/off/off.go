@@ -119,29 +119,33 @@ func soldByVolume(p map[string]any) bool {
 // cl" of cl, "12 fl oz (355 ml)" of oz; "" for none ("one bottle").
 func unitOfQuantity(quantity string) string {
 	q := strings.ToLower(quantity)
-	for i, r := range q {
-		if r < '0' || r > '9' {
-			continue
-		}
-		// The unit follows the amount: its digits, a decimal point or
-		// comma, spaces, and "x" with the next amount ("6 x 33 cl").
-		rest := strings.TrimLeftFunc(q[i:], func(r rune) bool {
-			return r >= '0' && r <= '9' || r == '.' || r == ',' || unicode.IsSpace(r)
-		})
-		if after, ok := strings.CutPrefix(rest, "x"); ok && after != "" &&
-			(unicode.IsSpace(rune(after[0])) || after[0] >= '0' && after[0] <= '9') {
-			return unitOfQuantity(after)
-		}
-		word := strings.FieldsFunc(rest, func(r rune) bool { return !unicode.IsLetter(r) })
-		switch {
-		case len(word) == 0:
-			return ""
-		case word[0] == "fl" && len(word) > 1 && word[1] == "oz":
-			return "fl oz"
-		}
-		return word[0]
+	i := strings.IndexFunc(q, func(r rune) bool { return r >= '0' && r <= '9' })
+	if i < 0 {
+		return ""
 	}
-	return ""
+	// The unit follows the amount: its digits, a decimal point or comma,
+	// spaces, and "x" with the next amount ("6 x 33 cl", "6x33cl").
+	rest := strings.TrimLeftFunc(q[i:], func(r rune) bool {
+		return r >= '0' && r <= '9' || r == '.' || r == ',' || unicode.IsSpace(r)
+	})
+	if after, ok := strings.CutPrefix(rest, "x"); ok && after != "" &&
+		(unicode.IsSpace(rune(after[0])) || after[0] >= '0' && after[0] <= '9') {
+		return unitOfQuantity(after)
+	}
+	return unitWord(rest)
+}
+
+// unitWord is the unit a quantity's rest after its amount begins with:
+// its first word, "fl oz" of two; "" for none.
+func unitWord(rest string) string {
+	word := strings.FieldsFunc(rest, func(r rune) bool { return !unicode.IsLetter(r) })
+	switch {
+	case len(word) == 0:
+		return ""
+	case word[0] == "fl" && len(word) > 1 && word[1] == "oz":
+		return "fl oz"
+	}
+	return word[0]
 }
 
 // nutrientNames are the nutrients a food keeps, by their names at Open
