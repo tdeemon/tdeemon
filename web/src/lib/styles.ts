@@ -26,7 +26,7 @@ export const chipClass =
 export const chosenChip =
   'has-checked:border-transparent has-checked:bg-primary-soft has-checked:font-semibold has-checked:text-primary has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-background'
 export const activeChip =
-  'focus-visible:ring-2 focus-visible:ring-ring data-active:border-transparent data-active:bg-primary-soft data-active:font-semibold data-active:text-primary'
+  'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-active:border-transparent data-active:bg-primary-soft data-active:font-semibold data-active:text-primary'
 
 // linkTarget is a link's or a button's that looks like one, on a line of
 // its own: as high as its words to the eye, 44 px or more to a finger (an
