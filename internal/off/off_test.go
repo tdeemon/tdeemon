@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"uuid"
@@ -49,6 +50,14 @@ func TestProduct(t *testing.T) {
 	if asked.URL.Path != "/api/v2/product/3850000000015" || !strings.Contains(asked.URL.Query().Get("fields"), "product_name_hr") ||
 		asked.Header.Get("User-Agent") != "tdeemon/test (https://example.com)" {
 		t.Errorf("asked %s %s, user agent %q", asked.URL.Path, asked.URL.RawQuery, asked.Header.Get("User-Agent"))
+	}
+	// Open Food Facts answers product_quantity_unit, of the quantity, only
+	// when the quantity is asked for too.
+	fields := strings.Split(asked.URL.Query().Get("fields"), ",")
+	for _, f := range []string{"quantity", "product_quantity_unit", "serving_quantity", "serving_quantity_unit", "categories_tags", "nutriments"} {
+		if !slices.Contains(fields, f) {
+			t.Errorf("the fields asked %v, want %s among them", fields, f)
+		}
 	}
 	want := off.Product{
 		Code: "3850000000015", Name: "Grčki jogurt", Brand: "Dukat", Serving: 150, URL: c.BaseURL + "/product/3850000000015",
@@ -108,9 +117,9 @@ func TestProductOfADrinkInKJ(t *testing.T) {
 	}
 }
 
-// Open Food Facts answers no product_quantity_unit with the nutriments:
-// a drink is told by the unit its quantity is written in ("330 ml",
-// "1,5 L"), or else its serving's, and its serving in ml is kept.
+// A product without product_quantity_unit (a quantity Open Food Facts
+// did not read) is told by the unit its quantity is written in ("330 ml",
+// "1,5 L"), or else its serving's, and a drink's serving in ml is kept.
 func TestProductOfADrinkWithoutItsQuantityUnit(t *testing.T) {
 	t.Parallel()
 
@@ -122,8 +131,12 @@ func TestProductOfADrinkWithoutItsQuantityUnit(t *testing.T) {
 		{"1,5 L", `"quantity": "1,5 L"`, true},
 		{"6 x 33 cl", `"quantity": "6 x 33 cl"`, true},
 		{"no quantity, a serving in ml", `"quantity": ""`, true},
+		{"330ml ℮", `"quantity": "330ml ℮"`, true},
+		{"1 litre", `"quantity": "1 litre"`, true},
+		{"12 fl oz (355 ml)", `"quantity": "12 fl oz (355 ml)"`, true},
 		{"500 g", `"quantity": "500 g"`, false},
-		{"a word", `"quantity": "one bottle"`, false},
+		// A quantity of no unit known: its serving's says.
+		{"a word, a serving in ml", `"quantity": "one bottle"`, true},
 	} {
 		c := server(t, http.StatusOK, `{"status": 1, "product": {"code": "5449000000996", "product_name": "Cola",
 			`+tc.fields+`, "serving_quantity": 330, "serving_quantity_unit": "ml",

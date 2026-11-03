@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 	"uuid"
 
@@ -86,40 +87,60 @@ var fields = []string{
 	"serving_quantity_unit",
 }
 
-// volumeUnits are the units of a quantity sold by volume, as Open Food
-// Facts' products write them.
-var volumeUnits = []string{"ml", "cl", "dl", "l"}
+// volumeUnits and massUnits are the units of a quantity sold by volume
+// or by weight, as Open Food Facts' products write them.
+var (
+	volumeUnits = []string{"ml", "cl", "dl", "l", "litre", "litres", "liter", "liters", "oz"}
+	massUnits   = []string{"g", "kg", "mg"}
+)
 
-// soldByVolume says whether p is sold by volume: its quantity's unit,
-// which Open Food Facts answers as product_quantity_unit only at times
-// (not with the nutriments asked for too), else the unit its quantity
-// is written in ("330 ml", "1,5 L"), else its serving's.
+// soldByVolume says whether p is sold by volume: by its quantity's unit,
+// which Open Food Facts reads off the quantity and answers only when the
+// quantity is asked for too; else by the unit its quantity is written in
+// ("330 ml", "1,5 L"); else, of a quantity of no unit known, by its
+// serving's.
 func soldByVolume(p map[string]any) bool {
 	if unit, _ := p["product_quantity_unit"].(string); unit != "" {
 		return strings.EqualFold(unit, "ml")
 	}
-	if quantity, _ := p["quantity"].(string); strings.TrimSpace(quantity) != "" {
-		return slices.Contains(volumeUnits, unitOfQuantity(quantity))
+	quantity, _ := p["quantity"].(string)
+	switch unit := unitOfQuantity(quantity); {
+	case slices.Contains(volumeUnits, unit):
+		return true
+	case slices.Contains(massUnits, unit):
+		return false
 	}
 	unit, _ := p["serving_quantity_unit"].(string)
 	return strings.EqualFold(unit, "ml")
 }
 
-// unitOfQuantity is the unit a quantity as written ends in, in lower
-// case: "330 ml" and "0,33L" are of ml and l, "6 x 330 ml" of ml.
+// unitOfQuantity is the unit of the first amount of a quantity as
+// written, in lower case: "330 ml" and "0,33L" are of ml and l, "6 x 33
+// cl" of cl, "12 fl oz (355 ml)" of oz; "" for none ("one bottle").
 func unitOfQuantity(quantity string) string {
-	q := strings.ToLower(strings.TrimSpace(quantity))
-	end := len(q)
-	for end > 0 && q[end-1] >= 'a' && q[end-1] <= 'z' {
-		end--
+	q := strings.ToLower(quantity)
+	for i, r := range q {
+		if r < '0' || r > '9' {
+			continue
+		}
+		// The unit follows the amount: its digits, a decimal point or
+		// comma, spaces, and "x" with the next amount ("6 x 33 cl").
+		rest := strings.TrimLeftFunc(q[i:], func(r rune) bool {
+			return r >= '0' && r <= '9' || r == '.' || r == ',' || unicode.IsSpace(r)
+		})
+		if after, ok := strings.CutPrefix(rest, "x"); ok && strings.TrimLeftFunc(after, unicode.IsSpace) != after {
+			return unitOfQuantity(after)
+		}
+		word := strings.FieldsFunc(rest, func(r rune) bool { return !unicode.IsLetter(r) })
+		switch {
+		case len(word) == 0:
+			return ""
+		case word[0] == "fl" && len(word) > 1:
+			return word[1]
+		}
+		return word[0]
 	}
-	unit := q[end:]
-	// The unit follows a number, not a word ("one bottle").
-	before := strings.TrimRight(q[:end], " ")
-	if before == "" || before[len(before)-1] < '0' || before[len(before)-1] > '9' {
-		return ""
-	}
-	return unit
+	return ""
 }
 
 // nutrientNames are the nutrients a food keeps, by their names at Open
