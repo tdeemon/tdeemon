@@ -94,7 +94,7 @@ export function FoodBrowser() {
             )
           : !(filter === 'inUse' && total === 0) && <NewMenu from={from} />}
       </header>
-      <label className="flex h-12 items-center gap-2.5 rounded-lg border-2 border-input bg-card px-3.5 focus-within:border-ring">
+      <label className="flex h-12 items-center gap-2.5 rounded-lg border border-input bg-card px-3.5 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
         <Search aria-hidden className="size-4.5 shrink-0 text-muted-foreground" />
         <span className="sr-only">{t.foods.search}</span>
         <input

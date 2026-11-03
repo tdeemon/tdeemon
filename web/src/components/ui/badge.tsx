@@ -2,12 +2,14 @@ import type { ComponentProps } from 'react'
 
 import { cn } from '@/lib/utils'
 
-// tones are a badge's colours: plain, a warning's (an estimate) and the
-// brand's (the user's own, a scope).
+// tones are a badge's colours: plain, a warning's (an estimate), the
+// brand's (the user's own, a scope) and a coach's (what an AI did, and
+// nothing else).
 const tones = {
   neutral: 'bg-surface-2 text-muted-foreground',
-  warning: 'bg-warning/10 text-warning',
+  warning: 'bg-warning-soft text-warning',
   primary: 'bg-primary-soft text-primary',
+  coach: 'bg-coach-soft text-coach',
 } as const
 
 // Badge is a short mark beside a thing: AI, an estimate, a token's

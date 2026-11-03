@@ -141,7 +141,7 @@ export function JoinPreview({ invite, onDone }: { invite: HouseholdInvite; onDon
       <p className="text-small text-muted-foreground">{t.household.previewHint}</p>
       {failed}
       {changed && failed === null && (
-        <output className="block rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+        <output className="block rounded-lg border border-warning/40 bg-warning-soft p-3 text-sm">
           {t.household.changed}
         </output>
       )}

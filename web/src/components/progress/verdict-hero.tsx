@@ -49,8 +49,8 @@ function stateOf(v: Verdict): State {
 // colour alone.
 const looks: Record<State, { icon: LucideIcon; card: string; tint: string }> = {
   on_target: { icon: CircleCheck, card: 'border-primary/30 bg-primary-soft', tint: 'text-primary' },
-  fast: { icon: CircleAlert, card: 'border-warning/30 bg-warning/10', tint: 'text-warning' },
-  slow: { icon: CircleAlert, card: 'border-warning/30 bg-warning/10', tint: 'text-warning' },
+  fast: { icon: CircleAlert, card: 'border-warning/30 bg-warning-soft', tint: 'text-warning' },
+  slow: { icon: CircleAlert, card: 'border-warning/30 bg-warning-soft', tint: 'text-warning' },
   waiting: { icon: Hourglass, card: 'bg-card', tint: 'text-muted-foreground' },
   no_phase: { icon: Flag, card: 'bg-card', tint: 'text-muted-foreground' },
   no_target: { icon: Flag, card: 'bg-card', tint: 'text-muted-foreground' },

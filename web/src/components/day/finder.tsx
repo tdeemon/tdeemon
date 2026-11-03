@@ -221,7 +221,7 @@ export function Finder({
         </section>
       )}
       {/* The search, and beside it a barcode's: the camera, or its digits. */}
-      <div className="flex h-12 items-center rounded-lg border-2 border-input bg-card pr-0.5 focus-within:border-ring">
+      <div className="flex h-12 items-center rounded-lg border border-input bg-card pr-0.5 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
         <label className="flex h-full min-w-0 flex-1 items-center gap-2.5 pl-3.5">
           <Search aria-hidden className="size-4.5 shrink-0 text-muted-foreground" />
           <span className="sr-only">{t.log.search}</span>

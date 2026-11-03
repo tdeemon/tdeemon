@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { useId, type ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
@@ -5,8 +6,10 @@ import { cn } from '@/lib/utils'
 // ChipGroup picks one of a few options, as chips in a row: radios in a
 // fieldset whose legend, for a screen reader only, names it, so it says
 // them as one group and the arrow keys move between them, as in
-// SegmentedControl. The one chosen is dark. A chip is 32 px high to the
-// eye and 44 px to a finger (an ::after over it, 6 px above and below).
+// SegmentedControl. A chip has a control's edge; the one chosen is the
+// brand's soft green with a check, as a chosen segment is. A chip is 32
+// px high to the eye and 44 px to a finger (an ::after over it, 6 px
+// above and below).
 export function ChipGroup<T extends string>({
   legend,
   options,
@@ -28,7 +31,7 @@ export function ChipGroup<T extends string>({
       {options.map((option) => (
         <label
           key={option.value}
-          className="relative flex h-8 min-w-11 cursor-pointer items-center justify-center rounded-full bg-surface-2 px-2.5 text-small whitespace-nowrap transition-colors after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] has-checked:bg-foreground has-checked:font-semibold has-checked:text-background has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-background motion-reduce:transition-none"
+          className="relative flex h-8 min-w-11 cursor-pointer items-center justify-center gap-1 rounded-sm border border-control-border bg-card px-2.5 text-small whitespace-nowrap transition-colors after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] has-checked:border-transparent has-checked:bg-primary-soft has-checked:font-semibold has-checked:text-primary has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-background motion-reduce:transition-none"
         >
           <input
             type="radio"
@@ -39,6 +42,7 @@ export function ChipGroup<T extends string>({
               onChange(option.value)
             }}
           />
+          {value === option.value && <Check aria-hidden className="size-4 shrink-0" />}
           {option.label}
         </label>
       ))}

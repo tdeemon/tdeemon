@@ -39,8 +39,8 @@ export default defineConfig({
         display: 'standalone',
         // --background in src/index.css, light; index.html's theme-color
         // follows the theme chosen.
-        background_color: '#f5f6f8',
-        theme_color: '#f5f6f8',
+        background_color: '#f6f7f9',
+        theme_color: '#f6f7f9',
         icons: [
           { src: '/pwa-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/pwa-512.png', sizes: '512x512', type: 'image/png' },
