@@ -352,11 +352,14 @@ func (s *sessions) tools() []tool {
 				"without its last_use. archived archives the food, or keeps it so; left out, a save brings an archived food back. " +
 				"A name and brand, an alias or a barcode another food has is refused (409), naming that food, which may be archived and so in no search: get_food gives it. " +
 				"Its errors say it as data: where (body.name, the alias's body.aliases[i] or the barcode's body.barcodes[i]) and the food's id as the value. " +
-				"A barcode the user says is a food's is added to its barcodes, so a scan finds it.",
+				"A barcode the user says is a food's is added to its barcodes, so a scan finds it. " +
+				"In a household, every food is every member's, and a save of one reaches them all: a name and brand or a barcode " +
+				"of another member's other food is refused (409), naming none of theirs.",
 			Errors: []int{http.StatusUnauthorized, http.StatusNotFound, http.StatusConflict},
 		}, s.upsertFood).
 			briefly("Saves a food, or corrects one: by its id, or else its name and brand; else a new one. A save replaces the whole food, " +
-				"so a field left out is cleared: correct from what find_foods or get_food gave. A name, alias or barcode another food has is a 409 naming it.").destroys(),
+				"so a field left out is cleared: correct from what find_foods or get_food gave. A name, alias or barcode another food has is a 409 naming it. " +
+				"In a household, a save is every member's; another member's food in the way is a 409 naming none.").destroys(),
 		s.recipeTool(),
 		newTool("log_meal", []auth.Scope{auth.ScopeTools}, huma.Operation{
 			OperationID:   "log-meal",
