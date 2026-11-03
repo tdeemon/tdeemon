@@ -108,3 +108,24 @@ func FromDays(days map[string]map[string]float64) (Result, error) {
 	}
 	return build(byDay, ignored), nil
 }
+
+// FutureReason is why a value of a day after today is left out: a clock
+// set wrong, or a time zone, would put a weighing on a day to come,
+// whose trend and day it would then be.
+const FutureReason = "a measurement is of today or a day before"
+
+// UpTo returns r with the days after today left out, each of their
+// values rejected (FutureReason), after the values r rejected already.
+func (r Result) UpTo(today day.Date) Result {
+	out := Result{Rejected: r.Rejected, Ignored: r.Ignored}
+	for _, d := range r.Days {
+		if !today.Before(d.Date) {
+			out.Days = append(out.Days, d)
+			continue
+		}
+		for _, v := range d.Values {
+			out.Rejected = append(out.Rejected, Rejected{Date: d.Date, Kind: v.Kind, Value: v.Value, Reason: FutureReason})
+		}
+	}
+	return out
+}

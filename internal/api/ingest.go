@@ -61,7 +61,7 @@ type ingestRejected struct {
 
 type ingestBody struct {
 	Days     []ingestDay      `json:"days" nullable:"false"`
-	Rejected []ingestRejected `json:"rejected" nullable:"false" doc:"Values out of their bounds, left out; the others are stored."`
+	Rejected []ingestRejected `json:"rejected" nullable:"false" doc:"Values out of their bounds, or of a day after today, left out; the others are stored."`
 	Ignored  []string         `json:"ignored" nullable:"false" doc:"Metric names tdeemon does not read."`
 }
 
@@ -268,10 +268,16 @@ func (s *sessions) ingestMetrics(ctx context.Context, in *ingestMetricsInput) (*
 }
 
 // store merges r's days into the user's, as an import of client's, and
-// says what changed. A day stored before a later day fails stays: a retry
+// says what changed; a day after the user's today is rejected, as a
+// measurement logged by hand would be. A day stored before a later day fails stays: a retry
 // of the whole body changes nothing more for it.
 func (s *sessions) store(ctx context.Context, p auth.Principal, client string, r ingest.Result) (*ingestOutput, error) {
 	a := event.Actor{Kind: event.Import, Client: client}
+	_, today, err := userDay(p, s.now())
+	if err != nil {
+		return nil, internalError("importing the metrics failed", err)
+	}
+	r = r.UpTo(today)
 	out := &ingestOutput{Body: ingestBody{Days: []ingestDay{}, Rejected: []ingestRejected{}, Ignored: []string{}}}
 	for _, d := range r.Days {
 		changes, err := s.db.MergeMetrics(ctx, p.User.ID, a, d.Date, d.Values, s.now())

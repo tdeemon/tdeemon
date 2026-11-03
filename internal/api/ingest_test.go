@@ -152,6 +152,52 @@ func TestIngestMetrics(t *testing.T) {
 	}
 }
 
+// A value of a day after the user's today is rejected, as one logged by
+// hand is, from Health Auto Export and the simple form alike: a phone's
+// clock set wrong puts no weighing on a day to come. Today's is kept.
+func TestIngestRejectsDaysToCome(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	tok := ingestToken(t, in, `"ingest"`)
+	today := in.clock.Now().UTC().Format(time.DateOnly)
+	for _, c := range []struct{ path, body, date string }{
+		{"/api/v1/ingest/metrics", `{"date": "2027-01-15", "metrics": {"weight": 70, "steps": 4000}}`, "2027-01-15"},
+		{"/api/v1/ingest/hae", `{"data": {"metrics": [{"name": "step_count", "units": "count", "data": [
+			{"date": "` + today + ` 00:00:00 +0000", "qty": 5}, {"date": "2026-12-31 00:00:00 +0100", "qty": 7}]}]}}`, "2026-12-31"},
+	} {
+		rec := in.do(t, http.MethodPost, c.path, c.body, nil, tok)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", c.path, rec.Code, rec.Body.String())
+		}
+		got := decodeJSON[ingestResponse](t, rec.Body.Bytes())
+		for _, d := range got.Days {
+			if d.Date == c.date {
+				t.Errorf("%s stored the day to come: %+v", c.path, d)
+			}
+		}
+		if len(got.Rejected) == 0 {
+			t.Fatalf("%s rejected nothing: %s", c.path, rec.Body.String())
+		}
+		for _, r := range got.Rejected {
+			if r.Date != c.date || r.Reason != "a measurement is of today or a day before" {
+				t.Errorf("%s rejected %+v, want the day to come's values", c.path, r)
+			}
+		}
+		d, err := day.ParseDate(c.date)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ms, err := in.db.Metrics(t.Context(), in.user.ID, d, d); err != nil || len(ms[d]) != 0 {
+			t.Errorf("the day to come = %+v, %v; want nothing", ms[d], err)
+		}
+	}
+	d, _ := day.ParseDate(today)
+	if ms, err := in.db.Metrics(t.Context(), in.user.ID, d, d); err != nil || len(ms[d]) != 1 {
+		t.Errorf("today = %+v, %v; want its steps", ms[d], err)
+	}
+}
+
 func TestIngestMetricsRefuses(t *testing.T) {
 	t.Parallel()
 
@@ -384,6 +430,8 @@ func TestIngestHAEUnsummarizedSleep(t *testing.T) {
 
 	in := newInstance(t, "http://localhost", "")
 	tok := ingestToken(t, in, `"ingest"`)
+	// The payload's day is the 22nd: today, not a day to come.
+	in.clock.Set(time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC))
 	rec := in.do(t, http.MethodPost, "/api/v1/ingest/hae", haePayload(t, "unsummarized-sleep.json"), nil, tok)
 	got := decodeJSON[ingestResponse](t, rec.Body.Bytes())
 	if rec.Code != http.StatusOK || len(got.Rejected) != 1 || !strings.Contains(got.Rejected[0].Reason, "Summarize Data") ||

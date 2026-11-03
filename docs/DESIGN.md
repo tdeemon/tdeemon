@@ -1350,7 +1350,9 @@ the first spec.
     database would escape a user's export and deletion.
   - A value belongs to the calendar date of its point, as HAE writes it;
     the day keeps its earliest weighing, with body fat and lean mass from
-    the same weighing, and each value is checked on its own.
+    the same weighing, and each value is checked on its own. A value of
+    a day after the user's today is rejected, as one logged by hand is:
+    a clock or a time zone set wrong puts no weighing on a day to come.
   - Caveat: HAE is iOS-only and its automated export is a paid tier.
     Native HealthKit is the long-term answer (§11).
 - **Scheduler:** a minute's tick runs the jobs due in each user's day,
