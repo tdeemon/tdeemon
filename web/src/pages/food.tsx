@@ -88,14 +88,17 @@ export function FoodPage() {
 
   return (
     <div className="space-y-3">
-      {(!edit || food.data === undefined) && (
+      {!edit ? (
         // The way back, on a desktop beside the list and none; on a phone
-        // the user's mark at its other end. A food to correct that is not
-        // there (yet) has it too: its page has no bar of sections.
+        // the user's mark at its other end.
         <div className="flex items-center justify-between gap-2 lg:hidden">
           <BackToFoods />
           <SettingsAvatar />
         </div>
+      ) : (
+        // A food to correct that did not come, or is none, has the way
+        // back alone: its page, a form's, has no bar of sections.
+        food.data === undefined && food.isError && <BackToFoods />
       )}
       {food.data !== undefined && <HouseholdMark />}
       {body}

@@ -1506,10 +1506,12 @@ the first spec.
     progress, the plan) are a bar at the bottom on a phone, with Log a
     meal in its middle, which a form's page (a food's or a recipe's, the
     profile, the limits, the notes) has none of and which steps down
-    under a sheet; a rail of 72 px at the left from 600 px, Log a meal
-    first and the settings at its foot; and a sidebar of 240 px from
-    1280 px, with a way to search (the foods', for now), Log a meal and
-    the settings at its foot. From 768 px the day is in two columns.
+    under a sheet; a rail of 72 px at the left from 600 px wide and 480
+    px high, Log a meal first and the settings at its foot; and a sidebar
+    of 240 px from 1280 px wide (as high), with a way to search (the
+    foods', for now), Log a meal and the settings at its foot. A window
+    lower than 480 px keeps the bar and the user's mark in a page's
+    header, whatever its width. From 768 px the day is in two columns.
     Log a meal (and its key, N) opens the meal to log on today
     over the screen shown, which stays as it was, and the toast of the meal
     logged leads to the day; on today's page it is the page's own, so the

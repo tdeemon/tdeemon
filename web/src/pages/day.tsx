@@ -262,7 +262,8 @@ export function DayPage() {
     )
   } else if (desktop) {
     // Another day's on a desktop, as today's is: its date the title, and
-    // its type and the way back to today at the other end.
+    // its type and the way back to today at the other end; the user's
+    // mark after them in a window too low for the rail or the sidebar.
     header = (
       <header className="flex items-center gap-2">
         <div className="flex shrink-0 items-center">
@@ -272,6 +273,7 @@ export function DayPage() {
         <h1 className="min-w-0 flex-1 text-title">{dated}</h1>
         {dayType}
         {toToday}
+        <SettingsAvatar />
       </header>
     )
   } else {
