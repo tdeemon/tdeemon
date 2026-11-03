@@ -359,7 +359,7 @@ func (s *sessions) tools() []tool {
 		}, s.upsertFood).
 			briefly("Saves a food, or corrects one: by its id, or else its name and brand; else a new one. A save replaces the whole food, " +
 				"so a field left out is cleared: correct from what find_foods or get_food gave. A name, alias or barcode another food has is a 409 naming it. " +
-				"In a household, a save is every member's.").destroys(),
+				"In a household, a save is every member's; another member's food in the way is a 409 naming none.").destroys(),
 		s.recipeTool(),
 		newTool("log_meal", []auth.Scope{auth.ScopeTools}, huma.Operation{
 			OperationID:   "log-meal",

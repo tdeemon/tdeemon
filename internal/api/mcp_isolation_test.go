@@ -199,6 +199,38 @@ func TestMCPHouseholdSharesTheKitchenAlone(t *testing.T) {
 	forbidden := notToCross(t, e)
 	cs := mcpSession(t, e.in, e.other.token.Token)
 	bread := e.owner.user.Name + "'s rye bread"
+	// A model reads that a clash in a household names no food, so it does
+	// not look for one.
+	tools, err := cs.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tl := range tools.Tools {
+		if tl.Name == "upsert_food" && !strings.Contains(tl.Description, "another member's food in the way is a 409 naming none") {
+			t.Errorf("upsert_food says nothing of a household's clash: %s", tl.Description)
+		}
+	}
+	mcpReadsNoneOf(t, e, cs, forbidden)
+
+	copyOf := foodOf(t, e.in.db, e.other.user.ID, bread)
+	corrected := map[string]any{
+		"id": copyOf.ID.String(), "name": bread, "basis": "100g", "source": "user", "barcodes": []string{"3850000000015"},
+		"nutrients": map[string]any{"kcal": 265, "protein": 9, "carbs": 48, "fat": 3.3},
+	}
+	if text, isErr := callTool(t, cs, "upsert_food", corrected); isErr {
+		t.Fatalf("the other's correction: %s", text)
+	}
+	if got := foodOf(t, e.in.db, e.owner.user.ID, bread); got.Nutrients.Kcal != 265 || got.ID != e.owner.bread.ID {
+		t.Errorf("the owner's bread after the other's correction = %+v, want 265 kcal under its id", got)
+	}
+}
+
+// mcpReadsNoneOf fails if a read tool, through cs, shows the other one of
+// forbidden, or the owner's weight; their own weight and their copy of
+// the owner's bread it must show.
+func mcpReadsNoneOf(t *testing.T, e isolationEnv, cs *mcp.ClientSession, forbidden []string) {
+	t.Helper()
+	bread := e.owner.user.Name + "'s rye bread"
 	for _, c := range []struct {
 		tool string
 		args map[string]any
@@ -222,17 +254,13 @@ func TestMCPHouseholdSharesTheKitchenAlone(t *testing.T) {
 		if c.tool == "find_foods" && !strings.Contains(text, bread) {
 			t.Errorf("find_foods finds no copy of the owner's bread: %s", text)
 		}
-	}
-
-	copyOf := foodOf(t, e.in.db, e.other.user.ID, bread)
-	corrected := map[string]any{
-		"id": copyOf.ID.String(), "name": bread, "basis": "100g", "source": "user", "barcodes": []string{"3850000000015"},
-		"nutrients": map[string]any{"kcal": 265, "protein": 9, "carbs": 48, "fat": 3.3},
-	}
-	if text, isErr := callTool(t, cs, "upsert_food", corrected); isErr {
-		t.Fatalf("the other's correction: %s", text)
-	}
-	if got := foodOf(t, e.in.db, e.owner.user.ID, bread); got.Nutrients.Kcal != 265 || got.ID != e.owner.bread.ID {
-		t.Errorf("the owner's bread after the other's correction = %+v, want 265 kcal under its id", got)
+		// The measurements and intake are numbers, which forbidden has
+		// none of: the other's own show, the owner's never.
+		if c.tool == "get_summary" || c.tool == "get_history" {
+			own, owners := fmt.Sprintf(`"weight_kg":%v`, isolationWeight(e.other.user)), fmt.Sprintf(`"weight_kg":%v`, isolationWeight(e.owner.user))
+			if !strings.Contains(text, own) || strings.Contains(text, owners) {
+				t.Errorf("%s shows %s, want the other's %s and not the owner's %s", c.tool, text, own, owners)
+			}
+		}
 	}
 }

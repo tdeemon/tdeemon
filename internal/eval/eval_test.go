@@ -938,8 +938,13 @@ func seedHousehold(t *testing.T, db *store.DB, userID uuid.UUID, lang string, no
 	}
 }
 
-// checkHousehold holds the other member's kefir to have kcal per 100 ml,
-// the user's correction of theirs; no kcal checks nothing.
+// correctedKefir is the kefir's label as the household's cases correct
+// it to, per 100 ml.
+var correctedKefir = food.Nutrients{Kcal: 64, Protein: 3.4, Carbs: 4.1, Fat: 3.5}
+
+// checkHousehold holds both members' kefir to be the label's, per 100
+// ml, with kcal: the user's correction reaches the other member's; no
+// kcal checks nothing.
 func checkHousehold(t *testing.T, in instance, kcal float64) {
 	t.Helper()
 	if kcal == 0 {
@@ -949,9 +954,14 @@ func checkHousehold(t *testing.T, in instance, kcal float64) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f, err := in.db.FoodByKey(t.Context(), partner.ID, kefirNames[in.user.Locale], "")
-	if err != nil || f.Nutrients.Kcal != kcal {
-		t.Errorf("the partner's kefir = %+v, %v; want %v kcal, the user's correction", f.Nutrients, err, kcal)
+	want := correctedKefir
+	want.Kcal = kcal
+	for who, id := range map[string]uuid.UUID{"the user's": in.user.ID, "the partner's": partner.ID} {
+		f, err := in.db.FoodByKey(t.Context(), id, kefirNames[in.user.Locale], "")
+		n := f.Nutrients
+		if err != nil || f.Basis != food.Per100ml || n.Kcal != want.Kcal || n.Protein != want.Protein || n.Carbs != want.Carbs || n.Fat != want.Fat {
+			t.Errorf("%s kefir = %s %+v, %v; want %+v per 100 ml, the user's correction", who, f.Basis, n, err, want)
+		}
 	}
 }
 
