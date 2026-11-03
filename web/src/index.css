@@ -176,7 +176,7 @@
   /*
     What an AI coach did, and only that: its mark, its proposal's edge.
   */
-  --coach: #6a4bd8;
+  --coach: #7c43da;
   --coach-soft: #ece8fc;
   /*
     A day past its target, beyond what the plan's week takes in its
@@ -211,7 +211,10 @@
     --background: #0b0f16;
     --foreground: #e8ecf4;
     --card: #131925;
-    /* An overlay is lighter than the card it is over. */
+    /*
+      A popover (an ⓘ's, the time zones' list) is lighter than the card
+      it is over; a sheet or a menu is still a card.
+    */
     --popover: #182030;
     --surface-2: #1b2231;
     --muted-foreground: #a3adbf;

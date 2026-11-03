@@ -2,11 +2,23 @@
 // palette check them by: WCAG's contrast, OKLab's distance, and how a
 // colour-blind eye sees one.
 
-// resolved is a token's value in a theme, following the tokens it names.
+// resolved is a token's value in a theme, following the tokens it names:
+// a colour, #rrggbb. A token the theme does not have, or one that is no
+// such colour, throws, or a measure of it would be NaN, and NaN is less
+// than no bound a test asks for.
 export function resolved(theme: Record<string, string>, name: string): string {
-  const value = theme[name] ?? ''
+  const value = theme[name]
+  if (value === undefined) {
+    throw new Error(`no token ${name}`)
+  }
   const named = /^var\((--[\w-]+)\)$/.exec(value)?.[1]
-  return named === undefined ? value : resolved(theme, named)
+  if (named !== undefined) {
+    return resolved(theme, named)
+  }
+  if (!/^#[\da-f]{6}$/i.test(value)) {
+    throw new Error(`${name} is ${value}, no #rrggbb`)
+  }
+  return value
 }
 
 type Rgb = [number, number, number]

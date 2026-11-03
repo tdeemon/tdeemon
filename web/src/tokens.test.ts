@@ -120,10 +120,20 @@ test.each(themes)('in the %s theme, a control’s edge is not a divider’s', (_
 })
 
 // The coach's violet marks only what an AI did: it is none of the
-// colours that mean something else.
+// colours that mean something else, nor a macro's.
 test.each(themes)('in the %s theme, the coach’s colour is none of the others', (_, theme) => {
-  const near = meaning
+  const near = [...meaning, ...macros]
     .map((m) => [m, distance(resolved(theme, '--coach'), resolved(theme, m))] as const)
     .filter(([, d]) => d < apart)
   expect(near).toEqual([])
+})
+
+// A token missing, or no colour, is an error, not a measure that passes
+// every bound as NaN would.
+test('a token the theme does not have, or no colour, is an error', () => {
+  const theme = { '--a': 'var(--b)', '--b': '#0b7a5e', '--c': 'var(--gone)', '--d': '1px' }
+  expect(resolved(theme, '--a')).toBe('#0b7a5e')
+  expect(() => resolved(theme, '--gone')).toThrow('no token --gone')
+  expect(() => resolved(theme, '--c')).toThrow('no token --gone')
+  expect(() => resolved(theme, '--d')).toThrow('no #rrggbb')
 })

@@ -767,6 +767,16 @@ test('the lists show the foods eaten lately and most, and the meals, each as the
 
   fireEvent.click(sheet.getByRole('tab', { name: 'Recent' }))
   expect(found()).toEqual(['Add: Rye bread'])
+  // The list chosen is a chip chosen as any other is: the soft green and
+  // a check, on it alone; each has a control's edge.
+  const tabs = sheet.getAllByRole('tab')
+  expect(
+    tabs.filter((tab) => tab.querySelector('svg') !== null).map((tab) => tab.textContent),
+  ).toEqual(['Recent'])
+  for (const tab of tabs) {
+    expect(tab.className).toContain('border-control-border')
+    expect(tab.className).toContain('data-active:bg-primary-soft')
+  }
   fireEvent.click(sheet.getByRole('tab', { name: 'Frequent' }))
   await sheet.findByRole('button', { name: /^Skyr/ })
   expect(found()).toEqual(['Add: Skyr', 'Add: Rye bread'])
