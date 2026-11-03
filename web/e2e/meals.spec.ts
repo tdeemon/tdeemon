@@ -83,6 +83,13 @@ test('a meal moved to the day before says so, and its toast brings it back', asy
   })
   expect(logged.ok()).toBe(true)
   const snack = page.getByRole('article').filter({ hasText: 'Late snack' })
+  // What the server's CSP refuses (an inline <style>) says so in the page.
+  const refused: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error' && message.text().includes('Content Security Policy')) {
+      refused.push(message.text())
+    }
+  })
 
   await page.goto('/')
   await openMeal(snack)
@@ -94,6 +101,7 @@ test('a meal moved to the day before says so, and its toast brings it back', asy
   await day.click()
   await page.getByRole('option', { name: 'Yesterday' }).click()
   await expect(day).toHaveText('Yesterday')
+  expect(refused).toEqual([])
   await editor.getByRole('button', { name: 'Save the meal' }).click()
   await expect(snack).toHaveCount(0)
   await expect(page.getByText(/^Moved to /)).toBeVisible()
