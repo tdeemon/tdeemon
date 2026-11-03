@@ -306,6 +306,63 @@ func TestMergeAnArchivedFoodComesArchived(t *testing.T) {
 	householdHolds(t, db, ana, ivo)
 }
 
+// In a household of two joined by a third, a food one member archived
+// and the other has in use comes to the third in use, one both archived
+// comes archived, and so does a recipe; each of the two keeps their own.
+// A food saved archived afterwards comes to the others archived.
+func TestMergeIntoAHouseholdOfArchivedFoods(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	mia := addEva(t, db)
+	saveFood(t, db, ana, bar())
+	saveFood(t, db, ana, kefir())
+	join(t, db, ana, ivo)
+	archive := func(who uuid.UUID, name string) {
+		t.Helper()
+		if err := db.SetFoodArchived(t.Context(), who, testActor, copyNamed(t, db, who, name).ID, true, t0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	archive(ana, bar().Name)
+	archive(ana, "Kefir")
+	archive(ivo, "Kefir")
+	porridge := curryOf(t, saveFood(t, db, mia, renamed(chickenBreast(), "Oats")), saveFood(t, db, mia, renamed(kefir(), "Milk")))
+	porridge.Food.Name, porridge.Food.Aliases = "Mia's porridge", nil
+	dish := saveRecipe(t, db, mia, porridge)
+	if err := db.SetFoodArchived(t.Context(), mia, testActor, dish.Food.ID, true, t0); err != nil {
+		t.Fatal(err)
+	}
+
+	join(t, db, ana, mia)
+	for _, c := range []struct {
+		who      uuid.UUID
+		name     string
+		archived bool
+	}{
+		{mia, bar().Name, false},
+		{mia, "Kefir", true},
+		{ana, bar().Name, true},
+		{ivo, bar().Name, false},
+		{ana, "Mia's porridge", true},
+		{ivo, "Mia's porridge", true},
+	} {
+		if f := copyNamed(t, db, c.who, c.name); f.Archived != c.archived {
+			t.Errorf("%s's %s: archived %v, want %v", c.who, c.name, f.Archived, c.archived)
+		}
+	}
+	householdHolds(t, db, ana, ivo, mia)
+
+	withdrawn := chickenBreast()
+	withdrawn.Archived = true
+	saveFood(t, db, ivo, withdrawn)
+	for _, who := range []uuid.UUID{ana, mia} {
+		if f := copyNamed(t, db, who, withdrawn.Name); !f.Archived {
+			t.Errorf("the copy of Ivo's chicken saved archived: %+v, want it archived", f)
+		}
+	}
+}
+
 // Two foods of no name in common match by a barcode, else by the
 // catalog's row, the most recently saved first; the invited user's takes
 // the inviter's name.

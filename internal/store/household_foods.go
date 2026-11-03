@@ -90,7 +90,9 @@ func householdSeats(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Fo
 
 // seatMate gives member m a seat in share of food f, as householdSeats
 // does: it returns their food of it, and whether it seated them (a new
-// seat, or one they left brought back), not a live one they have.
+// seat, or one they left brought back), not a live one they have. A new
+// seat's food is archived as f is: a food saved withdrawn comes to no
+// one in use.
 func seatMate(ctx context.Context, tx *sql.Tx, share string, m uuid.UUID, f food.Food, now time.Time) (shareMember, bool, error) {
 	var id string
 	var left sql.NullString
@@ -113,7 +115,7 @@ func seatMate(ctx context.Context, tx *sql.Tx, share string, m uuid.UUID, f food
 	if err := checkMemberName(ctx, tx, to, f); err != nil {
 		return shareMember{}, false, err
 	}
-	if err := insertFood(ctx, tx, m, food.Food{ID: to.Food, Name: f.Name, Brand: f.Brand, Basis: f.Basis, Source: f.Source},
+	if err := insertFood(ctx, tx, m, food.Food{ID: to.Food, Name: f.Name, Brand: f.Brand, Basis: f.Basis, Source: f.Source, Archived: f.Archived},
 		food.Key(f.Name), food.Key(f.Brand), now); err != nil {
 		return shareMember{}, false, err
 	}
