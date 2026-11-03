@@ -19,9 +19,9 @@ import (
 // product, which every user's search finds; another user's stay theirs,
 // so no one but an admin changes what every user finds. A row is kept in
 // step with the latest save of an admin's food that names it
-// (foods.catalog_id): the last values win. A barcode stays the product's that had it first. A
-// user's notes and aliases stay theirs, and a user's deletion leaves
-// the catalog.
+// (foods.catalog_id): the last values win. A barcode stays the
+// product's that had it first. A user's notes and aliases stay theirs,
+// and a user's deletion leaves the catalog.
 
 // catalogued reports whether f's values go into the catalog: a food in
 // use, of declared values.
@@ -37,11 +37,6 @@ func catalogued(f food.Food) bool {
 	return false
 }
 
-// declared reports whether a food of source s is of declared values.
-func declared(s food.Source) bool {
-	return s == food.Label || s == food.Reference || s == food.OpenFoodFacts
-}
-
 // catalogState is a catalog row as a save found it, for the save's
 // undo: its food, its version, and the save before the catalog it was
 // made of, if any (legacy_save).
@@ -55,8 +50,8 @@ type catalogState struct {
 
 // syncCatalog puts userID's food f, which was was (nil for a new one),
 // as its save of event saved it, into
-// the catalog, unless it is not catalogued (an admin's of declared
-// values before may then hide its row, hideRow) or userID is no admin (whose copy of a row is linked
+// the catalog, unless it is not catalogued (an admin's may then hide
+// its row, hideRow; a new food names none) or userID is no admin (whose copy of a row is linked
 // to it alone), links f to its row, and
 // records what it did for the save's undo (catalog_saves). The row is
 // the product of f's name and brand; else the row f names already,
@@ -68,7 +63,7 @@ func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food,
 		return nil
 	}
 	if !catalogued(f) {
-		if was == nil || !declared(was.Source) {
+		if was == nil {
 			return nil
 		}
 		return hideRow(ctx, tx, userID, f, saved)

@@ -177,7 +177,9 @@ too, and a declared save shows it again; an undo puts it back. A
 household's food is each member's, so a member's change of one an
 admin keeps is the admin's food's too, and goes into the row with the
 admin's next save. Rows users wrote before the rule stay, and a former
-admin's undo still puts back what their own save did. One
+admin's undo still puts back what their own save did; an undo of a
+save from before the rule shows or hides a row as that save left it
+(rows hidden then were hidden by the migration). One
 product is one row, by its name and brand, else the row the food went
 into before (renamed with it), else one of its barcodes; the latest
 save of an admin's food wins, but a barcode stays the product's that
