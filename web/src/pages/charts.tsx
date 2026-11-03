@@ -29,6 +29,7 @@ import { byMonth, firstDay, spans, weeksOf, type Span } from '@/components/progr
 import { card, entry } from '@/components/progress/styles'
 import { VerdictHero } from '@/components/progress/verdict-hero'
 import { WeeklyTable } from '@/components/progress/weekly-table'
+import { SettingsAvatar } from '@/components/settings-avatar'
 import { buttonVariants } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented'
 import { rounded, useFormat } from '@/i18n/format'
@@ -138,7 +139,10 @@ export function ChartsPage() {
   return (
     <section className="space-y-3 lg:space-y-4">
       <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <h1 className="text-title">{t.charts.title}</h1>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-title">{t.charts.title}</h1>
+          <SettingsAvatar className="-my-1.5" />
+        </div>
         <SegmentedControl
           legend={t.charts.span}
           hideLegend

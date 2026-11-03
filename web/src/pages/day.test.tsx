@@ -805,7 +805,7 @@ test("another day's header has its date between the arrows, its type and the way
   }
   // In the order they are read and shown: the arrow back, the date, its
   // type and the recent changes, the way back to today under them, then
-  // the arrow ahead.
+  // the arrow ahead, and the user's mark, to the settings.
   const parts = Array.from(header.querySelectorAll('a, h1, button')).map(
     (e) => e.getAttribute('aria-label') ?? e.textContent,
   )
@@ -816,6 +816,7 @@ test("another day's header has its date between the arrows, its type and the way
     'Zadnje promjene',
     'Natrag na danas',
     'Dan poslije',
+    'Postavke i račun',
   ])
   // Once, there: not at the page's foot too.
   expect(screen.getAllByRole('link', { name: 'Natrag na danas' })).toHaveLength(1)

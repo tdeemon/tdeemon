@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { sessionQuery } from '@/api/session'
 import { setLocale } from '@/i18n/locale'
 import { setTheme } from '@/lib/theme'
-import { day, fakeServer, renderAt, signedIn, today, unreachable } from '@/test/app'
+import { day, fakeServer, problem, renderAt, signedIn, today, unreachable } from '@/test/app'
 
 afterEach(() => {
   cleanup()
@@ -36,7 +36,7 @@ test('the sections are linked from one navigation, the current one marked', asyn
   ])
   expect(links.filter((a) => a.getAttribute('aria-current') === 'page')).toEqual([links[1]])
   // Log a meal is no section, but a button of each: the bar's middle, the
-  // sidebar's first.
+  // rail's and the sidebar's first.
   expect(within(await nav()).getAllByRole('button', { name: 'Log a meal' })).toHaveLength(2)
   expect(within(await nav()).getByRole('link', { name: 'Today' })).toBe(links[0])
 })
@@ -141,6 +141,85 @@ test('the charts are the progress now, and the plan its own section', async () =
   await waitFor(() => {
     expect(plan.state.location.pathname).toBe('/plan')
   })
+})
+
+test("a phone's page leads to the settings by the user's mark in its header", async () => {
+  fakeServer({
+    ...signedIn(),
+    'GET /api/v1/foods': () => Response.json({ foods: [] }),
+  })
+  const router = renderAt('/foods')
+  await screen.findByRole('heading', { name: 'Foods' })
+
+  // In the page, not the sections: the bar has no room for it.
+  const mark = within(screen.getByRole('main')).getByRole('link', { name: 'Settings and account' })
+  expect(mark.textContent).toBe('A')
+  expect(within(await nav()).queryByRole('link', { name: 'Settings and account' })).toBeNull()
+  fireEvent.click(mark)
+  await screen.findByRole('heading', { name: 'Settings', level: 1 })
+  expect(router.state.location.pathname).toBe('/settings')
+
+  // The day's and the plan's headers have it too.
+  const hasMark = async (path: '/' | '/plan', heading: string) => {
+    await router.navigate({ to: path })
+    await screen.findByRole('heading', { name: heading, level: 1 })
+    expect(
+      within(screen.getByRole('main')).getByRole('link', { name: 'Settings and account' }),
+    ).toBeDefined()
+  }
+  await hasMark('/', 'Today')
+  await hasMark('/plan', 'Plan')
+})
+
+test("a form's page has no bar of sections on a phone, nor the user's mark", async () => {
+  fakeServer({
+    ...signedIn(),
+    'GET /api/v1/foods/0193c3a5-0000-7000-8000-0000000000f1': () => problem(404),
+  })
+  const router = renderAt('/plan/notes')
+  await screen.findByRole('heading', { name: 'Notes for your AI coach', level: 1 })
+
+  // The bar is the phone's (max-tablet:), the rail and the sidebar stay.
+  const bar = await nav()
+  expect(bar.className.split(' ')).toContain('max-tablet:hidden')
+  expect(screen.queryByRole('link', { name: 'Settings and account' })).toBeNull()
+
+  await router.navigate({
+    to: '/foods/$id',
+    params: { id: '0193c3a5-0000-7000-8000-0000000000f1' },
+    search: { edit: true },
+  })
+  await screen.findByText('There is no such food.')
+  expect((await nav()).className.split(' ')).toContain('max-tablet:hidden')
+
+  await router.navigate({ to: '/plan' })
+  await screen.findByRole('heading', { name: 'Plan', level: 1 })
+  expect((await nav()).className.split(' ')).not.toContain('max-tablet:hidden')
+})
+
+test('an address the app has no page of leads home, and a signed-in user to the settings', async () => {
+  fakeServer(signedIn())
+  renderAt('/nowhere')
+
+  expect(await screen.findByRole('link', { name: 'Settings and account' })).toBeDefined()
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Page not found')
+})
+
+test("the sidebar's search finds a food, as / does", async () => {
+  fakeServer({
+    ...signedIn(),
+    'GET /api/v1/foods': () => Response.json({ foods: [] }),
+  })
+  const router = renderAt('/')
+  await screen.findByRole('heading', { name: 'Today' })
+
+  fireEvent.click(within(await nav()).getByRole('button', { name: 'Search…' }))
+
+  const search = await screen.findByRole('searchbox', { name: 'Search the foods' })
+  await waitFor(() => {
+    expect(document.activeElement).toBe(search)
+  })
+  expect(router.state.location.pathname).toBe('/foods')
 })
 
 test('the user is named in the sidebar, by their initials too', async () => {

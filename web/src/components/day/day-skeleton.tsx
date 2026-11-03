@@ -10,47 +10,61 @@ const meals = [0, 1, 2]
 
 // DaySkeleton stands in for a day under its header while what it shows
 // comes (DayPage), in its shape: on a phone the week above the hero, its
-// ring, numbers and macros, and three meals' rows; on a desktop
-// (columns) the hero and the meals' table, and beside them the week, the
-// body and the check-in. A screen reader hears that it loads.
+// ring, numbers and macros, and three meals' rows; from a tablet's 768
+// px, the check-in and the body beside them; on a desktop (columns) the
+// hero and the meals' table, and beside them the week, the body and the
+// check-in. A screen reader hears that it loads.
 export function DaySkeleton({ columns }: { columns: boolean }) {
   const t = useMessages()
+  const phoneWeek = (
+    <div className="space-y-2">
+      <WeekDays />
+      <Skeleton className="h-11" />
+    </div>
+  )
+  const body = (
+    <div className="space-y-3 rounded-lg border bg-card p-4">
+      <Skeleton className="h-5.5 w-28" />
+      <div className="grid grid-cols-2 gap-2">
+        <Skeleton className="h-18" />
+        <Skeleton className="h-18" />
+      </div>
+    </div>
+  )
+  const checkIn = (
+    <div className="space-y-3 rounded-lg border bg-card p-4">
+      <Skeleton className="h-5.5 w-24" />
+      <Skeleton className="h-11" />
+    </div>
+  )
 
   return (
     <div aria-busy className="space-y-4">
       <output className="sr-only">{t.loading}</output>
-      {!columns && (
-        <div className="space-y-2">
-          <WeekDays />
-          <Skeleton className="h-11" />
-        </div>
-      )}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start">
-        <div className="space-y-4 lg:col-span-8">
+      {!columns && phoneWeek}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start lg:grid-cols-12">
+        <div className="space-y-4 lg:col-span-7 xl:col-span-8">
           <Hero columns={columns} />
           <div className="space-y-2">
             <Skeleton className="h-6.5 w-24" />
             {columns ? <MealTable /> : <MealCards />}
           </div>
         </div>
-        {columns && (
-          <div className="space-y-4 lg:col-span-4">
+        {columns ? (
+          <div className="space-y-4 lg:col-span-5 xl:col-span-4">
             <div className="space-y-3 rounded-lg border bg-card p-4">
               <Skeleton className="h-5.5 w-28" />
               <WeekDays bars />
               <Skeleton className="h-11" />
             </div>
-            <div className="space-y-3 rounded-lg border bg-card p-4">
-              <Skeleton className="h-5.5 w-28" />
-              <div className="grid grid-cols-2 gap-2">
-                <Skeleton className="h-18" />
-                <Skeleton className="h-18" />
-              </div>
-            </div>
-            <div className="space-y-3 rounded-lg border bg-card p-4">
-              <Skeleton className="h-5.5 w-24" />
-              <Skeleton className="h-11" />
-            </div>
+            {body}
+            {checkIn}
+          </div>
+        ) : (
+          // A phone's come after the meals, the day's skeleton enough.
+          <div className="hidden space-y-4 md:block">
+            {checkIn}
+            {body}
           </div>
         )}
       </div>

@@ -52,11 +52,12 @@ and the methodology as its resource, the API contract and the web app's frame
 whose new version a toast offers; signing in, under the product's mark
 and what it is, and out, an account made by an invite's link (a password
 or the provider), its
-sections in a bar at the bottom on a phone and
-a sidebar on a desktop, Log a meal over the screen shown, sheets with a
-handle, dragged down to close, keyboard shortcuts (a skip to the
-content, G and a letter to a section, ⌘Z or Ctrl+Z to undo the latest
-change), a light and a dark theme,
+sections in a bar at the bottom on a phone (none in a form, stepping
+down under a sheet, the settings an avatar in a page's header away),
+a rail on a tablet and a sidebar on a desktop, Log a meal over the
+screen shown, sheets with a handle, dragged down to close, keyboard
+shortcuts (a skip to the content, G and a letter to a section, ⌘Z or
+Ctrl+Z to undo the latest change), a light and a dark theme,
 each change said in a toast whose Undo takes it back, clear of a
 sheet's buttons, a delete's for 10 s, and after it the recent changes
 in a sheet, by whom, with Undo on the next, each number of

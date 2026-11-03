@@ -155,10 +155,9 @@ test("the plan lists what it rests on of the user's, each a row to its page, and
     )
   })
   expect(summaryOf(you.getByRole('link', { name: 'Notes for your AI coach' }))).toBe('None yet')
-  // A phone has the settings there too.
-  const settings = within(screen.getByRole('region', { name: 'Settings' }))
-  expect(settings.getByRole('link', { name: 'Appearance' })).toBeDefined()
-  expect(settings.getByRole('button', { name: 'Sign out' })).toBeDefined()
+  // The settings are not the plan's: a phone's header leads to them.
+  expect(screen.queryByRole('region', { name: 'Settings' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
 
   fireEvent.click(profile)
   await screen.findByRole('heading', { name: 'Profile', level: 1 })

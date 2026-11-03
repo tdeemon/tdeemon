@@ -167,6 +167,8 @@ test("another day's header on a desktop is laid out as today's", async () => {
     'Type of day: Rest day',
     'Recent changes',
     'Back to today',
+    // The user's mark, shown in a window too low for the sidebar.
+    'Settings and account',
   ])
   // The week beside the day: that week's.
   expect(await screen.findByRole('region', { name: 'This week' })).toBeDefined()

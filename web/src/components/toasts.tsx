@@ -31,7 +31,7 @@ export function Toasts() {
       <Toast.Portal>
         <Toast.Viewport
           aria-label={t.toast.region}
-          className="fixed inset-x-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-60 mx-auto flex max-w-md flex-col gap-2 outline-none lg:right-8 lg:bottom-8 lg:left-auto lg:mx-0 lg:w-96 sheet-open:max-lg:top-[max(0.5rem,env(safe-area-inset-top))] sheet-open:max-lg:bottom-auto sheet-open:lg:right-[calc(var(--container-md)+2rem)]"
+          className="fixed inset-x-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-60 mx-auto flex max-w-md flex-col gap-2 outline-none lg:right-8 lg:left-auto lg:mx-0 lg:w-96 sheet-open:max-lg:top-[max(0.5rem,env(safe-area-inset-top))] sheet-open:max-lg:bottom-auto sheet-open:lg:right-[calc(var(--container-md)+2rem)] tablet:bottom-8"
         >
           <List />
         </Toast.Viewport>

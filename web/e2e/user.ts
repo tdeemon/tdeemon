@@ -17,14 +17,11 @@ export async function signIn(page: Page, who: { email: string; password: string 
   await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
 }
 
-// toSettings goes to the settings as a phone does: they are a list under
-// the plan, each a row to its page.
+// toSettings goes to the settings as a phone does: by the user's mark in
+// the page's header, to their list, each a row to its page.
 export async function toSettings(page: Page) {
-  await page
-    .getByRole('navigation', { name: 'Sections' })
-    .getByRole('link', { name: 'Plan' })
-    .click()
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
+  await page.getByRole('main').getByRole('link', { name: 'Settings and account' }).click()
+  await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible()
 }
 
 // openMeal opens a meal's row, unless it is open: its items show, and its

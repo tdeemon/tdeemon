@@ -178,14 +178,16 @@ test('the settings are rows that say their value, each leading to its page and b
   fireEvent.click(devices)
   expect(await screen.findByRole('heading', { name: 'Devices and AI coaches' })).toBeDefined()
   expect(router.state.location.pathname).toBe('/settings/devices')
-  // Back to the settings on a desktop, to the plan on a phone.
+  // Back to the settings, on a phone too: the plan has them no more.
+  expect(within(screen.getByRole('main')).queryByRole('link', { name: 'Plan' })).toBeNull()
   fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Settings' }))
   await screen.findByRole('heading', { name: 'Settings', level: 1 })
+  expect(router.state.location.pathname).toBe('/settings')
   fireEvent.click(screen.getByRole('link', { name: 'Appearance' }))
   await screen.findByRole('heading', { name: 'Appearance' })
-  fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Plan' }))
-  await screen.findByRole('heading', { name: 'Plan', level: 1 })
-  expect(router.state.location.pathname).toBe('/plan')
+  fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Settings' }))
+  await screen.findByRole('heading', { name: 'Settings', level: 1 })
+  expect(router.state.location.pathname).toBe('/settings')
 })
 
 test("the user's name, language, time zone and day's start are changed, and the app follows", async () => {

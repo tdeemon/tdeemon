@@ -18,6 +18,8 @@ export const hr: Messages = {
     progress: 'Napredak',
     plan: 'Plan',
     settings: 'Postavke',
+    account: 'Postavke i račun',
+    search: 'Traži…',
     logMeal: 'Upiši obrok',
     darkTheme: 'Tamna tema',
     waits: 'Čeka prijedlog',

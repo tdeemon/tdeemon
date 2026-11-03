@@ -28,6 +28,10 @@ export const en = {
     progress: 'Progress',
     plan: 'Plan',
     settings: 'Settings',
+    // The user's mark in a phone's header, which leads to the settings.
+    account: 'Settings and account',
+    // The sidebar's way to search, the foods' for now.
+    search: 'Search…',
     logMeal: 'Log a meal',
     darkTheme: 'Dark theme',
     // Describes the plan's section while a proposal waits there.

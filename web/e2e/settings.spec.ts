@@ -21,7 +21,7 @@ test("the account's name and time zone are saved, and come back", async ({ page 
   await expect(zone).toHaveValue('Europe/Kyiv')
 
   // The list says them.
-  await page.getByRole('main').getByRole('link', { name: 'Plan' }).click()
+  await page.getByRole('main').getByRole('link', { name: 'Settings' }).click()
   await expect(page.getByText('Signed in as Ana M.')).toBeVisible()
   await expect(page.getByText('English · Europe/Kyiv · the day from 04:00')).toBeVisible()
 
@@ -38,8 +38,14 @@ test("the account's name and time zone are saved, and come back", async ({ page 
 
 test('the notes for a coach are saved, and come back', async ({ page }) => {
   await signIn(page)
-  await toSettings(page)
+  // What the plan rests on of the user's, under it.
+  await page
+    .getByRole('navigation', { name: 'Sections' })
+    .getByRole('link', { name: 'Plan' })
+    .click()
   await page.getByRole('link', { name: 'Notes for your AI coach' }).click()
+  // A form's page has the whole screen: no bar of sections.
+  await expect(page.getByRole('navigation', { name: 'Sections' })).toBeHidden()
 
   const notes = page.getByRole('textbox', { name: 'Notes for your AI coach' })
   await notes.fill('Knees: no running.')
