@@ -814,16 +814,19 @@ func TestListFoodsByNameInTheUsersAlphabet(t *testing.T) {
 		{"Croatian", ana, []string{"Banana", "cikla", "Čaj", "Ćevapi", "dinja", "Đumbir", "Sir", "Šunka", "zobene pahuljice", "Žganci"}},
 		{"English", en.ID, []string{"Banana", "Čaj", "Ćevapi", "cikla", "dinja", "Đumbir", "Sir", "Šunka", "Žganci", "zobene pahuljice"}},
 	} {
-		got, _, err := db.ListFoods(t.Context(), tc.id, false, "", store.ByName, 50, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var order []string
-		for _, f := range got {
-			order = append(order, f.Name)
-		}
-		if !slices.Equal(order, tc.want) {
-			t.Errorf("%s: %v, want %v", tc.who, order, tc.want)
+		// Foods no meal had: use and frequency go by the name too.
+		for _, order := range []store.FoodOrder{store.ByName, store.ByUse, store.ByFrequency} {
+			got, _, err := db.ListFoods(t.Context(), tc.id, false, "", order, 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var names []string
+			for _, f := range got {
+				names = append(names, f.Name)
+			}
+			if !slices.Equal(names, tc.want) {
+				t.Errorf("%s by %s: %v, want %v", tc.who, order, names, tc.want)
+			}
 		}
 	}
 }
