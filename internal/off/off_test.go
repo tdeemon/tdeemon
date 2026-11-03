@@ -134,6 +134,8 @@ func TestProductOfADrinkWithoutItsQuantityUnit(t *testing.T) {
 		{"330ml ℮", `"quantity": "330ml ℮"`, true},
 		{"1 litre", `"quantity": "1 litre"`, true},
 		{"12 fl oz (355 ml)", `"quantity": "12 fl oz (355 ml)"`, true},
+		{"6x33cl", `"quantity": "6x33cl"`, true},
+		{"12 oz, by weight", `"quantity": "12 oz"`, false},
 		{"500 g", `"quantity": "500 g"`, false},
 		// A quantity of no unit known: its serving's says.
 		{"a word, a serving in ml", `"quantity": "one bottle"`, true},

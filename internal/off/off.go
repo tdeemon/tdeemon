@@ -90,8 +90,8 @@ var fields = []string{
 // volumeUnits and massUnits are the units of a quantity sold by volume
 // or by weight, as Open Food Facts' products write them.
 var (
-	volumeUnits = []string{"ml", "cl", "dl", "l", "litre", "litres", "liter", "liters", "oz"}
-	massUnits   = []string{"g", "kg", "mg"}
+	volumeUnits = []string{"ml", "cl", "dl", "l", "lt", "ltr", "litre", "litres", "liter", "liters", "fl oz", "floz"}
+	massUnits   = []string{"g", "gr", "gram", "grams", "kg", "mg", "oz"}
 )
 
 // soldByVolume says whether p is sold by volume: by its quantity's unit,
@@ -128,15 +128,16 @@ func unitOfQuantity(quantity string) string {
 		rest := strings.TrimLeftFunc(q[i:], func(r rune) bool {
 			return r >= '0' && r <= '9' || r == '.' || r == ',' || unicode.IsSpace(r)
 		})
-		if after, ok := strings.CutPrefix(rest, "x"); ok && strings.TrimLeftFunc(after, unicode.IsSpace) != after {
+		if after, ok := strings.CutPrefix(rest, "x"); ok && after != "" &&
+			(unicode.IsSpace(rune(after[0])) || after[0] >= '0' && after[0] <= '9') {
 			return unitOfQuantity(after)
 		}
 		word := strings.FieldsFunc(rest, func(r rune) bool { return !unicode.IsLetter(r) })
 		switch {
 		case len(word) == 0:
 			return ""
-		case word[0] == "fl" && len(word) > 1:
-			return word[1]
+		case word[0] == "fl" && len(word) > 1 && word[1] == "oz":
+			return "fl oz"
 		}
 		return word[0]
 	}
