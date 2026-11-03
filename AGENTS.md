@@ -13,7 +13,10 @@ API. It is early: the skeleton, the database layer, users, sign-in
 (password, sessions, OpenID Connect), API tokens with scopes, foods
 (and the instance's catalog of the declared ones, which every user's
 search finds after their own, and a meal copies),
-meals, recipes (shared with other users too, by address), metrics and
+meals, recipes (shared with other users too, by address), households
+(users who keep one kitchen, every food and recipe of a member each
+member's, joined by an invite after a preview of the merge, left by a
+member alone), metrics and
 the plan (profile, phases, targets, limits) in the
 domain and the database with an event log and undo, the proposals of
 changes of the plan and their life in the domain and the database, the
@@ -145,7 +148,12 @@ list (the theme, the account with a time zone found by its name, its
 data exported as a ZIP and the account deleted once its address is typed,
 the admin's users (someone invited in a sheet whose link is shown once,
 the invites waiting, each revoked, the accounts deactivated, made an admin
-or deleted, each after it asks), the
+or deleted, each after it asks), the household (its members and the
+way out, someone invited in a sheet, the invites sent, each revoked,
+and those for the user's answer, declined or seen in a sheet of what
+joining does and joined, a stale merge shown anew; its invite a line on
+the day, its food's page saying a change is every member's, its
+recipe's members marked), the
 devices and AI coaches connected in a guided sheet, an access key (a
 token) shown once with the steps to give it (an AI coach's MCP address
 and commands, Health Auto Export's checklist) and its first call seen
@@ -242,8 +250,9 @@ details.
 - **One user's data stays theirs.** A store method for a user's rows
   takes the user's ID and filters by it; a handler takes the user from
   the request's principal. The one exception is a recipe its users
-  shared, which a member's save writes into the others' recipes, as
-  docs/conventions.md says. A new operation in the OpenAPI document adds
+  shared, and every food and recipe of a household's members, which a
+  member's save writes into the others' copies, as docs/conventions.md
+  says. A new operation in the OpenAPI document adds
   its case to `isolationCases` in `internal/api/isolation_test.go`, or
   the test fails, and a new kind of data adds rows of it for both users
   to `newIsolationEnv`; a new tool adds its case to

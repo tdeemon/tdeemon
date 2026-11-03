@@ -16,7 +16,9 @@ lower.
 
 ## Planned highlights
 
-- One container, one SQLite file, multi-user (household or friends).
+- One container, one SQLite file, multi-user (household or friends):
+  a household shares one kitchen, every food and recipe, while each
+  member's meals, weight and plan stay their own.
 - MCP server: any MCP client, with any model (Claude Code, Codex,
   Hermes, a local model), and coaching sessions that read the numbers
   as tdeemon computes them.
