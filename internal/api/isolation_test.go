@@ -230,12 +230,20 @@ func saveIsolationFoods(t *testing.T, db *store.DB, u user.User, now time.Time) 
 
 // saveIsolationCatalog gives u a label's product the other party has
 // too, so each has a save of it in the catalog (catalog_saves), which
-// holds it once, and neither's search of it shows it.
+// holds it once, and neither's search of it shows it: the admin's save
+// writes the row, and the other's food is a copy of it.
 func saveIsolationCatalog(t *testing.T, db *store.DB, u user.User, now time.Time) {
 	t.Helper()
 	crackers := food.Food{
 		ID: uuid.NewV7(), Name: "Rye crackers", Brand: "Isola", Basis: food.Per100g, Source: food.Label,
 		Nutrients: food.Nutrients{Kcal: 380, Protein: 10, Carbs: 70, Fat: 4},
+	}
+	rows, err := db.FindCatalog(t.Context(), u.ID, "rye crackers", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) == 1 {
+		crackers.CopyOf = rows[0].ID
 	}
 	if _, err := db.SaveFood(t.Context(), u.ID, isolationActor, crackers, now); err != nil {
 		t.Fatalf("save %s's food: %v", u.Name, err)

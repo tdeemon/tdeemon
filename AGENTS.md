@@ -11,7 +11,7 @@ tdeemon is a self-hosted nutrition tracker with an adaptive TDEE: one Go
 binary with SQLite and a React web app inside, an MCP server and a REST
 API. It is early: the skeleton, the database layer, users, sign-in
 (password, sessions, OpenID Connect), API tokens with scopes, foods
-(and the instance's catalog of the declared ones, which every user's
+(and the instance's catalog of the admins' declared ones, which every user's
 search finds after their own, and a meal copies),
 meals, recipes (shared with other users too, by address), households
 (users who keep one kitchen, every food and recipe of a member each

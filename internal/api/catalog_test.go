@@ -12,7 +12,7 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/domain/user"
 )
 
-// catalogEnv is an instance whose other user, Zoe, has a protein bar of
+// catalogEnv is an instance whose other user, Zoe, an admin, has a protein bar of
 // a label's, which is in the catalog, and a stew of her estimate, which
 // is not; and Ana's session.
 type catalogEnv struct {
@@ -29,7 +29,7 @@ const barCode = "4006381333931"
 func newCatalogEnv(t *testing.T) catalogEnv {
 	t.Helper()
 	e := catalogEnv{mealsEnv: newMealsEnv(t)}
-	e.zoe = e.in.addUser(t, user.RoleUser)
+	e.zoe = e.in.addUser(t, user.RoleAdmin)
 	e.bar = food.Food{
 		ID: uuid.NewV7(), Name: "Protein bar", Brand: "Brawn", Basis: food.Per100g, Source: food.Label,
 		Nutrients: food.Nutrients{Kcal: 380, Protein: 30, Carbs: 40, Fat: 11},

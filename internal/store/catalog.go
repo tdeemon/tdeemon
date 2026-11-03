@@ -14,11 +14,12 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/domain/food"
 )
 
-// The catalog is the instance's foods, no user's: every user's declared
+// The catalog is the instance's foods, no user's: an admin's declared
 // foods (a label's, Open Food Facts', a food table's) come to one row a
-// product, which every user's search finds. A row is kept in step with
-// the latest save of a user's food that names it (foods.catalog_id): the
-// last values win. A barcode stays the product's that had it first. A
+// product, which every user's search finds; another user's stay theirs,
+// so no one but an admin changes what every user finds. A row is kept in
+// step with the latest save of an admin's food that names it
+// (foods.catalog_id): the last values win. A barcode stays the product's that had it first. A
 // user's notes and aliases stay theirs, and a user's deletion leaves
 // the catalog.
 
@@ -46,7 +47,8 @@ type catalogState struct {
 }
 
 // syncCatalog puts userID's food f, as its save of event saved it, into
-// the catalog, unless it is not catalogued, links f to its row, and
+// the catalog, unless it is not catalogued or userID is no admin (whose
+// copy of a row is linked to it alone), links f to its row, and
 // records what it did for the save's undo (catalog_saves). The row is
 // the product of f's name and brand; else the row f names already,
 // renamed to f's; else the row of one of f's barcodes; else a new one.
@@ -61,10 +63,8 @@ func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food,
 	if err != nil {
 		return err
 	}
-	if f.CopyOf != uuid.Nil() {
-		if copied, err := linkCopy(ctx, tx, userID, f, saved, link); err != nil || copied {
-			return err
-		}
+	if done, err := linkedAlone(ctx, tx, userID, f, saved, link); err != nil || done {
+		return err
 	}
 	target, err := catalogTarget(ctx, tx, userID, f, nameKey, brandKey)
 	if err != nil {
@@ -96,6 +96,28 @@ func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food,
 	_, err = tx.ExecContext(ctx, `INSERT INTO catalog_saves (user_id, event_id, catalog_id, version, before_state, link_before)
 		VALUES (?, ?, ?, ?, ?, ?)`, userID.String(), saved.String(), target.id, version, state, link)
 	return err
+}
+
+// linkedAlone does what syncCatalog does to a copy of a row, which it
+// links (linkCopy), and to no admin's save, nothing, and reports whether
+// it did: the rest is an admin's save's.
+func linkedAlone(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, saved uuid.UUID, link sql.NullString) (bool, error) {
+	if f.CopyOf != uuid.Nil() {
+		if copied, err := linkCopy(ctx, tx, userID, f, saved, link); err != nil || copied {
+			return true, err
+		}
+	}
+	admin, err := isAdmin(ctx, tx, userID)
+	return !admin, err
+}
+
+// isAdmin reports whether userID is an admin of the instance, active:
+// the one who writes the catalog.
+func isAdmin(ctx context.Context, tx *sql.Tx, userID uuid.UUID) (bool, error) {
+	var admin bool
+	err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM users WHERE id = ? AND role = 'admin' AND disabled_at IS NULL)",
+		userID.String()).Scan(&admin)
+	return admin, err
 }
 
 // copyVersion is the version a copy's save records (catalog_saves): no
@@ -432,14 +454,18 @@ func foodCatalogID(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID) (sql.N
 const catalogColumns = `c.id, c.name, c.brand, c.basis, c.kcal, c.protein, c.carbs, c.fat,
 	c.fiber, c.saturated_fat, c.sugars, c.salt, c.polyols, c.alcohol, c.portion_g, c.source, '', 0`
 
-// catalogShown holds a row of the catalog c to be shown: one a food of
-// declared values names, archived too, or none at all (its users gone).
-// A row all of whose foods are of no declared values now, such as a
-// plate first saved as a label's and then as an estimate, is not: no one
-// says its values are a label's. The foods keep their link, so a save of
-// one as declared again, or an undo, shows it again.
-const catalogShown = `(NOT EXISTS (SELECT 1 FROM foods AS l WHERE l.catalog_id = c.id)
-	OR EXISTS (SELECT 1 FROM foods AS l WHERE l.catalog_id = c.id AND l.source IN ('label', 'off', 'reference')))`
+// catalogShown holds a row of the catalog c to be shown: one an admin's
+// food of declared values names, archived too, or no admin's food at all
+// (their users gone, or users' copies of it alone). A row all of whose
+// admins' foods are of no declared values now, such as a plate first
+// saved as a label's and then as an estimate, is not: no one says its
+// values are a label's. Another user's food counts for nothing, so their
+// copy made an estimate hides the row from no one. The foods keep their
+// link, so a save of one as declared again, or an undo, shows it again.
+const catalogShown = `(NOT EXISTS (SELECT 1 FROM foods AS l JOIN users AS u ON u.id = l.user_id
+		WHERE l.catalog_id = c.id AND u.role = 'admin')
+	OR EXISTS (SELECT 1 FROM foods AS l JOIN users AS u ON u.id = l.user_id
+		WHERE l.catalog_id = c.id AND u.role = 'admin' AND l.source IN ('label', 'off', 'reference')))`
 
 // FindCatalog returns up to limit of the catalog's foods that match
 // query as FindFoods matches, but the ones userID has already: a food of

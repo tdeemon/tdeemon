@@ -359,6 +359,10 @@ func TestUndoOfALinkToARowGone(t *testing.T) {
 	actor := event.Actor{Kind: event.User, Client: "web"}
 	now := time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC)
 	apple.Name = "Jabuka zelena"
+	// An admin's save, which writes the catalog.
+	if _, err := db.write.ExecContext(t.Context(), "UPDATE users SET role = 'admin' WHERE id = ?", ivo.String()); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := db.SaveFood(t.Context(), ivo, actor, apple, now); err != nil {
 		t.Fatal(err)
 	}
