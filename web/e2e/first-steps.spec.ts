@@ -31,6 +31,8 @@ test("a new user's first steps lead to a plan, one ticked at a time", async ({ p
   await profile.getByRole('textbox', { name: /Height/ }).fill('166')
   await profile.getByRole('button', { name: 'Save' }).click()
   await expect(profile.getByText('A plan has all it needs of you.')).toBeVisible()
+  // A form's page has no bar of sections: back to the plan, then today.
+  await page.getByRole('main').getByRole('link', { name: 'Plan' }).click()
   await page
     .getByRole('navigation', { name: 'Sections' })
     .getByRole('link', { name: 'Today' })

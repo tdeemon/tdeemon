@@ -330,8 +330,8 @@ test("a phone's day is one column as before, today's Croatian date on one line",
     await withTarget(page)
     await page.goto('/')
 
-    // The date under "Danas", the day's type beside the title: the date
-    // on a line of its own.
+    // The date under "Danas", the user's mark beside the title and the
+    // day's type under the date: the date on a line of its own.
     const title = page.getByRole('heading', { level: 1, name: 'Danas' })
     await expect(title).toBeVisible()
     const date = page.locator('header').filter({ has: title }).locator('p')
@@ -342,7 +342,10 @@ test("a phone's day is one column as before, today's Croatian date on one line",
       boxOf(page.getByRole('button', { name: /^Tip dana: / })),
     ])
     expect(when.y).toBeGreaterThanOrEqual(heading.y + heading.height - 1)
-    expect(type.y).toBeLessThan(when.y)
+    expect(type.y).toBeGreaterThanOrEqual(when.y + when.height - 1)
+    const mark = await boxOf(page.getByRole('link', { name: 'Postavke i račun' }))
+    expect(mark.y).toBeLessThan(when.y)
+    expect(mark.x).toBeGreaterThan(heading.x + heading.width)
 
     // The week above the day; then the day, its meals' cards, the
     // check-in and the body, one under another, as wide.
