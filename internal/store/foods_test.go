@@ -785,6 +785,49 @@ func TestListFoods(t *testing.T) {
 	}
 }
 
+// By name, a list is in the alphabet of the user's language: in
+// Croatian Č and Ć after C, Đ after D, Š after S and Ž after Z; in
+// English each beside its plain letter. Case does not count.
+func TestListFoodsByNameInTheUsersAlphabet(t *testing.T) {
+	t.Parallel()
+
+	db, ana, _ := withTwoUsers(t)
+	en := newUser("eva@example.com")
+	en.Locale = "en"
+	if err := db.CreateUser(t.Context(), en, ""); err != nil {
+		t.Fatal(err)
+	}
+	names := []string{"Žganci", "zobene pahuljice", "Šunka", "Sir", "Đumbir", "dinja", "Ćevapi", "Čaj", "cikla", "Banana"}
+	for _, u := range []uuid.UUID{ana, en.ID} {
+		for _, name := range names {
+			saveFood(t, db, u, food.Food{
+				ID: uuid.NewV7(), Name: name, Basis: food.Per100g, Source: food.Estimate,
+				Nutrients: food.Nutrients{Kcal: 100, Protein: 5, Carbs: 10, Fat: 3},
+			})
+		}
+	}
+	for _, tc := range []struct {
+		who  string
+		id   uuid.UUID
+		want []string
+	}{
+		{"Croatian", ana, []string{"Banana", "cikla", "Čaj", "Ćevapi", "dinja", "Đumbir", "Sir", "Šunka", "zobene pahuljice", "Žganci"}},
+		{"English", en.ID, []string{"Banana", "Čaj", "Ćevapi", "cikla", "dinja", "Đumbir", "Sir", "Šunka", "Žganci", "zobene pahuljice"}},
+	} {
+		got, _, err := db.ListFoods(t.Context(), tc.id, false, "", store.ByName, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var order []string
+		for _, f := range got {
+			order = append(order, f.Name)
+		}
+		if !slices.Equal(order, tc.want) {
+			t.Errorf("%s: %v, want %v", tc.who, order, tc.want)
+		}
+	}
+}
+
 // ListFoods by frequency counts the meals of the latest 100 alone: a food
 // of many meals before them comes after one of a few among them.
 func TestListFoodsByFrequency(t *testing.T) {

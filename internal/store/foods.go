@@ -1030,8 +1030,8 @@ type FoodOrder string
 
 // The orders of ListFoods.
 const (
-	// ByName sorts by name, then brand, in any case (food.Key), by code
-	// point: a letter with a diacritic after the plain ones.
+	// ByName sorts by name, then brand, in any case (food.Key), in the
+	// alphabet of the user's language (collation.go).
 	ByName FoodOrder = "name"
 	// ByUse puts the food a meal had last first, and the foods no meal
 	// has had after the others, by name.
@@ -1052,7 +1052,8 @@ const MaxFoodList = 200
 // order, from offset and at most limit of them, with their servings,
 // aliases and barcodes; and how many such foods there are.
 func (db *DB) ListFoods(ctx context.Context, userID uuid.UUID, archived bool, source food.Source, order FoodOrder, limit, offset int) ([]food.Food, int, error) {
-	by := "f.name_key, f.brand_key, f.id"
+	// The collation goes in at the transaction, of the user's language.
+	by := "f.name_key COLLATE %[1]s, f.brand_key COLLATE %[1]s, f.id"
 	lastUse := `(SELECT max(m.eaten_at) FROM meal_items AS i JOIN meals AS m ON m.id = i.meal_id AND m.user_id = i.user_id
 				WHERE i.user_id = f.user_id AND i.food_id = f.id) DESC NULLS LAST, `
 	switch order {
@@ -1077,11 +1078,16 @@ func (db *DB) ListFoods(ctx context.Context, userID uuid.UUID, archived bool, so
 			uid, archived, source, source).Scan(&total); err != nil {
 			return err
 		}
+		var locale string
+		if err := tx.QueryRowContext(ctx, "SELECT locale FROM users WHERE id = ?", uid).Scan(&locale); err != nil &&
+			!errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
 		var err error
 		out, err = queryFoods(ctx, tx, `
 			SELECT `+foodColumns+` FROM foods AS f
 			WHERE f.user_id = ? AND f.archived = ? AND (? = '' OR f.source = ?) AND `+notWithdrawn+`
-			ORDER BY `+by+`
+			ORDER BY `+fmt.Sprintf(by, namesCollation(locale))+`
 			LIMIT ? OFFSET ?`, uid, archived, source, source, limit, offset)
 		if err != nil {
 			return err
