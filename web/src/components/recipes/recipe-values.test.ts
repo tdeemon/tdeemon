@@ -14,7 +14,13 @@ import {
   portionsOf,
   yieldOf,
 } from '@/components/recipes/recipe-values'
-import { potOf, weighingOf, weighingWrong, withPot } from '@/components/recipes/weighing'
+import {
+  potOf,
+  weighingOf,
+  weighingWrong,
+  withPot,
+  yieldOfWeighing,
+} from '@/components/recipes/weighing'
 import { en } from '@/i18n/en'
 import { useFormat } from '@/i18n/format'
 
@@ -103,6 +109,11 @@ test('the pot gives the weight, and is remembered', () => {
   const full = withPot(w, { full: '2900' }, parse, field)
   expect(full.weight).toBe('1700')
   expect(weighingWrong(withPot(w, { full: '1000' }, parse, field), parse)).toEqual({ pot: true })
+  // A full pot no heavier than the empty one keeps no weight of before.
+  const lighter = withPot(full, { full: '1100' }, parse, field)
+  expect(lighter.weight).toBe('')
+  expect(yieldOfWeighing(lighter, parse)).toBeUndefined()
+  expect(withPot(full, { full: '1200' }, parse, field).weight).toBe('')
   expect(weighingWrong({ ...w, weight: '0' }, parse)).toEqual({ weight: true })
   expect(potOf({ ...w, empty: '' }, parse, 1200)).toBe(1200)
   expect(potOf({ ...w, empty: '900' }, parse, 1200)).toBe(900)
