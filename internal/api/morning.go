@@ -200,17 +200,17 @@ func morningText(today day.Date, td, yd dayBody, sum summaryBody, waits day.Date
 
 // phrases are the words of the morning summary in a language.
 type phrases struct {
-	title, sleep, weight, trend, since, bodyFat            string
-	yesterday, trainingDay, excluded, nothingLogged        string
-	activity, steps, active, exercise                      string
-	calibration, noPlan, noEstimate, pace, perWeek, target string
-	phaseBegun, firstVerdict, firstEstimate, notTrusted    string
-	onTarget, below, above, proposal, perDay               string
-	plan, waits, proposalWaits                             string
-	moreProteinOrKcal, smallerSurplus, toMaintenance       string
-	recovery, shortSleep, average, highRestingHR, lowHRV   string
-	weekdays                                               [7]string
-	decimalComma                                           bool
+	title, sleep, weight, trend, since, bodyFat                 string
+	yesterday, trainingDay, excluded, nothingLogged             string
+	activity, steps, active, exercise                           string
+	calibration, noPlan, noEstimate, pace, perWeek, target      string
+	phaseBegun, firstVerdict, firstEstimate, notTrusted, noTDEE string
+	onTarget, below, above, proposal, perDay                    string
+	plan, waits, proposalWaits                                  string
+	moreProteinOrKcal, smallerSurplus, toMaintenance            string
+	recovery, shortSleep, average, highRestingHR, lowHRV        string
+	weekdays                                                    [7]string
+	decimalComma                                                bool
 	// date writes a day with its weekday, short without it.
 	date, short func(p phrases, d day.Date) string
 }
@@ -222,8 +222,8 @@ var english = phrases{
 	calibration: "Calibration", noPlan: "no plan (a phase and a target), so no rate to judge",
 	noEstimate: "no estimate to trust yet", pace: "rate", perWeek: "%/wk", target: "target",
 	phaseBegun: "the phase has just begun", firstVerdict: "its first verdict about", firstEstimate: "the first about",
-	notTrusted: "not trusted yet",
-	onTarget:   "on plan", below: "below plan", above: "above plan", proposal: "proposed", perDay: "kcal/day",
+	notTrusted: "not trusted yet", noTDEE: "the TDEE came out at 0 or less: are the meals all logged?",
+	onTarget: "on plan", below: "below plan", above: "above plan", proposal: "proposed", perDay: "kcal/day",
 	plan: "Plan", waits: "a proposed change waits for your answer, until", proposalWaits: "a change of the plan waits",
 	moreProteinOrKcal: "more protein or kcal", smallerSurplus: "a smaller surplus", toMaintenance: "move to maintenance",
 	recovery: "Recovery", shortSleep: "short sleep", average: "average", highRestingHR: "high resting heart rate", lowHRV: "low HRV",
@@ -241,8 +241,8 @@ var croatian = phrases{
 	calibration: "Kalibracija", noPlan: "nema plana (faze i cilja), pa nema tempa za ocijeniti",
 	noEstimate: "još nema pouzdane procjene", pace: "tempo", perWeek: "%/tj", target: "cilj",
 	phaseBegun: "faza je tek počela", firstVerdict: "prva ocjena oko", firstEstimate: "prva oko",
-	notTrusted: "još nije pouzdan",
-	onTarget:   "u planu", below: "ispod plana", above: "iznad plana", proposal: "prijedlog", perDay: "kcal/dan",
+	notTrusted: "još nije pouzdan", noTDEE: "TDEE je ispao 0 ili manji: jesu li svi obroci upisani?",
+	onTarget: "u planu", below: "ispod plana", above: "iznad plana", proposal: "prijedlog", perDay: "kcal/dan",
 	plan: "Plan", waits: "prijedlog promjene čeka tvoj odgovor, do", proposalWaits: "promjena plana čeka",
 	moreProteinOrKcal: "više proteina ili kcal", smallerSurplus: "manji suficit", toMaintenance: "prijeđi na održavanje",
 	recovery: "Oporavak", shortSleep: "kratak san", average: "prosjek", highRestingHR: "povišen puls u mirovanju", lowHRV: "nizak HRV",
@@ -377,16 +377,24 @@ func (w writer) calibrationLine(v verdictBody, tdee tdeeBody) string {
 		return label + w.verdictLine(v)
 	}
 	noPlan := slices.Contains(v.Reasons, "no_phase") || slices.Contains(v.Reasons, "no_target")
-	if !tdee.Measured || tdee.Kcal == nil {
+	switch {
+	case !tdee.Measured || tdee.Kcal == nil:
 		return label + w.withoutTDEE(noPlan, tdee)
+	case slices.Contains(v.Reasons, "no_tdee") || math.Round(*tdee.Kcal) <= 0:
+		return label + w.noTDEE
 	}
 	measured := "TDEE " + w.num(*tdee.Kcal, 0) + " kcal"
 	switch {
 	case noPlan:
 		return label + measured + "; " + w.noPlan
 	case tdee.BeforePhase || slices.Contains(v.Reasons, "before_phase"):
-		line := label + measured + "; " + w.phaseBegun
+		line := label + measured
+		if !tdee.Trusted {
+			line += ", " + w.notTrusted
+		}
+		line += "; " + w.phaseBegun
 		if d, err := day.ParseDate(tdee.BeforePhaseUntil); err == nil {
+			// The first summary of the phase's own days is the day after.
 			line += ", " + w.firstVerdict + " " + w.shortDate(d.AddDays(1))
 		}
 		return line

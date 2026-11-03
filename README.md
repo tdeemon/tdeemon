@@ -321,7 +321,8 @@ came:
 - calibration's verdict in a line: the rate against the target and
   what it proposes, or else the TDEE measured and why there is no
   verdict yet (no plan, a phase just begun with about when its first
-  comes, a TDEE not trusted yet), or about when a first estimate comes;
+  comes, a TDEE not trusted yet), that a TDEE of 0 or less asks whether
+  the meals are all logged, or about when a first estimate comes;
 - recovery's flags, with their averages.
 
 A value that did not come is left out; nothing is guessed.

@@ -126,7 +126,9 @@ func TestCalibrationLineWithoutAVerdict(t *testing.T) {
 
 	trusted := tdeeBody{Measured: true, Trusted: true, Kcal: new(1956.4), HalfWidth: new(21.0)}
 	beforePhase := trusted
-	beforePhase.BeforePhase, beforePhase.Trusted, beforePhase.BeforePhaseUntil = true, false, "2026-11-29"
+	beforePhase.BeforePhase, beforePhase.BeforePhaseUntil = true, "2026-11-29"
+	untrustedBefore := beforePhase
+	untrustedBefore.Trusted = false
 	untrusted := trusted
 	untrusted.Trusted = false
 	for _, tc := range []struct {
@@ -141,6 +143,20 @@ func TestCalibrationLineWithoutAVerdict(t *testing.T) {
 			beforePhase,
 			"Kalibracija: TDEE 1.956 kcal; faza je tek počela, prva ocjena oko 30. 11.",
 			"Calibration: TDEE 1,956 kcal; the phase has just begun, its first verdict about Nov 30",
+		},
+		{
+			"a phase just begun, its TDEE not trusted",
+			verdictBody{Rate: "none", Reasons: []string{"before_phase"}},
+			untrustedBefore,
+			"Kalibracija: TDEE 1.956 kcal, još nije pouzdan; faza je tek počela, prva ocjena oko 30. 11.",
+			"Calibration: TDEE 1,956 kcal, not trusted yet; the phase has just begun, its first verdict about Nov 30",
+		},
+		{
+			"a TDEE of 0 or less",
+			verdictBody{Rate: "none", Reasons: []string{"no_tdee"}},
+			tdeeBody{Measured: true, Trusted: true, Kcal: new(-150.0)},
+			"Kalibracija: TDEE je ispao 0 ili manji: jesu li svi obroci upisani?",
+			"Calibration: the TDEE came out at 0 or less: are the meals all logged?",
 		},
 		{
 			"no plan",
