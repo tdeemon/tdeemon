@@ -159,8 +159,10 @@ func (in *instance) serve(t *testing.T, req *http.Request) *httptest.ResponseRec
 	rec := httptest.NewRecorder()
 	in.h.ServeHTTP(rec, req)
 	// What the request left for after its answer is done, as a test of
-	// what it did expects.
-	in.afterward.Wait()
+	// what it did expects; an instance without a WaitGroup did it before.
+	if in.afterward != nil {
+		in.afterward.Wait()
+	}
 	if op := checkAnswer(t, req, rec); op != "" && rec.Code >= 200 && rec.Code <= 299 {
 		in.mu.Lock()
 		if in.succeeded == nil {

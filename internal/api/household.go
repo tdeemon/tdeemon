@@ -480,12 +480,14 @@ func (s *sessions) tellHousehold(ctx context.Context, to []user.User, words map[
 }
 
 // afterAnswerTimeout bounds the work a request leaves for after its
-// answer.
-const afterAnswerTimeout = time.Minute
+// answer: no longer than a server's shutdown waits for its requests, as
+// the server waits for it too before the database closes.
+const afterAnswerTimeout = 15 * time.Second
 
-// afterAnswer runs f once the request is answered, of ctx's values but
-// not its end, within afterAnswerTimeout; or at once, before the answer,
-// when the server keeps no work for afterward (Config.Afterward).
+// afterAnswer runs f apart from the request, which answers without
+// waiting for it, of ctx's values but not its end, within
+// afterAnswerTimeout; or at once, before the answer, when the server
+// keeps no work for afterward (Config.Afterward).
 func (s *sessions) afterAnswer(ctx context.Context, f func(context.Context)) {
 	if s.afterward == nil {
 		f(ctx)
