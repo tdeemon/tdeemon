@@ -44,10 +44,20 @@ var (
 // HouseholdMembers returns the members of userID's household, userID
 // among them, in the order they joined; none when they are in none.
 func (db *DB) HouseholdMembers(ctx context.Context, userID uuid.UUID) ([]user.User, error) {
-	return db.users(ctx, "SELECT "+userColumnsOfU+` FROM household_members AS m
-		JOIN household_members AS me ON me.household_id = m.household_id
-		JOIN users AS u ON u.id = m.user_id
-		WHERE me.user_id = ? ORDER BY m.joined_at, m.user_id`, userID.String())
+	return db.users(ctx, householdMembers, userID.String(), "")
+}
+
+// householdMembers selects the members of user ?1's household but user ?2
+// (none for ""), in the order they joined.
+const householdMembers = "SELECT " + userColumnsOfU + ` FROM household_members AS m
+	JOIN household_members AS me ON me.household_id = m.household_id
+	JOIN users AS u ON u.id = m.user_id
+	WHERE me.user_id = ?1 AND m.user_id <> ?2 ORDER BY m.joined_at, m.user_id`
+
+// householdMatesInTx returns the members of userID's household but them,
+// in tx: those a join or a leave of theirs tells.
+func householdMatesInTx(ctx context.Context, tx *sql.Tx, userID uuid.UUID) ([]user.User, error) {
+	return queryUsers(ctx, tx, householdMembers, userID.String(), userID.String())
 }
 
 // HouseholdPerson is a user an invite names: who invited, or whom.
@@ -311,14 +321,17 @@ func (db *DB) PreviewHouseholdInvite(ctx context.Context, userID, id uuid.UUID, 
 // in none, in one transaction, which takes the invites among its members
 // away. It is recorded as userID's event (household.join), which undo
 // never takes back. A merge of another fingerprint now is ErrMergeChanged,
-// and does nothing; the other refusals are PreviewHouseholdInvite's.
+// and does nothing; the other refusals are PreviewHouseholdInvite's. It
+// returns what the merge did, and the members userID joined, as the
+// transaction left them.
 func (db *DB) AcceptHouseholdInvite(ctx context.Context, userID uuid.UUID, a event.Actor, id uuid.UUID, fingerprint string,
 	now time.Time,
-) (MergeReport, error) {
+) (MergeReport, []user.User, error) {
 	if err := a.Validate(); err != nil {
-		return MergeReport{}, fmt.Errorf("invalid actor: %w", err)
+		return MergeReport{}, nil, fmt.Errorf("invalid actor: %w", err)
 	}
 	var out MergePreview
+	var mates []user.User
 	err := db.WriteTx(ctx, func(tx *sql.Tx) error {
 		var err error
 		if out, err = joinInTx(ctx, tx, userID, id, now); err != nil {
@@ -327,16 +340,19 @@ func (db *DB) AcceptHouseholdInvite(ctx context.Context, userID uuid.UUID, a eve
 		if out.Fingerprint != fingerprint {
 			return ErrMergeChanged
 		}
+		if mates, err = householdMatesInTx(ctx, tx, userID); err != nil {
+			return err
+		}
 		_, err = record(ctx, tx, userID, a, event.HouseholdJoin, householdEntity, nil, joinState{Report: out.Report}, now)
 		return err
 	})
 	if isInviteRefusal(err) {
-		return MergeReport{}, err
+		return MergeReport{}, nil, err
 	}
 	if err != nil {
-		return MergeReport{}, fmt.Errorf("accept household invite: %w", err)
+		return MergeReport{}, nil, fmt.Errorf("accept household invite: %w", err)
 	}
-	return out.Report, nil
+	return out.Report, mates, nil
 }
 
 // householdEntity is the entity of a join's event, and a leave's.

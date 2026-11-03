@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -491,13 +492,17 @@ func TestHouseholdSharesTheKitchenAlone(t *testing.T) {
 	e := newIsolationEnv(t, false)
 	ana, ivo := e.owner, e.other
 	ivos := []*http.Cookie{ivo.session}
-	if err := e.in.db.LeaveHousehold(t.Context(), ivo.user.ID, isolationActor, e.in.clock.Now()); err != nil {
+	if _, err := e.in.db.LeaveHousehold(t.Context(), ivo.user.ID, isolationActor, e.in.clock.Now()); err != nil {
 		t.Fatal(err)
 	}
+	before := map[uuid.UUID][]string{ana.user.ID: privateRows(t, e, ana.user.ID), ivo.user.ID: privateRows(t, e, ivo.user.ID)}
 	id := inviteByAPI(t, e.in, []*http.Cookie{ana.session}, ivo.user.Email)
 	if rec := e.in.do(t, http.MethodPost, "/api/v1/household/invites/"+id+"/accept", acceptBody(previewByAPI(t, e.in, ivos, id)), ivos, nil); rec.Code != http.StatusOK {
 		t.Fatalf("Ivo's accept: %d %s", rec.Code, rec.Body.String())
 	}
+	// Neither's meals, measurements, plan or anything else out of the
+	// kitchen changed, a number of them neither.
+	samePrivateRows(t, e, before)
 
 	forbidden := notToCross(t, e)
 	shows := func(what, body string, values []string) {
@@ -576,4 +581,41 @@ func notToCross(t *testing.T, e isolationEnv) []string {
 		t.Fatalf("Ivo's kitchen has no copy of Ana's bread")
 	}
 	return forbidden
+}
+
+// samePrivateRows fails unless each user's privateRows are as before has
+// them.
+func samePrivateRows(t *testing.T, e isolationEnv, before map[uuid.UUID][]string) {
+	t.Helper()
+	for who, rows := range before {
+		if after := privateRows(t, e, who); !slices.Equal(after, rows) {
+			t.Errorf("the rows of %v out of the kitchen changed:\nbefore %s\nafter  %s", who,
+				strings.Join(rows, "\n       "), strings.Join(after, "\n       "))
+		}
+	}
+}
+
+// lastSent is when a push subscription was last sent to.
+var lastSent = regexp.MustCompile(` last_sent_at=\S+`)
+
+// privateRows are the rows of id's out of their kitchen and household,
+// whole, but what a request or the join itself writes: the sessions' and
+// tokens' last use, the join's event, and when a device was told.
+func privateRows(t *testing.T, e isolationEnv, id uuid.UUID) []string {
+	t.Helper()
+	var out []string
+	for _, tb := range e.userTables(t) {
+		if slices.Contains(kitchenTables, tb.name) || slices.Contains(householdTables, tb.name) ||
+			tb.name == "sessions" || tb.name == "api_tokens" {
+			continue
+		}
+		rows, _ := e.tableRows(t, tb, id)
+		for _, r := range rows {
+			if !strings.Contains(r, " operation=household.join ") {
+				out = append(out, lastSent.ReplaceAllString(r, ""))
+			}
+		}
+	}
+	slices.Sort(out)
+	return out
 }

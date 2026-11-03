@@ -1322,7 +1322,7 @@ func isolateDeleteHouseholdInvite(t *testing.T, e isolationEnv) {
 // in none, invite them into one; it returns the invite's path.
 func invitedByAThird(t *testing.T, e isolationEnv) string {
 	t.Helper()
-	if err := e.in.db.LeaveHousehold(t.Context(), e.other.user.ID, isolationActor, e.in.clock.Now()); err != nil {
+	if _, err := e.in.db.LeaveHousehold(t.Context(), e.other.user.ID, isolationActor, e.in.clock.Now()); err != nil {
 		t.Fatal(err)
 	}
 	zoe := e.in.addUser(t, user.RoleUser)

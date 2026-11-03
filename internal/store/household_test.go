@@ -30,7 +30,7 @@ func join(t *testing.T, db *store.DB, inviter, invited uuid.UUID) store.MergeRep
 	if err != nil {
 		t.Fatalf("PreviewHouseholdInvite: %v", err)
 	}
-	got, err := db.AcceptHouseholdInvite(t.Context(), invited, testActor, inv.ID, preview.Fingerprint, t0)
+	got, _, err := db.AcceptHouseholdInvite(t.Context(), invited, testActor, inv.ID, preview.Fingerprint, t0)
 	if err != nil {
 		t.Fatalf("AcceptHouseholdInvite: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestHouseholdInviteExpires(t *testing.T) {
 	if _, err := db.PreviewHouseholdInvite(t.Context(), ivo, inv.ID, at); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("the preview of an expired invite = %v, want ErrNotFound", err)
 	}
-	if _, err := db.AcceptHouseholdInvite(t.Context(), ivo, testActor, inv.ID, "", at); !errors.Is(err, store.ErrNotFound) {
+	if _, _, err := db.AcceptHouseholdInvite(t.Context(), ivo, testActor, inv.ID, "", at); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("the accept of an expired invite = %v, want ErrNotFound", err)
 	}
 	if got := membersOf(t, db, ivo); len(got) != 0 {
@@ -183,7 +183,7 @@ func TestRevokeAndDeclineHouseholdInvite(t *testing.T) {
 	if err := db.DeclineHouseholdInvite(t.Context(), ivo, inv.ID); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("Ivo's decline of Eva's invite = %v, want ErrNotFound", err)
 	}
-	if _, err := db.AcceptHouseholdInvite(t.Context(), ivo, testActor, inv.ID, "", t0); !errors.Is(err, store.ErrNotFound) {
+	if _, _, err := db.AcceptHouseholdInvite(t.Context(), ivo, testActor, inv.ID, "", t0); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("Ivo's accept of Eva's invite = %v, want ErrNotFound", err)
 	}
 	if err := db.RevokeHouseholdInvite(t.Context(), ivo, inv.ID); err != nil {
@@ -253,5 +253,32 @@ func TestHouseholdMembers(t *testing.T) {
 	}
 	if got, err := db.HouseholdMembers(t.Context(), ivo); err != nil || len(got) != 0 {
 		t.Errorf("Ivo's members = %+v, %v; want none", got, err)
+	}
+}
+
+// An accept returns the members the user joined, and a leave those who
+// stay, each read in its own transaction: whom each tells.
+func TestJoinAndLeaveSayWhomToTell(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	eva := addEva(t, db)
+	join(t, db, ana, ivo)
+	inv := invite(t, db, ivo, eva)
+	preview, err := db.PreviewHouseholdInvite(t.Context(), eva, inv.ID, t0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, mates, err := db.AcceptHouseholdInvite(t.Context(), eva, testActor, inv.ID, preview.Fingerprint, t0)
+	if err != nil || len(mates) != 2 || mates[0].ID != ana || mates[1].ID != ivo {
+		t.Fatalf("Eva's accept tells %+v, %v; want Ana and Ivo", mates, err)
+	}
+	stay, err := db.LeaveHousehold(t.Context(), ivo, testActor, t0)
+	if err != nil || len(stay) != 2 || stay[0].ID != ana || stay[1].ID != eva {
+		t.Fatalf("Ivo's leave tells %+v, %v; want Ana and Eva", stay, err)
+	}
+	leave(t, db, ana)
+	if stay, err := db.LeaveHousehold(t.Context(), eva, testActor, t0); !errors.Is(err, store.ErrNotFound) || len(stay) != 0 {
+		t.Errorf("Eva's leave of a household dissolved = %+v, %v; want ErrNotFound", stay, err)
 	}
 }

@@ -404,17 +404,14 @@ func (s *sessions) acceptHouseholdInvite(ctx context.Context, in *acceptHousehol
 	if err != nil {
 		return nil, joinRefusal(store.ErrNotFound)
 	}
-	_, err = s.db.AcceptHouseholdInvite(ctx, p.User.ID, actorOf(p), id, in.Body.Fingerprint, s.now())
+	// Those to tell are the members as the join left them.
+	_, mates, err := s.db.AcceptHouseholdInvite(ctx, p.User.ID, actorOf(p), id, in.Body.Fingerprint, s.now())
 	if r := joinRefusal(err); r != nil {
 		return nil, r
 	} else if err != nil {
 		return nil, internalError("joining the household failed", err)
 	}
-	members, err := s.db.HouseholdMembers(ctx, p.User.ID)
-	if err != nil {
-		return nil, internalError("joining the household failed", err)
-	}
-	s.tellHousehold(ctx, othersThan(members, p.User.ID), joinedWords, p.User.Name, "household-"+p.User.ID.String())
+	s.tellHousehold(ctx, mates, joinedWords, p.User.Name, "household-"+p.User.ID.String())
 	b, err := s.household(ctx, p.User.ID)
 	if err != nil {
 		return nil, internalError("joining the household failed", err)
@@ -427,31 +424,16 @@ func (s *sessions) leaveHousehold(ctx context.Context, _ *struct{}) (*struct{}, 
 	if err != nil {
 		return nil, err
 	}
-	// Those who stay, read before the leave: after it, the user has none.
-	members, err := s.db.HouseholdMembers(ctx, p.User.ID)
-	if err != nil {
-		return nil, internalError("leaving the household failed", err)
-	}
-	err = s.db.LeaveHousehold(ctx, p.User.ID, actorOf(p), s.now())
+	// Those to tell are the members who stay, as the leave found them.
+	stay, err := s.db.LeaveHousehold(ctx, p.User.ID, actorOf(p), s.now())
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return nil, huma.Error404NotFound("you are in no household")
 	case err != nil:
 		return nil, internalError("leaving the household failed", err)
 	}
-	s.tellHousehold(ctx, othersThan(members, p.User.ID), leftWords, p.User.Name, "household-"+p.User.ID.String())
+	s.tellHousehold(ctx, stay, leftWords, p.User.Name, "household-"+p.User.ID.String())
 	return nil, nil
-}
-
-// othersThan is members but the one of id.
-func othersThan(members []user.User, id uuid.UUID) []user.User {
-	var out []user.User
-	for i := range members {
-		if members[i].ID != id {
-			out = append(out, members[i])
-		}
-	}
-	return out
 }
 
 // householdWords are a household's notification in a language: its
