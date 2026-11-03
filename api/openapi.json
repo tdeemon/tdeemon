@@ -1811,7 +1811,7 @@
             "type": "array"
           },
           "rejected": {
-            "description": "Values out of their bounds, or of a day after today, left out; the others are stored.",
+            "description": "Values out of their bounds, or of a date that has begun nowhere yet, left out; the others are stored.",
             "items": {
               "$ref": "#/components/schemas/IngestRejected"
             },

@@ -1351,8 +1351,10 @@ the first spec.
   - A value belongs to the calendar date of its point, as HAE writes it;
     the day keeps its earliest weighing, with body fat and lean mass from
     the same weighing, and each value is checked on its own. A value of
-    a day after the user's today is rejected, as one logged by hand is:
-    a clock or a time zone set wrong puts no weighing on a day to come.
+    a date that has begun nowhere yet (after the date at UTC+14) is
+    rejected: a clock set wrong puts no weighing on a day to come, and a
+    traveller's day ahead of home, or the hours before the user's day
+    starts, still count.
   - Caveat: HAE is iOS-only and its automated export is a paid tier.
     Native HealthKit is the long-term answer (§11).
 - **Scheduler:** a minute's tick runs the jobs due in each user's day,

@@ -597,7 +597,8 @@ exercise) is left out rather than read wrong.
 The values merge as an import: a value you entered stays, the day's
 first weighing stays, and a running total only grows, so a sync of part
 of the day undoes nothing. A value out of its bounds is left out, and
-the answer says why. A body must be under 10 MB; split a large first
+so is one of a date that has begun nowhere yet (a phone's clock set
+wrong); the answer says why. A body must be under 10 MB; split a large first
 export by date range in the app.
 
 `POST /api/v1/ingest/metrics` takes the same from a script, one day at a
