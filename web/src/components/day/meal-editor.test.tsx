@@ -1745,6 +1745,12 @@ test('the day is today or one of the days before, each named in words', async ()
   expect(days.names).toHaveLength(31)
   expect(days.names.at(-1)).toBe('Wednesday, September 23')
   expect(days.chosen).toBe('Today')
+  // Its list puts no <style> in the page, which the server's CSP refuses.
+  expect(
+    [...document.querySelectorAll('style')].filter((el) =>
+      el.textContent.includes('base-ui-disable-scrollbar'),
+    ),
+  ).toEqual([])
 })
 
 test("a meal of a day after the app's today keeps its day, left as it is", async () => {

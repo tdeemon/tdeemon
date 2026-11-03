@@ -1,3 +1,4 @@
+import { CSPProvider } from '@base-ui/react/csp-provider'
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { RouterProvider } from '@tanstack/react-router'
 import { useEffect } from 'react'
@@ -13,9 +14,13 @@ export function App({ router, queryClient }: { router: AppRouter; queryClient: Q
     document.documentElement.lang = locale
   }, [locale])
 
+  // Base UI renders no <style> of its own, which the server's CSP
+  // refuses: index.css has its rules (base-ui-disable-scrollbar).
   return (
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <CSPProvider disableStyleElements>
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </CSPProvider>
   )
 }
