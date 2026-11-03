@@ -68,7 +68,8 @@ type HouseholdPerson struct {
 }
 
 // HouseholdInvite is an invite into a household waiting for an answer:
-// By invited Invited, until ExpiresAt.
+// By invited Invited's address, until ExpiresAt. Invited's ID is
+// uuid.Nil and their Name "" while no user has the address.
 type HouseholdInvite struct {
 	ID        uuid.UUID
 	By        HouseholdPerson
@@ -77,37 +78,44 @@ type HouseholdInvite struct {
 	ExpiresAt time.Time
 }
 
-// InviteToHousehold invites the user invitedID into userID's household,
-// or into one of the two of them when userID is in none, for
-// HouseholdInviteTTL. A user of no such id is ErrNotFound; userID
-// themselves ErrInviteSelf; a member of userID's household
-// ErrInviteMember; a member of another ErrInviteOtherHousehold; and a
-// user an invite from userID's household (or userID alone) waits for
-// already ErrInviteWaiting. An invite expired is no longer waiting: a new
-// one takes its place.
-func (db *DB) InviteToHousehold(ctx context.Context, userID, invitedID uuid.UUID, now time.Time) (HouseholdInvite, error) {
-	if invitedID == userID {
-		return HouseholdInvite{}, ErrInviteSelf
-	}
+// InviteToHousehold invites the address email (normalized,
+// user.NormalizeEmail) into userID's household, or into one of the two
+// of them when userID is in none, for HouseholdInviteTTL. The invite
+// names the address, not a user: whoever has it answers, now or once
+// they have an account, and an address of no user is invited as any
+// other, so an invite tells nothing about who has an account. userID's
+// own address is ErrInviteSelf; one of a member of userID's household
+// ErrInviteMember; and one an invite from userID's household (or userID
+// alone) waits for already ErrInviteWaiting. An invite expired is no
+// longer waiting: a new one takes its place. Whether its user is in
+// another household is the accept's to refuse.
+func (db *DB) InviteToHousehold(ctx context.Context, userID uuid.UUID, email string, now time.Time) (HouseholdInvite, error) {
 	inv := HouseholdInvite{ID: uuid.NewV7(), CreatedAt: now, ExpiresAt: now.Add(HouseholdInviteTTL)}
 	err := db.WriteTx(ctx, func(tx *sql.Tx) error {
-		if err := checkInvitee(ctx, tx, userID, invitedID); err != nil {
+		var self, member, waiting bool
+		if err := tx.QueryRowContext(ctx, `SELECT
+				EXISTS (SELECT 1 FROM users WHERE id = ?1 AND email = ?2),
+				EXISTS (SELECT 1 FROM users AS u JOIN household_members AS m ON m.user_id = u.id
+					JOIN household_members AS me ON me.household_id = m.household_id
+					WHERE me.user_id = ?1 AND u.email = ?2),
+				EXISTS (SELECT 1 FROM household_invites
+					WHERE email = ?2 AND expires_at > ?3 AND user_id IN (`+householdSide+`))`,
+			userID.String(), email, formatTime(now)).Scan(&self, &member, &waiting); err != nil {
 			return err
 		}
-		var waiting bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM household_invites
-			WHERE invited_id = ?2 AND expires_at > ?3 AND user_id IN (`+householdSide+`))`,
-			userID.String(), invitedID.String(), formatTime(now)).Scan(&waiting); err != nil {
-			return err
-		}
-		if waiting {
+		switch {
+		case self:
+			return ErrInviteSelf
+		case member:
+			return ErrInviteMember
+		case waiting:
 			return ErrInviteWaiting
 		}
 		if _, err := tx.ExecContext(ctx, "DELETE FROM household_invites WHERE expires_at <= ?", formatTime(now)); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO household_invites (id, user_id, invited_id, created_at, expires_at)
-			VALUES (?, ?, ?, ?, ?)`, inv.ID.String(), userID.String(), invitedID.String(),
+		if _, err := tx.ExecContext(ctx, `INSERT INTO household_invites (id, user_id, email, created_at, expires_at)
+			VALUES (?, ?, ?, ?, ?)`, inv.ID.String(), userID.String(), email,
 			formatTime(inv.CreatedAt), formatTime(inv.ExpiresAt)); err != nil {
 			return err
 		}
@@ -168,17 +176,23 @@ func isInviteRefusal(err error) bool {
 	return false
 }
 
+// householdInviteSelect selects invites, with the user of the address
+// invited when there is one: their id and name are ” when there is
+// none.
 const householdInviteSelect = `SELECT i.id, i.created_at, i.expires_at,
-	b.id, b.name, b.email, v.id, v.name, v.email
+	b.id, b.name, b.email, coalesce(v.id, ''), coalesce(v.name, ''), i.email
 	FROM household_invites AS i
 	JOIN users AS b ON b.id = i.user_id
-	JOIN users AS v ON v.id = i.invited_id`
+	LEFT JOIN users AS v ON v.email = i.email`
 
 func scanHouseholdInvite(scan func(dest ...any) error) (HouseholdInvite, error) {
 	var inv HouseholdInvite
 	var id, created, expires, by, invited string
 	if err := scan(&id, &created, &expires, &by, &inv.By.Name, &inv.By.Email, &invited, &inv.Invited.Name, &inv.Invited.Email); err != nil {
 		return HouseholdInvite{}, err
+	}
+	if invited == "" {
+		invited = uuid.Nil().String()
 	}
 	var err error
 	if inv.ID, err = uuid.Parse(id); err != nil {
@@ -213,7 +227,7 @@ func inviteInTx(ctx context.Context, tx *sql.Tx, id uuid.UUID, now time.Time) (H
 // HouseholdInvitesTo returns the invites into a household waiting for
 // userID's answer, the newest first.
 func (db *DB) HouseholdInvitesTo(ctx context.Context, userID uuid.UUID, now time.Time) ([]HouseholdInvite, error) {
-	return db.householdInvites(ctx, "WHERE i.invited_id = ?1 AND i.expires_at > ?2", userID, now)
+	return db.householdInvites(ctx, "WHERE i.email = (SELECT email FROM users WHERE id = ?1) AND i.expires_at > ?2", userID, now)
 }
 
 // HouseholdInvitesFrom returns the invites waiting that userID's
@@ -256,7 +270,7 @@ func (db *DB) RevokeHouseholdInvite(ctx context.Context, userID, id uuid.UUID) e
 // DeclineHouseholdInvite declines the invite id of userID's, which goes;
 // an invite of none of theirs, or none at all, is ErrNotFound.
 func (db *DB) DeclineHouseholdInvite(ctx context.Context, userID, id uuid.UUID) error {
-	return db.deleteHouseholdInvite(ctx, "DELETE FROM household_invites WHERE id = ?2 AND invited_id = ?1",
+	return db.deleteHouseholdInvite(ctx, "DELETE FROM household_invites WHERE id = ?2 AND email = (SELECT email FROM users WHERE id = ?1)",
 		userID, id, "decline household invite")
 }
 
@@ -413,7 +427,8 @@ func joinInTx(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID, now time.Ti
 	}
 	_, err = tx.ExecContext(ctx, `DELETE FROM household_invites
 		WHERE user_id IN (SELECT user_id FROM household_members WHERE household_id = ?1)
-			AND invited_id IN (SELECT user_id FROM household_members WHERE household_id = ?1)`, household)
+			AND email IN (SELECT u.email FROM users AS u JOIN household_members AS m ON m.user_id = u.id
+				WHERE m.household_id = ?1)`, household)
 	return out, err
 }
 

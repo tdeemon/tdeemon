@@ -925,7 +925,11 @@ func seedHousehold(t *testing.T, db *store.DB, userID uuid.UUID, lang string, no
 	if _, err := db.SaveFood(t.Context(), partner.ID, actor, kefir, now); err != nil {
 		t.Fatal(err)
 	}
-	inv, err := db.InviteToHousehold(t.Context(), partner.ID, userID, now)
+	var email string
+	if err := db.Read().QueryRowContext(t.Context(), "SELECT email FROM users WHERE id = ?", userID.String()).Scan(&email); err != nil {
+		t.Fatal(err)
+	}
+	inv, err := db.InviteToHousehold(t.Context(), partner.ID, email, now)
 	if err != nil {
 		t.Fatal(err)
 	}

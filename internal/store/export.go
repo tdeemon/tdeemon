@@ -35,12 +35,12 @@ var exportLeavesOut = map[string][]string{
 // user_id column is not all of it: their own row of users; their
 // household's row, whose members are household_members' rows, each a
 // user's, of whom the export has the user's alone; and the invites into
-// a household they made, and those made to them, which name the other
-// user by their id alone. Every other table's are its rows of user_id.
+// a household they made, and those made to their address. Every other
+// table's are its rows of user_id.
 var exportRowsOf = map[string]string{
 	"users":             "id = ?1",
 	"households":        "id IN (SELECT household_id FROM household_members WHERE user_id = ?1)",
-	"household_invites": "user_id = ?1 OR invited_id = ?1",
+	"household_invites": "user_id = ?1 OR email = (SELECT email FROM users WHERE id = ?1)",
 }
 
 // ExportUser returns all the data of the user with id, a table at a time,

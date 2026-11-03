@@ -43,6 +43,9 @@ type instance struct {
 	logs *lockedBuffer
 	// pushes are the push services' side of the notifications sent.
 	pushes *pushServices
+	// afterward is the work requests left for after their answers, which
+	// serve waits for.
+	afterward *sync.WaitGroup
 
 	mu sync.Mutex
 	// succeeded are the operations whose success do checked against the
@@ -100,14 +103,16 @@ func newInstance(t *testing.T, baseURL, hash string) *instance {
 		t.Fatalf("NewSender: %v", err)
 	}
 	sender.Client = &http.Client{Transport: pushes}
+	afterward := &sync.WaitGroup{}
 	h, err := api.NewHandler(api.Config{
 		Info: testInfo, DB: db, BaseURL: base, Logger: slog.New(slog.NewJSONHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug})), Now: c.Now,
-		Push: sender,
+		Push: sender, Afterward: afterward,
 	})
 	if err != nil {
 		t.Fatalf("NewHandler: %v", err)
 	}
-	return &instance{h: h, db: db, clock: c, user: u, logs: logs, pushes: pushes}
+	t.Cleanup(afterward.Wait)
+	return &instance{h: h, db: db, clock: c, user: u, logs: logs, pushes: pushes, afterward: afterward}
 }
 
 // passwordHash hashes password, the password of the test user.
@@ -153,6 +158,11 @@ func (in *instance) serve(t *testing.T, req *http.Request) *httptest.ResponseRec
 	t.Helper()
 	rec := httptest.NewRecorder()
 	in.h.ServeHTTP(rec, req)
+	// What the request left for after its answer is done, as a test of
+	// what it did expects; an instance without a WaitGroup did it before.
+	if in.afterward != nil {
+		in.afterward.Wait()
+	}
 	if op := checkAnswer(t, req, rec); op != "" && rec.Code >= 200 && rec.Code <= 299 {
 		in.mu.Lock()
 		if in.succeeded == nil {

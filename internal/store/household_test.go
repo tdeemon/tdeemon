@@ -10,14 +10,37 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/store"
 )
 
-// invite is inviter's invite of invited into their household, at t0.
+// invite is inviter's invite of invited's address into their household,
+// at t0.
 func invite(t *testing.T, db *store.DB, inviter, invited uuid.UUID) store.HouseholdInvite {
 	t.Helper()
-	inv, err := db.InviteToHousehold(t.Context(), inviter, invited, t0)
+	inv, err := db.InviteToHousehold(t.Context(), inviter, emailOf(t, db, invited), t0)
 	if err != nil {
 		t.Fatalf("InviteToHousehold: %v", err)
 	}
 	return inv
+}
+
+// emailOf is the address of the user userID.
+func emailOf(t *testing.T, db *store.DB, userID uuid.UUID) string {
+	t.Helper()
+	var email string
+	if err := db.Read().QueryRowContext(t.Context(), "SELECT email FROM users WHERE id = ?", userID.String()).Scan(&email); err != nil {
+		t.Fatal(err)
+	}
+	return email
+}
+
+// accept is userID's accept of the invite id, after its preview.
+func accept(t *testing.T, db *store.DB, userID, id uuid.UUID) {
+	t.Helper()
+	preview, err := db.PreviewHouseholdInvite(t.Context(), userID, id, t0)
+	if err != nil {
+		t.Fatalf("PreviewHouseholdInvite: %v", err)
+	}
+	if _, _, err := db.AcceptHouseholdInvite(t.Context(), userID, testActor, id, preview.Fingerprint, t0); err != nil {
+		t.Fatalf("AcceptHouseholdInvite: %v", err)
+	}
 }
 
 // join is invited's accept of inviter's invite into their household,
@@ -64,41 +87,36 @@ func membersOf(t *testing.T, db *store.DB, userID uuid.UUID) []uuid.UUID {
 	return out
 }
 
-// An invite goes to another user of the instance outside the household,
-// one from a household at a time; each refusal says why.
+// An invite goes to an address outside the household, one from a
+// household at a time; each refusal says why. An address of no user,
+// or of a member of another household, is invited as any other: the
+// accept refuses the one in another household.
 func TestInviteToHouseholdRefusals(t *testing.T) {
 	t.Parallel()
 
 	db, ana, ivo := withTwoUsers(t)
 	eva := addEva(t, db)
-	for _, tc := range []struct {
-		name            string
-		inviter, invite uuid.UUID
-		want            error
-	}{
-		{"no such user", ana, uuid.NewV7(), store.ErrNotFound},
-		{"oneself", ana, ana, store.ErrInviteSelf},
-	} {
-		if _, err := db.InviteToHousehold(t.Context(), tc.inviter, tc.invite, t0); !errors.Is(err, tc.want) {
-			t.Errorf("an invite of %s = %v, want %v", tc.name, err, tc.want)
-		}
+	if _, err := db.InviteToHousehold(t.Context(), ana, emailOf(t, db, ana), t0); !errors.Is(err, store.ErrInviteSelf) {
+		t.Errorf("an invite of oneself = %v, want ErrInviteSelf", err)
 	}
 	invite(t, db, ana, ivo)
-	if _, err := db.InviteToHousehold(t.Context(), ana, ivo, t0); !errors.Is(err, store.ErrInviteWaiting) {
+	if _, err := db.InviteToHousehold(t.Context(), ana, emailOf(t, db, ivo), t0); !errors.Is(err, store.ErrInviteWaiting) {
 		t.Errorf("a second invite of Ivo = %v, want ErrInviteWaiting", err)
 	}
 	// Ivo may invite Ana meanwhile: his own side, alone.
 	ivosInvite := invite(t, db, ivo, ana)
 
 	join(t, db, ana, eva)
-	if _, err := db.InviteToHousehold(t.Context(), ana, eva, t0); !errors.Is(err, store.ErrInviteMember) {
+	if _, err := db.InviteToHousehold(t.Context(), ana, emailOf(t, db, eva), t0); !errors.Is(err, store.ErrInviteMember) {
 		t.Errorf("an invite of a member = %v, want ErrInviteMember", err)
 	}
-	if _, err := db.InviteToHousehold(t.Context(), ivo, eva, t0); !errors.Is(err, store.ErrInviteOtherHousehold) {
-		t.Errorf("an invite of another household's member = %v, want ErrInviteOtherHousehold", err)
+	// Ivo's invite of Eva waits, but Eva leaves her household first.
+	evasInvite := invite(t, db, ivo, eva)
+	if _, err := db.PreviewHouseholdInvite(t.Context(), eva, evasInvite.ID, t0); !errors.Is(err, store.ErrInviteOtherHousehold) {
+		t.Errorf("Eva's preview of Ivo's invite = %v, want ErrInviteOtherHousehold", err)
 	}
 	// Ana's invite of Ivo is the household's: Eva's waits behind it.
-	if _, err := db.InviteToHousehold(t.Context(), eva, ivo, t0); !errors.Is(err, store.ErrInviteWaiting) {
+	if _, err := db.InviteToHousehold(t.Context(), eva, emailOf(t, db, ivo), t0); !errors.Is(err, store.ErrInviteWaiting) {
 		t.Errorf("Eva's invite of Ivo after Ana's = %v, want ErrInviteWaiting", err)
 	}
 	// Ivo's invite of Ana waits, but Ana leaves her household first.
@@ -114,12 +132,50 @@ func TestInviteToHouseholdRefusals(t *testing.T) {
 	}
 }
 
+// An address no user has is invited as any other, and named alone; the
+// user who has it later, by an account made while it waits, answers it.
+func TestInviteOfAnAddressOfNoUser(t *testing.T) {
+	t.Parallel()
+
+	db, ana, _ := withTwoUsers(t)
+	const address = "mia@example.com"
+	inv, err := db.InviteToHousehold(t.Context(), ana, address, t0)
+	if err != nil {
+		t.Fatalf("an invite of an address of no user: %v", err)
+	}
+	if inv.Invited != (store.HouseholdPerson{ID: uuid.Nil(), Email: address}) {
+		t.Errorf("invited = %+v, want the address alone", inv.Invited)
+	}
+	if _, err := db.InviteToHousehold(t.Context(), ana, address, t0); !errors.Is(err, store.ErrInviteWaiting) {
+		t.Errorf("a second invite of the address = %v, want ErrInviteWaiting", err)
+	}
+	if got, err := db.HouseholdInvitesFrom(t.Context(), ana, t0); err != nil || len(got) != 1 || got[0].ID != inv.ID {
+		t.Errorf("Ana's invites sent = %+v, %v; want the address's", got, err)
+	}
+	u := newUser(address)
+	if err := db.CreateUser(t.Context(), u, ""); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	mia := u.ID
+	got, err := db.HouseholdInvitesTo(t.Context(), mia, t0)
+	if err != nil || len(got) != 1 || got[0].ID != inv.ID || got[0].Invited.ID != mia {
+		t.Fatalf("Mia's invites = %+v, %v; want Ana's, of her", got, err)
+	}
+	accept(t, db, mia, inv.ID)
+	if got := membersOf(t, db, mia); len(got) != 2 {
+		t.Errorf("Mia's household = %v, want her and Ana", got)
+	}
+	if got, err := db.HouseholdInvitesFrom(t.Context(), ana, t0); err != nil || len(got) != 0 {
+		t.Errorf("Ana's invites sent after the join = %+v, %v; want none", got, err)
+	}
+}
+
 // inviteAfterOneExpired is eva's invite of ivo once the invite of him
 // from her household expired: it waits no more.
 func inviteAfterOneExpired(t *testing.T, db *store.DB, eva, ivo uuid.UUID) {
 	t.Helper()
 	later := t0.Add(store.HouseholdInviteTTL)
-	if _, err := db.InviteToHousehold(t.Context(), eva, ivo, later); err != nil {
+	if _, err := db.InviteToHousehold(t.Context(), eva, emailOf(t, db, ivo), later); err != nil {
 		t.Errorf("Eva's invite of Ivo after Ana's expired: %v", err)
 	}
 	if got, err := db.HouseholdInvitesTo(t.Context(), ivo, later); err != nil || len(got) != 1 || got[0].By.ID != eva {

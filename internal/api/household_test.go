@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"slices"
 	"strings"
@@ -30,9 +31,7 @@ type inviteAnswer struct {
 	By struct {
 		Name, Email string
 	} `json:"by"`
-	Invited struct {
-		Name, Email string
-	} `json:"invited"`
+	Invited map[string]any `json:"invited"`
 }
 
 // problemAnswer is a problem's detail and its errors' locations and
@@ -164,8 +163,8 @@ func waitsForZoe(t *testing.T, in *instance, id string, ana, zoes, mias []*http.
 		got.Received[0].By.Email != "ana@example.com" || len(got.Sent) != 0 {
 		t.Errorf("Zoe's household = %+v, want Ana's invite for her answer", got)
 	}
-	if got := getHousehold(t, in, ana); len(got.Sent) != 1 || got.Sent[0].Invited.Name != "Zoe" || len(got.Received) != 0 {
-		t.Errorf("Ana's household = %+v, want her invite of Zoe", got)
+	if got := getHousehold(t, in, ana); len(got.Sent) != 1 || got.Sent[0].Invited["email"] != "zoe@example.com" || len(got.Received) != 0 {
+		t.Errorf("Ana's household = %+v, want her invite of Zoe's address", got)
 	}
 	// The invite is Zoe's to preview and accept, no one else's.
 	notTheirs(t, in, id, ana, mias)
@@ -217,7 +216,8 @@ func anaAndZoe(t *testing.T, got householdAnswer) {
 	}
 }
 
-// Each refusal of an invite says why by its code.
+// Each refusal of an invite says why by its code: none tells whether a
+// user has the address.
 func TestHouseholdInviteRefusals(t *testing.T) {
 	t.Parallel()
 
@@ -227,15 +227,9 @@ func TestHouseholdInviteRefusals(t *testing.T) {
 	zoe := in.addUser(t, user.RoleUser)
 	zoes := sessionOfUser(t, in, zoe)
 	newIsolationUser(t, in.db, "eva@example.com", "Eva", now)
-	gone := newIsolationUser(t, in.db, "gone@example.com", "Gone", now)
-	if _, err := in.db.ChangeUser(t.Context(), gone, store.UserChange{Active: new(false)}, now); err != nil {
-		t.Fatal(err)
-	}
-	mia := newIsolationUser(t, in.db, "mia@example.com", "Mia", now)
-	lea := newIsolationUser(t, in.db, "lea@example.com", "Lea", now)
-	inHousehold(t, in.db, mia, lea)
 	inHousehold(t, in.db, in.user.ID, zoe.ID)
 	inviteByAPI(t, in, zoes, "eva@example.com")
+	inviteByAPI(t, in, zoes, "nobody@example.com")
 	in.pushes.endpoints()
 
 	for _, c := range []struct {
@@ -243,13 +237,12 @@ func TestHouseholdInviteRefusals(t *testing.T) {
 		status int
 		code   string
 	}{
-		{"nobody@example.com", http.StatusUnprocessableEntity, "no_user"},
 		{"ANA@example.com", http.StatusUnprocessableEntity, "self"},
-		{"gone@example.com", http.StatusUnprocessableEntity, "deactivated"},
 		{"zoe@example.com", http.StatusConflict, "member"},
-		{"mia@example.com", http.StatusConflict, "other_household"},
-		// Zoe's invite is the household's: Ana's waits behind it.
+		// Zoe's invites are the household's: Ana's wait behind them, of a
+		// user's address and of none alike.
 		{"eva@example.com", http.StatusConflict, "waiting"},
+		{"Nobody@example.com", http.StatusConflict, "waiting"},
 	} {
 		rec := in.do(t, http.MethodPost, "/api/v1/household/invites", `{"email": "`+c.email+`"}`, ana, nil)
 		if rec.Code != c.status || codeOf(t, rec.Body, "body.email") != c.code {
@@ -259,6 +252,162 @@ func TestHouseholdInviteRefusals(t *testing.T) {
 	if got := in.pushes.endpoints(); len(got) != 0 {
 		t.Errorf("the refusals told %v, want no one", got)
 	}
+}
+
+// An invite answers the same whether a user has the address or not, an
+// active one in no household, a deactivated one or one in another
+// household: the address invited, never a name, and the invite listed
+// as sent. Only an active user of the address is told.
+func TestHouseholdInviteAnswersTheSameForAnyAddress(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	ana := []*http.Cookie{sessionOf(t, in)}
+	now := in.clock.Now()
+	eva := newIsolationUser(t, in.db, "eva@example.com", "Eva", now)
+	subscribe(t, in, sessionOfUser(t, in, user.User{ID: eva})[0], "https://web.push.apple.com/eva", "")
+	gone := newIsolationUser(t, in.db, "gone@example.com", "Gone", now)
+	subscribe(t, in, sessionOfUser(t, in, user.User{ID: gone})[0], "https://web.push.apple.com/gone", "")
+	if _, err := in.db.ChangeUser(t.Context(), gone, store.UserChange{Active: new(false)}, now); err != nil {
+		t.Fatal(err)
+	}
+	mia := newIsolationUser(t, in.db, "mia@example.com", "Mia", now)
+	lea := newIsolationUser(t, in.db, "lea@example.com", "Lea", now)
+	inHousehold(t, in.db, mia, lea)
+	in.pushes.endpoints()
+
+	invitesAlike(t, in, ana, "nobody@example.com", "eva@example.com", "gone@example.com", "mia@example.com")
+	if got := in.pushes.endpoints(); !slices.Equal(got, []string{"https://web.push.apple.com/eva"}) {
+		t.Errorf("the invites told %v, want Eva alone", got)
+	}
+	sent := getHousehold(t, in, ana).Sent
+	if len(sent) != 4 {
+		t.Fatalf("Ana's invites sent = %+v, want the four", sent)
+	}
+	for _, inv := range sent {
+		if len(inv.Invited) != 1 || inv.Invited["email"] == nil {
+			t.Errorf("a sent invite's invited = %v, want the address alone", inv.Invited)
+		}
+	}
+	// Mia, in another household, has the invite; the accept refuses it.
+	mias := sessionOfUser(t, in, user.User{ID: mia})
+	received := getHousehold(t, in, mias).Received
+	if len(received) != 1 {
+		t.Fatalf("Mia's invites = %+v, want Ana's", received)
+	}
+	rec := in.do(t, http.MethodGet, "/api/v1/household/invites/"+received[0].ID+"/preview", "", mias, nil)
+	if rec.Code != http.StatusConflict || codeOf(t, rec.Body, "path.id") != "other_household" {
+		t.Errorf("Mia's preview: %d %s, want 409 other_household", rec.Code, rec.Body.String())
+	}
+}
+
+// invitesAlike fails unless session's invite of each address answers
+// 201 as the others do, the address aside, and names no user.
+func invitesAlike(t *testing.T, in *instance, session []*http.Cookie, addresses ...string) {
+	t.Helper()
+	shape := func(body []byte) string {
+		var got map[string]any
+		if err := json.Unmarshal(body, &got); err != nil {
+			t.Fatal(err)
+		}
+		delete(got, "id")
+		invited, _ := json.Marshal(got["invited"])
+		delete(got, "invited")
+		rest, _ := json.Marshal(got)
+		return string(rest) + " " + strings.Replace(string(invited), "@example.com", "", 1)
+	}
+	var want string
+	for _, address := range addresses {
+		rec := in.do(t, http.MethodPost, "/api/v1/household/invites", `{"email": "`+address+`"}`, session, nil)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("an invite of %s: %d %s", address, rec.Code, rec.Body.String())
+		}
+		local := strings.TrimSuffix(address, "@example.com")
+		got := strings.Replace(shape(rec.Body.Bytes()), local, "X", 1)
+		if want == "" {
+			want = got
+		} else if got != want {
+			t.Errorf("the invite of %s answers %s, want as the others: %s", address, got, want)
+		}
+		if strings.Contains(rec.Body.String(), `"name":"`+strings.ToUpper(local[:1])+local[1:]) {
+			t.Errorf("the invite of %s names its user: %s", address, rec.Body.String())
+		}
+	}
+}
+
+// An invite is answered before its user, if any, is told: the answer
+// takes as long for an address of a user as for one of none.
+func TestHouseholdInviteAnswersBeforeTelling(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	ana := []*http.Cookie{sessionOf(t, in)}
+	eva := newIsolationUser(t, in.db, "eva@example.com", "Eva", in.clock.Now())
+	subscribe(t, in, sessionOfUser(t, in, user.User{ID: eva})[0], "https://web.push.apple.com/eva", "")
+	in.pushes.endpoints()
+	hold := make(chan struct{})
+	in.pushes.mu.Lock()
+	in.pushes.hold = hold
+	in.pushes.mu.Unlock()
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/household/invites", strings.NewReader(`{"email": "eva@example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	for _, c := range ana {
+		req.AddCookie(c)
+	}
+	rec := httptest.NewRecorder()
+	answered := make(chan struct{})
+	go func() {
+		in.h.ServeHTTP(rec, req)
+		close(answered)
+	}()
+	select {
+	case <-answered:
+	case <-time.After(10 * time.Second):
+		close(hold)
+		t.Fatal("the invite waited for Eva's push service to answer")
+	}
+	if rec.Code != http.StatusCreated {
+		t.Errorf("the invite: %d %s", rec.Code, rec.Body.String())
+	}
+	close(hold)
+	in.afterward.Wait()
+	told(t, in, "the invite", "https://web.push.apple.com/eva")
+}
+
+// A user makes 30 invites and recipe shares by address a day; the next
+// is a 429 with Retry-After, whatever the address, until a day passed.
+func TestHouseholdInvitesAreLimited(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	ana := []*http.Cookie{sessionOf(t, in)}
+	stew := uuid.NewV7().String()
+	for i := range 30 {
+		if i == 0 {
+			rec := in.do(t, http.MethodPost, "/api/v1/recipes/"+stew+"/shares", `{"email": "nobody@example.com"}`, ana, nil)
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("a share with no user: %d %s", rec.Code, rec.Body.String())
+			}
+			continue
+		}
+		inviteByAPI(t, in, ana, fmt.Sprintf("someone%d@example.com", i))
+	}
+	for _, c := range []struct{ path, body string }{
+		{"/api/v1/household/invites", `{"email": "more@example.com"}`},
+		{"/api/v1/household/invites", `{"email": "ANA@example.com"}`},
+		{"/api/v1/recipes/" + stew + "/shares", `{"email": "more@example.com"}`},
+	} {
+		rec := in.do(t, http.MethodPost, c.path, c.body, ana, nil)
+		if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") == "" {
+			t.Errorf("%s %s past the limit: %d %v, want 429 with Retry-After", c.path, c.body, rec.Code, rec.Header())
+		}
+	}
+	// The limit is Ana's: another user invites still.
+	zoe := in.addUser(t, user.RoleUser)
+	inviteByAPI(t, in, sessionOfUser(t, in, zoe), "more@example.com")
+	in.clock.Set(in.clock.Now().Add(24 * time.Hour))
+	inviteByAPI(t, in, ana, "more@example.com")
 }
 
 // inHousehold puts users in a household of their own, straight in the
@@ -298,7 +447,7 @@ func TestHouseholdAcceptAfterAChange(t *testing.T) {
 	id := inviteByAPI(t, in, ana, zoe.Email)
 	// Mia's invite of Zoe waits too, made while Zoe was in no household.
 	mia := newIsolationUser(t, in.db, "mia@example.com", "Mia", now)
-	inv, err := in.db.InviteToHousehold(t.Context(), mia, zoe.ID, now)
+	inv, err := in.db.InviteToHousehold(t.Context(), mia, zoe.Email, now)
 	if err != nil {
 		t.Fatal(err)
 	}

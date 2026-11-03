@@ -53,7 +53,9 @@ test('a household: invited, what joining does seen, joined, the kitchen shared, 
   await sheet.getByRole('button', { name: 'Invite' }).click()
   await expect(mia.getByText(`Invited ${leoEmail}`)).toBeVisible()
   await expect(
-    mia.getByRole('region', { name: 'Invites sent' }).getByRole('heading', { name: 'Leo' }),
+    mia
+      .getByRole('region', { name: 'Invites sent' })
+      .getByRole('heading', { name: leoEmail, exact: true }),
   ).toBeVisible()
 
   // Leo's day says it waits; he sees it from the settings, what joining

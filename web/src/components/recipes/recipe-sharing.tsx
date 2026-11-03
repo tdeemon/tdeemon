@@ -27,6 +27,9 @@ function why(t: Messages, error: unknown, own: boolean): string {
   if (status === 422) {
     return own ? t.sharing.self : t.sharing.noUser
   }
+  if (status === 429) {
+    return t.sharing.tooMany
+  }
   return t.sharing.failed(problem(t, error))
 }
 

@@ -101,7 +101,7 @@ store layer and covered by tests that run every query as the wrong user.
 | `catalog_foods` / `catalog_servings` / `catalog_barcodes` | id, name, brand, basis, the nutrients, portion_g?, source (label/reference/off), created_at, updated_at; its servings; its barcodes, each one product's | the instance's catalog, no user's ("The catalog" below); a user's food names the row it went into, or came from, in `foods.catalog_id`; `catalog_saves` (user_id, event_id, the row as the save found it, the version it left) is what a user's save did to it, for its undo |
 | `recipes` / `recipe_items` | food_id (the recipe's food), yield_g?, portions?, pot_g?; its ingredients as a meal's items (food_user_id + food_id, the food's owner and id, quantity as given, amount + unit, the nutrients) | batch cooking: a recipe is a food of `source: recipe` whose values per 100 g of the cooked dish are worked out of its ingredients and the dish's weight ("Recipes" below) |
 | `food_shares` | share_id, seat, user_id + food_id (the member's food or recipe), version, left_at?, household (the seat the household's, or an explicit share's) | a recipe shared between users, or a food of a household: each member's of it, tied together ("Shared recipes" below) |
-| `households` / `household_members` / `household_invites` | id, created_at; user_id (one household a user), household_id, joined_at; id, user_id (the inviter), invited_id, created_at, expires_at | users who keep one kitchen and share every food and recipe ("A household" below); an invite waits for the invited user's answer, one per inviter and invited user |
+| `households` / `household_members` / `household_invites` | id, created_at; user_id (one household a user), household_id, joined_at; id, user_id (the inviter), email (the address invited), created_at, expires_at | users who keep one kitchen and share every food and recipe ("A household" below); an invite waits for the answer of whoever has the address, one per inviter and address |
 | `meals` | id, user_id, day, eaten_at, description, client (mcp/chat/web/telegram/import), note, fingerprint | the fingerprint of the create, for idempotent retries (§9) |
 | `meal_items` | id, meal_id, user_id, food_id?, name, brand (the food's, apart from its name), quantity as given (amount with its unit g/ml or without it for the food's own, or servings × serving, the serving left out for the food's one, or portions), amount + unit (g/ml/portion), the nutrients, source, note | **snapshot at log time**; editing a food later does not silently rewrite history |
 | `metrics` | user_id, day, metric, value, source, updated_at | long format: weight, body_fat, lean_mass, steps, active_kcal, basal_kcal, sleep_h, rhr, hrv, vo2max, exercise_min |
@@ -284,13 +284,19 @@ the household does not leave a recipe no one else would keep. Equal
 members: any member invites and any changes any food, the latest save
 winning; no member removes another.
 
-A member invites a user of the instance by their address, from the web
-app, and so does a user in no household, whose invite's accept makes
-the household of the two; a deactivated user, oneself, a member, a
-user in another household (one household a user) or one an invite of
-the household waits for already is refused. The invite waits 7 days,
-revoked by any member or declined by the invited user; a Web Push
-tells the invited user, and the day has a line of it while it waits.
+A member invites an address, from the web app, and so does a user in
+no household, whose invite's accept makes the household of the two.
+The invite is the address's: whoever has an account of it answers,
+now or once they have one, and the answer is the same whether a user
+has the address or not, naming no one, so an invite tells no one who
+has an account here. Only oneself, a member, or an address an invite
+of the household waits for already is refused; a user in another
+household (one household a user) has the invite, and its accept is
+refused until they leave. A user makes 30 invites and recipe shares by
+address a day, in memory, so no one floods another with
+notifications. The invite waits 7 days, revoked by any member or
+declined by the invited user; a Web Push tells the invited user, if
+active, and the day has a line of it while it waits.
 Before accepting, the invited user sees what the merge does, from the
 merge itself run and rolled back (a dry run): how many foods and
 recipes of theirs become one with the household's, how many come to
@@ -349,7 +355,10 @@ explicit share keeps them in its group; members in it by the
 household's seats alone take their copies to a group of their own, so
 neither side's save reaches the other. The leaver's invites waiting
 go; the leave is their event (`household.leave`), which undo refuses
-and never goes past. A deleted account leaves first. An admin who must
+and never goes past. A deleted account leaves first; an invite to its
+address stays until it expires or is revoked, the inviter's own row,
+and whoever has the address next may answer it, as an invite's
+vanishing would say an account had it. An admin who must
 take a member out does it by hand, with the statements the leave runs
 (`internal/store/household_leave.sql`, which a test holds to this
 copy), the member's id bound to `:user`, in one transaction:

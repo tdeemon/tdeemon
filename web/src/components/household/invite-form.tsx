@@ -1,5 +1,6 @@
 import { useId, useState, type RefObject, type SubmitEvent } from 'react'
 
+import { statusOf } from '@/api/errors'
 import { codeOf, useInvite } from '@/api/household'
 import { Button } from '@/components/ui/button'
 import type { Messages } from '@/i18n/en'
@@ -9,16 +10,19 @@ import { fieldLabel, inputClass } from '@/lib/styles'
 import { sayChange } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
-// why says why an invite was not made: by the refusal's code, or what
-// failed.
+// why says why an invite was not made: by the refusal's code, too many
+// today, or what failed.
 function why(t: Messages, error: unknown): string {
+  if (statusOf(error) === 429) {
+    return t.household.tooMany
+  }
   const code = codeOf(error, 'body.email')
   const refusals: Record<string, string> = t.household.refusals
   return (code !== undefined ? refusals[code] : undefined) ?? t.household.failed(problem(t, error))
 }
 
-// InviteForm invites a user of the instance into the household by their
-// address, in the sheet it is in; done, a toast says so and the sheet
+// InviteForm invites an address into the household (whoever has an
+// account of it answers), in the sheet it is in; done, a toast says so and the sheet
 // closes. email is the field the sheet focuses as it opens.
 export function InviteForm({
   email,

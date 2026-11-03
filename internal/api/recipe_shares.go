@@ -57,9 +57,13 @@ func (s *sessions) registerRecipeShares(a huma.API) {
 		Summary:     "Share a recipe with another user",
 		Description: "Needs a web session. The user of the address has the recipe at once, a recipe of their own of it that a change by any member is every member's; " +
 			"its ingredients of your foods are theirs to see in it, never among their foods. They are told by a notification on their devices. " +
-			"Answers the recipe, with whom it is shared now.",
-		Tags:   []string{"foods"},
-		Errors: []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity},
+			"Answers the recipe, with whom it is shared now. A user makes 30 recipe shares and invites into a household by address in 24 hours; " +
+			"more answer 429 with Retry-After.",
+		Tags: []string{"foods"},
+		Errors: []int{
+			http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity,
+			http.StatusTooManyRequests,
+		},
 	}, s.shareRecipe)
 	huma.Register(a, huma.Operation{
 		OperationID:   "unshare-recipe",
@@ -91,6 +95,9 @@ func (s *sessions) shareRecipe(ctx context.Context, in *shareRecipeInput) (*food
 	id, err := uuid.Parse(in.ID)
 	if err != nil {
 		return nil, huma.Error404NotFound("no such recipe")
+	}
+	if _, wait, ok := s.addressInvites.take(p.User.ID.String()); !ok {
+		return nil, tooManyInvites(wait)
 	}
 	// The instance's users know one another: an address of none says so.
 	with, err := s.db.UserByEmail(ctx, user.NormalizeEmail(in.Body.Email))

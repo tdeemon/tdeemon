@@ -402,7 +402,7 @@ func answerCases() map[string]answerCase {
 			zoe := in.addUser(t, user.RoleUser)
 			zoes := sessionOfUser(t, in, zoe)
 			mia := newIsolationUser(t, in.db, "mia@example.com", "Mia", in.clock.Now())
-			if _, err := in.db.InviteToHousehold(t.Context(), mia, in.user.ID, in.clock.Now()); err != nil {
+			if _, err := in.db.InviteToHousehold(t.Context(), mia, in.user.Email, in.clock.Now()); err != nil {
 				t.Fatal(err)
 			}
 			id := inviteByAPI(t, in, ana, zoe.Email)
@@ -442,7 +442,7 @@ func answerCases() map[string]answerCase {
 			if _, err := in.db.SaveFood(t.Context(), in.user.ID, isolationActor, pudding, now); err != nil {
 				t.Fatal(err)
 			}
-			inv, err := in.db.InviteToHousehold(t.Context(), zoe.ID, in.user.ID, now)
+			inv, err := in.db.InviteToHousehold(t.Context(), zoe.ID, in.user.Email, now)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -457,7 +457,7 @@ func answerCases() map[string]answerCase {
 		"accept-household-invite": func(t *testing.T, in *instance, session *http.Cookie) {
 			t.Helper()
 			zoe := in.addUser(t, user.RoleUser)
-			inv, err := in.db.InviteToHousehold(t.Context(), zoe.ID, in.user.ID, in.clock.Now())
+			inv, err := in.db.InviteToHousehold(t.Context(), zoe.ID, in.user.Email, in.clock.Now())
 			if err != nil {
 				t.Fatal(err)
 			}

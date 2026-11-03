@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/danielgtaylor/huma/v2"
 )
 
 // Limits on failures, counted in memory per client address (addrKey) and
@@ -37,6 +39,12 @@ const (
 	// minute in all, so an agent caught in a loop does not use them up.
 	offLookups = 30
 	offWindow  = time.Minute
+	// addressInvites invites into a household and recipe shares, by an
+	// address, a user may make in addressWindow: a person invites the
+	// few they cook with, and no one sends a user a notification after
+	// another, or tries one address after another.
+	addressInvites = 30
+	addressWindow  = 24 * time.Hour
 )
 
 // maxLimitKeys bounds the memory of a limiter. Past it, expired keys are
@@ -155,4 +163,10 @@ func (l *limiter) reset(key string) {
 func retryAfter(wait time.Duration) http.Header {
 	secs := max(1, int(math.Ceil(wait.Seconds())))
 	return http.Header{"Retry-After": {strconv.Itoa(secs)}}
+}
+
+// tooManyInvites is the 429 of a user past addressInvites, for wait.
+func tooManyInvites(wait time.Duration) error {
+	return huma.ErrorWithHeaders(huma.NewError(http.StatusTooManyRequests,
+		"too many invites and shares by address today; try again later"), retryAfter(wait))
 }
