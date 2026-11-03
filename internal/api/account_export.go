@@ -154,7 +154,8 @@ func (s *sessions) registerExport(a huma.API) {
 		Path:        Prefix + "/account/export",
 		Summary:     "Export your data",
 		Description: "Needs a web session. All your data, as a ZIP: `tdeemon.json`, every table of your data with your " +
-			"rows (format `" + exportFormat + "`: the tables and columns as the database has them), and `csv/<table>.csv` " +
+			"rows (format `" + exportFormat + "`: the tables and columns as the database has them), your household's row and " +
+			"the invites into a household made to you among them, and `csv/<table>.csv` " +
 			"of each. Left out are secrets: hashes of the password, the API tokens and the sessions, and the devices' " +
 			"push subscriptions.",
 		Tags: []string{"settings"},

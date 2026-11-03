@@ -5859,7 +5859,7 @@
     },
     "/api/v1/account/export": {
       "get": {
-        "description": "Needs a web session. All your data, as a ZIP: `tdeemon.json`, every table of your data with your rows (format `tdeemon-export/1`: the tables and columns as the database has them), and `csv/\u003ctable\u003e.csv` of each. Left out are secrets: hashes of the password, the API tokens and the sessions, and the devices' push subscriptions.",
+        "description": "Needs a web session. All your data, as a ZIP: `tdeemon.json`, every table of your data with your rows (format `tdeemon-export/1`: the tables and columns as the database has them), your household's row and the invites into a household made to you among them, and `csv/\u003ctable\u003e.csv` of each. Left out are secrets: hashes of the password, the API tokens and the sessions, and the devices' push subscriptions.",
         "operationId": "export-account",
         "responses": {
           "200": {

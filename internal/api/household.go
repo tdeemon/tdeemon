@@ -190,11 +190,11 @@ func (s *sessions) registerHousehold(a huma.API) {
 		Errors:        append(session, http.StatusConflict, http.StatusUnprocessableEntity),
 	}, s.inviteToHousehold)
 	huma.Register(a, huma.Operation{
-		OperationID: "delete-household-invite",
-		Method:      http.MethodDelete,
-		Path:        Prefix + "/household/invites/{id}",
-		Summary:     "Revoke or decline an invite",
-		Description: "Needs a web session. An invite your household made is revoked, by any of its members; one for your answer is declined.",
+		OperationID:   "delete-household-invite",
+		Method:        http.MethodDelete,
+		Path:          Prefix + "/household/invites/{id}",
+		Summary:       "Revoke or decline an invite",
+		Description:   "Needs a web session. An invite your household made is revoked, by any of its members; one for your answer is declined.",
 		Tags:          []string{"household"},
 		DefaultStatus: http.StatusNoContent,
 		Errors:        append(session, http.StatusNotFound),
@@ -446,9 +446,9 @@ func (s *sessions) leaveHousehold(ctx context.Context, _ *struct{}) (*struct{}, 
 // othersThan is members but the one of id.
 func othersThan(members []user.User, id uuid.UUID) []user.User {
 	var out []user.User
-	for _, m := range members {
-		if m.ID != id {
-			out = append(out, m)
+	for i := range members {
+		if members[i].ID != id {
+			out = append(out, members[i])
 		}
 	}
 	return out
@@ -483,13 +483,14 @@ func (s *sessions) tellHousehold(ctx context.Context, to []user.User, words map[
 	if s.push == nil {
 		return
 	}
-	for _, u := range to {
+	for i := range to {
+		u := &to[i]
 		w, ok := words[u.Locale]
 		if !ok {
 			w = words["en"]
 		}
 		n := push.Notification{Title: fmt.Sprintf(w.title, who), Body: w.body, URL: householdPage, Tag: tag}
-		if r := notify.Push(ctx, s.db, s.push, u, n, push.Message{TTL: 24 * 60 * 60}, s.now()); r.Err != nil {
+		if r := notify.Push(ctx, s.db, s.push, *u, n, push.Message{TTL: 24 * 60 * 60}, s.now()); r.Err != nil {
 			s.logger.WarnContext(ctx, "telling the household failed", "user_id", u.ID.String(), "error", r.Err)
 		}
 	}

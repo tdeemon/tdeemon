@@ -193,8 +193,10 @@ The whole merge is one transaction.
   reaches the household; the budget (`TestMCPFitsItsBudget`) is kept or
   raised with a reason, and the eval run once after, with a case of a
   household's food corrected.
-- The export holds the user's household, its members' ids and the
-  seats; the account's delete leaves the household first.
+- The export holds the user's household, their own membership of it
+  (the other members' rows are theirs), their seats, and the invites
+  into a household they made or got; the account's delete leaves the
+  household first.
 - The web app: English and Croatian; axe, a finger's targets and the
   focus on a phone and a desktop; the merge's preview readable on a
   phone; a leave asks before.

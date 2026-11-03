@@ -495,6 +495,21 @@ func foodItemError(e *store.FoodItemError) error {
 
 // createError is the answer to CreateMeal's err.
 func createError(err error) error {
+	switch {
+	case itemsError(err) != nil:
+		return itemsError(err)
+	case errors.Is(err, store.ErrMealConflict):
+		return huma.Error409Conflict("another meal is under this id: a new meal takes a new id")
+	case errors.Is(err, store.ErrMealDeleted):
+		return huma.Error409Conflict("the meal under this id was deleted: a new meal takes a new id")
+	}
+	return internalError("logging the meal failed", err)
+}
+
+// itemsError is the answer to a meal's save's err about its items and
+// their foods, as a new meal and a change of one have them; nil for any
+// other err.
+func itemsError(err error) error {
 	var conflict *store.FoodConflictError
 	var fie *store.FoodItemError
 	switch {
@@ -506,14 +521,8 @@ func createError(err error) error {
 		return errItemTaken
 	case errors.Is(err, store.ErrRecipeFood):
 		return errRecipeFood
-	case errors.Is(err, store.ErrMealConflict):
-		return huma.Error409Conflict("another meal is under this id: a new meal takes a new id")
-	case errors.Is(err, store.ErrMealDeleted):
-		return huma.Error409Conflict("the meal under this id was deleted: a new meal takes a new id")
-	case shareRefusal(err) != nil:
-		return shareRefusal(err)
 	}
-	return internalError("logging the meal failed", err)
+	return shareRefusal(err)
 }
 
 // itemError says which item err is about, when it is a 422 of the item's
@@ -627,23 +636,13 @@ func (s *sessions) updateMeal(ctx context.Context, in *updateMealInput) (*mealOu
 		return edit(m, b, items, cal)
 	}, now)
 	var e *huma.ErrorModel
-	var conflict *store.FoodConflictError
-	var fie *store.FoodItemError
 	switch {
 	case errors.As(err, &e):
 		return nil, err
-	case errors.As(err, &fie):
-		return nil, foodItemError(fie)
-	case errors.As(err, &conflict):
-		return nil, huma.Error409Conflict(conflictDetail(conflict))
+	case itemsError(err) != nil:
+		return nil, itemsError(err)
 	case errors.Is(err, store.ErrNotFound):
 		return nil, huma.Error404NotFound("no such meal")
-	case errors.Is(err, store.ErrItemTaken):
-		return nil, errItemTaken
-	case errors.Is(err, store.ErrRecipeFood):
-		return nil, errRecipeFood
-	case shareRefusal(err) != nil:
-		return nil, shareRefusal(err)
 	case err != nil:
 		return nil, internalError("changing the meal failed", err)
 	}

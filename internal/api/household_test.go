@@ -113,34 +113,14 @@ func TestHouseholdInviteJoinAndLeave(t *testing.T) {
 	now := in.clock.Now()
 	mia := newIsolationUser(t, in.db, "mia@example.com", "Mia", now)
 	mias := sessionOfUser(t, in, user.User{ID: mia})
-	subscribe(t, in, ana[0], "https://push.example/ana", "")
-	subscribe(t, in, zoes[0], "https://push.example/zoe", "")
+	subscribe(t, in, ana[0], "https://web.push.apple.com/ana", "")
+	subscribe(t, in, zoes[0], "https://web.push.apple.com/zoe", "")
 	saveIsolationFoods(t, in.db, in.user, now)
 	in.pushes.endpoints()
 
 	id := inviteByAPI(t, in, ana, " Zoe@Example.com ")
-	if got := in.pushes.endpoints(); !slices.Equal(got, []string{"https://push.example/zoe"}) {
-		t.Errorf("the invite told %v, want Zoe's phone", got)
-	}
-	if got := getHousehold(t, in, zoes); len(got.Members) != 0 || len(got.Received) != 1 || got.Received[0].ID != id ||
-		got.Received[0].By.Email != "ana@example.com" || len(got.Sent) != 0 {
-		t.Errorf("Zoe's household = %+v, want Ana's invite for her answer", got)
-	}
-	if got := getHousehold(t, in, ana); len(got.Sent) != 1 || got.Sent[0].Invited.Name != "Zoe" || len(got.Received) != 0 {
-		t.Errorf("Ana's household = %+v, want her invite of Zoe", got)
-	}
-	// The invite is Zoe's to preview and accept, no one else's.
-	for _, who := range [][]*http.Cookie{ana, mias} {
-		if rec := in.do(t, http.MethodGet, "/api/v1/household/invites/"+id+"/preview", "", who, nil); rec.Code != http.StatusNotFound {
-			t.Errorf("a preview of another's invite: %d %s, want 404", rec.Code, rec.Body.String())
-		}
-		if rec := in.do(t, http.MethodPost, "/api/v1/household/invites/"+id+"/accept", acceptBody("x"), who, nil); rec.Code != http.StatusNotFound {
-			t.Errorf("an accept of another's invite: %d %s, want 404", rec.Code, rec.Body.String())
-		}
-	}
-	if rec := in.do(t, http.MethodDelete, "/api/v1/household/invites/"+id, "", mias, nil); rec.Code != http.StatusNotFound {
-		t.Errorf("Mia's delete of the invite: %d %s, want 404", rec.Code, rec.Body.String())
-	}
+	told(t, in, "the invite", "https://web.push.apple.com/zoe")
+	waitsForZoe(t, in, id, ana, zoes, mias)
 
 	rec := in.do(t, http.MethodGet, "/api/v1/household/invites/"+id+"/preview", "", zoes, nil)
 	if body := rec.Body.String(); rec.Code != http.StatusOK || !strings.Contains(body, `"received":{"foods":2,"recipes":0}`) {
@@ -152,24 +132,9 @@ func TestHouseholdInviteJoinAndLeave(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &joined); rec.Code != http.StatusOK || err != nil || len(joined.Members) != 2 {
 		t.Fatalf("Zoe's accept: %d %s", rec.Code, rec.Body.String())
 	}
-	if got := in.pushes.endpoints(); !slices.Equal(got, []string{"https://push.example/ana"}) {
-		t.Errorf("the accept told %v, want Ana's phone", got)
-	}
+	told(t, in, "the accept", "https://web.push.apple.com/ana")
 	for _, who := range [][]*http.Cookie{ana, zoes} {
-		got := getHousehold(t, in, who)
-		if len(got.Members) != 2 || len(got.Sent) != 0 || len(got.Received) != 0 {
-			t.Fatalf("the household = %+v, want Ana and Zoe, no invites", got)
-		}
-		for _, m := range got.Members {
-			for k := range m {
-				if k != "name" && k != "email" && k != "you" {
-					t.Errorf("a member shows %q: %v; want their name and address alone", k, m)
-				}
-			}
-		}
-		if got.Members[0]["email"] != "ana@example.com" || got.Members[1]["email"] != "zoe@example.com" {
-			t.Errorf("the members = %v, want Ana, then Zoe", got.Members)
-		}
+		anaAndZoe(t, getHousehold(t, in, who))
 	}
 	if got := getHousehold(t, in, mias); len(got.Members)+len(got.Sent)+len(got.Received) != 0 {
 		t.Errorf("Mia's household = %+v, want nothing", got)
@@ -181,14 +146,73 @@ func TestHouseholdInviteJoinAndLeave(t *testing.T) {
 	if rec := in.do(t, http.MethodPost, "/api/v1/household/leave", "", zoes, nil); rec.Code != http.StatusNoContent {
 		t.Fatalf("Zoe's leave: %d %s", rec.Code, rec.Body.String())
 	}
-	if got := in.pushes.endpoints(); !slices.Equal(got, []string{"https://push.example/ana"}) {
-		t.Errorf("the leave told %v, want Ana's phone", got)
-	}
+	told(t, in, "the leave", "https://web.push.apple.com/ana")
 	if got := getHousehold(t, in, ana); len(got.Members) != 0 {
 		t.Errorf("Ana's household after Zoe left = %+v, want none: a household of one is no more", got)
 	}
 	if rec := in.do(t, http.MethodPost, "/api/v1/household/leave", "", zoes, nil); rec.Code != http.StatusNotFound {
 		t.Errorf("Zoe's leave again: %d %s, want 404", rec.Code, rec.Body.String())
+	}
+}
+
+// waitsForZoe fails unless Ana's invite id waits for Zoe's answer, as
+// each of them sees it, and is Zoe's alone to answer, not Ana's nor Mia's.
+func waitsForZoe(t *testing.T, in *instance, id string, ana, zoes, mias []*http.Cookie) {
+	t.Helper()
+	if got := getHousehold(t, in, zoes); len(got.Members) != 0 || len(got.Received) != 1 || got.Received[0].ID != id ||
+		got.Received[0].By.Email != "ana@example.com" || len(got.Sent) != 0 {
+		t.Errorf("Zoe's household = %+v, want Ana's invite for her answer", got)
+	}
+	if got := getHousehold(t, in, ana); len(got.Sent) != 1 || got.Sent[0].Invited.Name != "Zoe" || len(got.Received) != 0 {
+		t.Errorf("Ana's household = %+v, want her invite of Zoe", got)
+	}
+	// The invite is Zoe's to preview and accept, no one else's.
+	notTheirs(t, in, id, ana, mias)
+	if rec := in.do(t, http.MethodDelete, "/api/v1/household/invites/"+id, "", mias, nil); rec.Code != http.StatusNotFound {
+		t.Errorf("Mia's delete of the invite: %d %s, want 404", rec.Code, rec.Body.String())
+	}
+}
+
+// told fails unless what told the devices of endpoints alone since the
+// last look.
+func told(t *testing.T, in *instance, what string, endpoints ...string) {
+	t.Helper()
+	if got := in.pushes.endpoints(); !slices.Equal(got, endpoints) {
+		t.Errorf("%s told %v, want %v", what, got, endpoints)
+	}
+}
+
+// notTheirs fails unless the invite id is none of each of whos' to
+// preview or accept.
+func notTheirs(t *testing.T, in *instance, id string, whos ...[]*http.Cookie) {
+	t.Helper()
+	path := "/api/v1/household/invites/" + id
+	for _, who := range whos {
+		if rec := in.do(t, http.MethodGet, path+"/preview", "", who, nil); rec.Code != http.StatusNotFound {
+			t.Errorf("a preview of another's invite: %d %s, want 404", rec.Code, rec.Body.String())
+		}
+		if rec := in.do(t, http.MethodPost, path+"/accept", acceptBody("x"), who, nil); rec.Code != http.StatusNotFound {
+			t.Errorf("an accept of another's invite: %d %s, want 404", rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// anaAndZoe fails unless got is a household of Ana, then Zoe, each by
+// their name and address alone, and no invites.
+func anaAndZoe(t *testing.T, got householdAnswer) {
+	t.Helper()
+	if len(got.Members) != 2 || len(got.Sent) != 0 || len(got.Received) != 0 {
+		t.Fatalf("the household = %+v, want Ana and Zoe, no invites", got)
+	}
+	for _, m := range got.Members {
+		for k := range m {
+			if k != "name" && k != "email" && k != "you" {
+				t.Errorf("a member shows %q: %v; want their name and address alone", k, m)
+			}
+		}
+	}
+	if got.Members[0]["email"] != "ana@example.com" || got.Members[1]["email"] != "zoe@example.com" {
+		t.Errorf("the members = %v, want Ana, then Zoe", got.Members)
 	}
 }
 
@@ -271,6 +295,12 @@ func TestHouseholdAcceptAfterAChange(t *testing.T) {
 	zoes := sessionOfUser(t, in, zoe)
 	now := in.clock.Now()
 	id := inviteByAPI(t, in, ana, zoe.Email)
+	// Mia's invite of Zoe waits too, made while Zoe was in no household.
+	mia := newIsolationUser(t, in.db, "mia@example.com", "Mia", now)
+	inv, err := in.db.InviteToHousehold(t.Context(), mia, zoe.ID, now)
+	if err != nil {
+		t.Fatal(err)
+	}
 	old := previewByAPI(t, in, zoes, id)
 	saveIsolationFoods(t, in.db, in.user, now)
 
@@ -279,8 +309,8 @@ func TestHouseholdAcceptAfterAChange(t *testing.T) {
 	if rec.Code != http.StatusConflict || codeOf(t, rec.Body, "body.fingerprint") != "merge_changed" {
 		t.Errorf("the accept of the old preview: %d %s, want 409 merge_changed", rec.Code, rec.Body.String())
 	}
-	if got := getHousehold(t, in, zoes); len(got.Members) != 0 || len(got.Received) != 1 {
-		t.Errorf("Zoe's household after the refusal = %+v, want her invite still waiting", got)
+	if got := getHousehold(t, in, zoes); len(got.Members) != 0 || len(got.Received) != 2 {
+		t.Errorf("Zoe's household after the refusal = %+v, want both invites still waiting", got)
 	}
 	fresh := previewByAPI(t, in, zoes, id)
 	if fresh == old {
@@ -290,12 +320,7 @@ func TestHouseholdAcceptAfterAChange(t *testing.T) {
 		t.Errorf("the accept of the new preview: %d %s", rec.Code, rec.Body.String())
 	}
 
-	// Mia's invite of Zoe, now in Ana's household, waits; Zoe leaves first.
-	mia := newIsolationUser(t, in.db, "mia@example.com", "Mia", now)
-	inv, err := in.db.InviteToHousehold(t.Context(), mia, zoe.ID, now)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Mia's invite waits, but Zoe, now in Ana's household, leaves it first.
 	other := "/api/v1/household/invites/" + inv.ID.String()
 	rec = in.do(t, http.MethodGet, other+"/preview", "", zoes, nil)
 	if rec.Code != http.StatusConflict || codeOf(t, rec.Body, "path.id") != "other_household" {
@@ -442,4 +467,113 @@ func TestUndoRefusesAJoin(t *testing.T) {
 	if body := rec.Body.String(); rec.Code != http.StatusOK || !strings.Contains(body, `"action":"household.join","entity":"household"`) || strings.Contains(body, `"next":true`) {
 		t.Errorf("Zoe's changes: %d %s, want the join, not next", rec.Code, body)
 	}
+}
+
+// kitchenTables are the tables of a user's foods and recipes, whose rows a
+// household's members each have a copy of.
+var kitchenTables = []string{
+	"foods", "foods_fts", "food_servings", "food_barcodes", "food_aliases", "food_shares", "recipes", "recipe_items", "catalog_saves",
+}
+
+// householdTables are the tables of the household itself: its members see
+// one another's rows of them, as get-household shows the invites any
+// member made.
+var householdTables = []string{"households", "household_members", "household_invites"}
+
+// Ana and Ivo join one household: Ivo's foods and recipes are Ana's
+// copies of hers and the members' names and addresses are his to see, and
+// nothing else of hers: no other row of his holds a value of hers, and no
+// answer of a GET of his shows one, his export among them. Mia, outside,
+// sees none of it.
+func TestHouseholdSharesTheKitchenAlone(t *testing.T) {
+	t.Parallel()
+
+	e := newIsolationEnv(t, false)
+	ana, ivo := e.owner, e.other
+	ivos := []*http.Cookie{ivo.session}
+	if err := e.in.db.LeaveHousehold(t.Context(), ivo.user.ID, isolationActor, e.in.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	id := inviteByAPI(t, e.in, []*http.Cookie{ana.session}, ivo.user.Email)
+	if rec := e.in.do(t, http.MethodPost, "/api/v1/household/invites/"+id+"/accept", acceptBody(previewByAPI(t, e.in, ivos, id)), ivos, nil); rec.Code != http.StatusOK {
+		t.Fatalf("Ivo's accept: %d %s", rec.Code, rec.Body.String())
+	}
+
+	forbidden := notToCross(t, e)
+	shows := func(what, body string, values []string) {
+		t.Helper()
+		for _, v := range values {
+			if strings.Contains(body, v) {
+				t.Errorf("%s shows Ana's %q: %s", what, v, body)
+			}
+		}
+	}
+	mia := newIsolationUser(t, e.in.db, "mia@example.com", "Mia", e.in.clock.Now())
+	mias := sessionOfUser(t, e.in, user.User{ID: mia})
+	for _, op := range operations(t) {
+		if op.method != http.MethodGet || strings.Contains(op.route, "{") {
+			continue
+		}
+		for who, values := range map[string][]string{"Ivo": forbidden, "Mia": e.ownerValues} {
+			session := ivos
+			if who == "Mia" {
+				session = mias
+			}
+			rec := e.in.do(t, http.MethodGet, op.path, "", session, nil)
+			body := rec.Body.String()
+			if op.id == "export-account" && rec.Code == http.StatusOK {
+				body = ""
+				for _, f := range unzipExport(t, rec.Body.Bytes()) {
+					body += f
+				}
+			}
+			shows(who+"'s GET "+op.route, body, values)
+		}
+	}
+	rec := e.in.do(t, http.MethodGet, "/api/v1/foods/list", "", ivos, nil)
+	if !strings.Contains(rec.Body.String(), ana.user.Name+"'s rye bread") {
+		t.Errorf("Ivo's foods: %d %s, want Ana's bread among them", rec.Code, rec.Body.String())
+	}
+}
+
+// notToCross are the owner's values the other, in a household with them,
+// has none of: those the other's kitchen and household have now, and the
+// members' names and addresses, cross. It fails if a row of the other's
+// out of their kitchen and household holds one of the owner's values.
+func notToCross(t *testing.T, e isolationEnv) []string {
+	t.Helper()
+	ana, ivo := e.owner, e.other
+	// What may cross: the values of Ana's that Ivo's kitchen has now, and
+	// the members' names and addresses.
+	mate := strings.ToLower(ana.user.Name) + ".housemate@example.com"
+	crosses := []string{ana.user.Name, ana.user.Email, ana.user.Name + "'s housemate", mate}
+	var forbidden []string
+	for _, tb := range e.userTables(t) {
+		_, theirs := e.tableRows(t, tb, ivo.user.ID)
+		if slices.Contains(householdTables, tb.name) {
+			_, hers := e.tableRows(t, tb, ana.user.ID)
+			crosses = append(crosses, append(hers, theirs...)...)
+			continue
+		}
+		if slices.Contains(kitchenTables, tb.name) {
+			crosses = append(crosses, theirs...)
+			continue
+		}
+		for _, v := range theirs {
+			for _, own := range e.ownerValues {
+				if strings.Contains(v, own) && !slices.Contains([]string{ana.user.Name, ana.user.Email}, own) {
+					t.Errorf("Ivo's %s holds Ana's %q: %s", tb.name, own, v)
+				}
+			}
+		}
+	}
+	for _, v := range e.ownerValues {
+		if !slices.Contains(crosses, v) {
+			forbidden = append(forbidden, v)
+		}
+	}
+	if !slices.Contains(crosses, ana.user.Name+"'s rye bread") {
+		t.Fatalf("Ivo's kitchen has no copy of Ana's bread")
+	}
+	return forbidden
 }
