@@ -515,11 +515,15 @@ in `web/`.
     token. A refusal over another member's food names none of theirs.
     `newIsolationEnv` puts each party in a household of their own with a
     third user, with an invite of a guest waiting, so a case runs inside
-    a household; `TestHouseholdSharesTheKitchenAlone` and
-    `TestMCPHouseholdSharesTheKitchenAlone` join the two parties in one
-    and hold every other row of theirs, numbers too, and every answer of
-    a GET, the export among them, to none of the other's but the
-    kitchen, and a third user to none of it;
+    a household. `TestHouseholdSharesTheKitchenAlone` joins the two
+    parties in one: their rows out of the kitchen and the household are
+    as before, numbers too (but a session's and a token's last use, the
+    join's and the leave's events, and when a device was told), no other
+    row of one holds a value of the other's, and no answer of a GET of
+    no parameters, the export among them, shows one, to them or to a
+    third user. `TestMCPHouseholdSharesTheKitchenAlone` holds MCP's read
+    tools to the same, weights included, and a correction to reaching
+    the other member;
   - a handler takes the user from the request's principal
     (`auth.PrincipalFrom`), never from the path, the query or the body
     (the sign-in, which finds the user by the address it is given,

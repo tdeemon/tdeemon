@@ -261,67 +261,83 @@ cooking and shopping together, link their accounts into a household
 (decided 2 November 2026, story 408): from then on every food and
 recipe of a member is every member's, a new one, a change, a barcode
 added or a recipe cooked again; what each eats, weighs and plans stays
-theirs. Each member keeps a copy of each food in their own foods, all
-the copies tied in a group of `food_shares` at the household's seats,
-so a meal's item, a search, a barcode's lookup and a food's use stay
-the member's own. Shared are the name, brand, basis, values, servings,
-portion, source and barcodes, and of a recipe its ingredients, dish's
-weight, portions and pot, each member's recipe naming each ingredient
-by that member's copy; each keeps their note, aliases and whether it
-is archived. Every path that makes or changes a food (the web app, the
-API, MCP's `upsert_food`, `upsert_recipe`, a meal's new food, a catalog
-food or an Open Food Facts product taken, a barcode linked on a log, an
-ingredient copied, an undo) reaches every member in one transaction,
-and a save another member's other food is in the way of, by its name
-and brand or a barcode, is refused (409) naming none of theirs. Equal
+theirs. A recipe a member left the share of (above) is the exception:
+it stays theirs alone, for their meals, unless a merge brings them back
+into its group. Each member keeps a copy of each food in their own
+foods, all the copies tied in a group of `food_shares` at the
+household's seats, so a meal's item, a search, a barcode's lookup and a
+food's use stay the member's own. Shared are the name, brand, basis,
+values, servings, portion, source and barcodes, and of a recipe its
+ingredients, dish's weight, portions and pot, each member's recipe
+naming an ingredient of the household's kitchen by that member's copy
+(one of a recipe shared from outside keeps its owner's food); each
+keeps their note, aliases and whether it is archived. Every path that
+makes or changes a food (the web app, the API, MCP's `upsert_food`,
+`upsert_recipe`, a meal's new food, a catalog food or an Open Food Facts
+product taken, a barcode linked on a log, an ingredient copied, an
+undo) reaches every member in one transaction, and a save another
+member's other food is in the way of, by its name and brand or a
+barcode, is refused (409) naming none of theirs. A recipe shared with a
+member (above) goes to their whole household, and a stop or a leave of
+it takes the household together: no member takes a housemate out, and
+the household does not leave a recipe no one else would keep. Equal
 members: any member invites and any changes any food, the latest save
 winning; no member removes another.
 
-A member invites a user of the instance by their address, from the
-web app; a deactivated user, oneself, a member, a user in another
-household (one household a user) or one an invite of the household
-waits for already is refused. The invite waits 7 days, revoked by any
-member or declined by the invited user, and a Web Push tells the
-invited user, the day has a line of it until it is answered. Before
-accepting, the invited user sees what the merge does, from the merge
-itself run and rolled back (a dry run): how many foods and recipes of
-theirs become one with the household's, how many come to them, how
-many go to the household, and each renamed or losing a barcode. The
-accept gives the preview's fingerprint, and a merge that is no longer
-that one (the foods changed since) does nothing, refused with a 409,
-and the app shows the new preview. The merge, one transaction:
+A member invites a user of the instance by their address, from the web
+app, and so does a user in no household, whose invite's accept makes
+the household of the two; a deactivated user, oneself, a member, a
+user in another household (one household a user) or one an invite of
+the household waits for already is refused. The invite waits 7 days,
+revoked by any member or declined by the invited user; a Web Push
+tells the invited user, and the day has a line of it while it waits.
+Before accepting, the invited user sees what the merge does, from the
+merge itself run and rolled back (a dry run): how many foods and
+recipes of theirs become one with the household's, how many come to
+them, how many go to the household, and each renamed or losing a
+barcode. The accept gives the preview's fingerprint, and a merge that
+is no longer that one (the foods changed since) does nothing, refused
+with a 409, and the app shows the new preview; a merge that would make
+a recipe its own ingredient is refused too (409, `recipe_cycle`), and
+does nothing. The merge, one transaction, of the inviting side (H, the
+household's foods) and the invited user's (U):
 
-1. **Matching**, in order: the same name and brand, the same barcode,
-   the same catalog row; a food matches at most one of the other side,
-   an earlier rule winning, the latest saved among several at one.
+1. **Matching**: first a recipe both sides are in one share group of
+   already (a copy U left of H's group comes back to U); then the same
+   name and brand, the same barcode, the same catalog row. A food
+   matches at most one of the other side, an earlier rule winning, the
+   latest saved among several at one.
 2. **The inviting side wins** (the maintainer's call): a matched pair
-   becomes one food of the household's shared fields; the invited
-   user's row keeps its id, so their meals still name it, and their
-   note, aliases and archived. Barcodes are the union of both.
-3. **The other side gets what it lacks**: a copy for the invited user
-   of each food of the household's they have no match of, and for each
-   member of each of theirs.
-4. **Kinds**: a recipe and a plain food of one name never merge; the
-   invited user's is renamed (" (2)", the lowest free). Two recipes
-   merge as foods do.
+   becomes one food of H's shared fields; U's row keeps its id, so U's
+   meals still name it, and U's note, aliases and archived. Barcodes
+   are the union of both, H's first, up to a food's most
+   (`food.MaxBarcodes`), the rest of U's dropped.
+3. **The other side gets what it lacks**: a copy for U of each food of
+   H's with no match, and for each member of each of U's.
+4. **Kinds**: a recipe and a plain food of one name and brand never
+   merge; U's is renamed (" (2)", the lowest free). Two recipes merge
+   as foods do.
 5. **Recipes shared outside** (above) keep their groups: the household's
-   members join them, and a copy of the invited user's that matched a
-   recipe of the household's leaves its outside group for the
-   household's.
-6. **What still clashes**, a name or a barcode, is resolved on the
-   invited user's side: renamed, or the barcode dropped.
+   members join them, and a copy of U's that matched a recipe of H's
+   leaves its outside group for H's.
+6. **What still clashes**, a name and brand or a barcode, is resolved
+   on U's side, a recipe U left among it: renamed, or the barcode
+   dropped.
 
-Joining is the joiner's event (`household.join`); a Web Push tells the
-members. Undo of a save of a household's food takes it back for every
-member, refused when another member saved it since (the group's
-version); joining and leaving are never undone, and an undo never goes
-past either, which would bring a state from before the merge into the
-shared foods. The household's operations are a web session's alone
-(`/api/v1/household`), closed to tokens; MCP has no tool of them, and
-its tools' descriptions say a save reaches the household. A member sees
-the others' names and addresses, and nothing of theirs but the
-kitchen; an account's export holds its household's row, the user's own
-membership, their seats and the invites they made or got.
+Joining is the joiner's event (`household.join`), and a Web Push tells
+the members; a leave's tells those who stay. An undo of a save of a
+household's food takes it back for every member, refused when another
+member saved it since (the group's version). Joining and leaving are
+never undone, and a user's undo never goes past their own join or
+leave, which would bring a state from before the merge into the shared
+foods; another member's undo of a change of before goes on, on the
+foods of the household as it is now. The household's operations are a
+web session's alone (`/api/v1/household`), closed to tokens; MCP has no
+tool of them, and its tools' descriptions say a save reaches the
+household. A member sees the others' names and addresses, and nothing
+of theirs but the kitchen; an account's export holds its household's
+row, the user's own membership, their seats and the invites they made
+or got.
 
 **Leaving a household.** A member leaves their household (story 408);
 no member takes out another. Every member keeps every food and recipe
