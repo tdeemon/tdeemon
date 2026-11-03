@@ -24,6 +24,7 @@ import { DevicesPage } from '@/pages/devices'
 import { FoodPage } from '@/pages/food'
 import { FoodsPage } from '@/pages/foods'
 import { FoodsIndexPage } from '@/pages/foods-index'
+import { HouseholdPage } from '@/pages/household'
 import { InvitePage } from '@/pages/invite'
 import { LimitsPage } from '@/pages/limits'
 import { LoginPage } from '@/pages/login'
@@ -280,6 +281,12 @@ const usersRoute = createRoute({
   path: '/settings/users',
   component: UsersPage,
 })
+// The user's household, which its notifications open.
+const householdRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/settings/household',
+  component: HouseholdPage,
+})
 // The addresses of before, the charts' and the plan's under the settings,
 // lead where they are now.
 const chartsRoute = createRoute({
@@ -316,6 +323,7 @@ const routeTree = rootRoute.addChildren([
     devicesRoute,
     notificationsRoute,
     usersRoute,
+    householdRoute,
   ]),
   loginRoute,
   inviteRoute,
