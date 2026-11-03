@@ -272,10 +272,10 @@ export const hr: Messages = {
     ending: {
       title: 'Kako dan završava',
       under: (kcal: string, under: string) =>
-        `Ako ovdje staneš, tjedan je u prosjeku ${kcal} na dan, ${under} ispod cilja.`,
+        `Ako ovdje staneš, tjedan je u prosjeku ${kcal} kcal na dan, ${under} ispod cilja.`,
       over: (kcal: string, over: string) =>
-        `Ako ovdje staneš, tjedan je u prosjeku ${kcal} na dan, ${over} iznad cilja.`,
-      on: (kcal: string) => `Ako ovdje staneš, tjedan je u prosjeku ${kcal} na dan, na cilju.`,
+        `Ako ovdje staneš, tjedan je u prosjeku ${kcal} kcal na dan, ${over} iznad cilja.`,
+      on: (kcal: string) => `Ako ovdje staneš, tjedan je u prosjeku ${kcal} kcal na dan, na cilju.`,
     },
     columns: { time: 'Vrijeme', meal: 'Obrok', kcal: 'kcal', total: 'Zbroj' },
     phase: 'Faza',

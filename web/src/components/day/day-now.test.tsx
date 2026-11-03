@@ -90,7 +90,7 @@ test('in the evening, the card under the hero says how the day ends the week', a
   const card = await screen.findByRole('region', { name: 'How the day ends' })
   expect(
     within(card).getByText(
-      'If you stop here, the week averages 1,770 a day, 230 under its target.',
+      'If you stop here, the week averages 1,770 kcal a day, 230 under its target.',
     ),
   ).toBeDefined()
 })
@@ -102,7 +102,7 @@ test('the evening card speaks Croatian', async () => {
 
   const card = await screen.findByRole('region', { name: 'Kako dan završava' })
   expect(card.textContent).toContain(
-    'Ako ovdje staneš, tjedan je u prosjeku 1.770 na dan, 230 ispod cilja.',
+    'Ako ovdje staneš, tjedan je u prosjeku 1.770 kcal na dan, 230 ispod cilja.',
   )
 })
 

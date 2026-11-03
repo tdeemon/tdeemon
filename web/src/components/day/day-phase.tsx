@@ -4,7 +4,6 @@ import { $api } from '@/api/client'
 import type { components } from '@/api/schema'
 import { daysBetween, useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
-import { linkTarget } from '@/lib/styles'
 import { cn } from '@/lib/utils'
 
 type Verdict = components['schemas']['VerdictBody']
@@ -22,7 +21,9 @@ const dots: Record<Verdict['rate'], string> = {
 // phase's ("Cut · week 1 of 12"); of the phase now, the rate calibration
 // measures and where it stands against the phase's, its dot green on
 // target and amber off it, with the words: the hero's subtitle, a link to
-// the progress. Nothing without a phase.
+// the progress, 44 px to a finger with an ::after reaching 4 px above it
+// and 24 below, clear of the day's type's chip over it. Nothing without a
+// phase.
 export function DayPhase({ date }: { date: string }) {
   const t = useMessages()
   const f = useFormat()
@@ -47,7 +48,7 @@ export function DayPhase({ date }: { date: string }) {
     <Link
       to="/progress"
       className={cn(
-        linkTarget,
+        "relative after:absolute after:inset-x-0 after:-top-1 after:-bottom-6 after:content-['']",
         'flex items-center gap-1.5 text-caption text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
       )}
     >

@@ -17,10 +17,11 @@ import { useMessages } from '@/i18n/messages'
 const macros: readonly Macro[] = ['protein', 'carbs', 'fat']
 
 // DaySummary is the day at a glance, its hero: what is left of its
-// target in the ring, the one number of what is left on the day; beside
+// target in the ring, the day's number of what is left (the meal's button
+// says the same); beside
 // it what was eaten and the target, the target's arithmetic (the TDEE
-// calibration measures, which leads to the progress, less the planned
-// deficit or plus the surplus, an ⓘ away from what the TDEE is), or
+// calibration measures, which leads to the progress, less the day's
+// target's deficit or plus its surplus, an ⓘ away from what the TDEE is), or
 // until calibration has a TDEE, how far it is from a first; the day's
 // type, a small picker, and the phase the day is in under it; then each
 // macro against its target, beside the ring on a desktop. A day before
@@ -48,7 +49,7 @@ export function DaySummary({ day }: { day: Day }) {
   const calibrating = !past && summary.data?.tdee.measured === false ? summary.data.tdee : undefined
   // The day's type, and the phase under it.
   const kind = (
-    <div className="flex flex-col items-start gap-2">
+    <div className="flex flex-col items-start gap-3">
       <DayTypeChip key={`type ${day.date}`} day={day} />
       <DayPhase date={day.date} />
     </div>

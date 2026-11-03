@@ -98,6 +98,16 @@ test('in the morning, a card under the hero asks for the weigh-in, and goes once
   await page.goto('/')
   const hero = page.getByRole('region', { name: 'Energy and macros' })
   const field = page.getByLabel('Morning weigh-in?')
+  // The day's type's chip in the hero is a finger's whole target: the
+  // phase's link under it reaches none of it.
+  const chip = hero.getByRole('button', { name: /^Type of day: / })
+  await expect(hero.getByRole('link', { name: /^Cut · / })).toBeVisible()
+  const box = await chip.boundingBox()
+  const hit = await page.evaluate(
+    ([x, y]) => document.elementFromPoint(x, y)?.closest('button')?.getAttribute('aria-label'),
+    [(box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) + 4] as const,
+  )
+  expect(hit).toMatch(/^Type of day: /)
   await expect(field).toHaveAttribute('placeholder', '85.2')
   // Under the hero, not in it.
   const [card, under] = await Promise.all([hero.boundingBox(), field.boundingBox()])

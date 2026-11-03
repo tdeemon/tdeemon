@@ -325,10 +325,11 @@ export const en = {
     ending: {
       title: 'How the day ends',
       under: (kcal: string, under: string) =>
-        `If you stop here, the week averages ${kcal} a day, ${under} under its target.`,
+        `If you stop here, the week averages ${kcal} kcal a day, ${under} under its target.`,
       over: (kcal: string, over: string) =>
-        `If you stop here, the week averages ${kcal} a day, ${over} over its target.`,
-      on: (kcal: string) => `If you stop here, the week averages ${kcal} a day, on its target.`,
+        `If you stop here, the week averages ${kcal} kcal a day, ${over} over its target.`,
+      on: (kcal: string) =>
+        `If you stop here, the week averages ${kcal} kcal a day, on its target.`,
     },
     // A desktop's meals, in a table.
     columns: { time: 'Time', meal: 'Meal', kcal: 'kcal', total: 'Total' },
