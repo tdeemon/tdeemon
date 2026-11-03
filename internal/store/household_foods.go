@@ -52,10 +52,10 @@ func householdMates(ctx context.Context, tx *sql.Tx, userID uuid.UUID) (map[uuid
 // householdSeats gives each other member of userID's household a seat
 // in the group of userID's food f, which it makes when there is none, in
 // a household seat: the seat they have, brought back if they left it, or
-// a new food of theirs of f's name, brand, basis and source, which the
-// save then writes whole. It returns the group, "" when userID is in no
-// household or left the food, and the members it seated (fresh), whose
-// food is to be written whole. A food of the name and brand that is
+// a new food of theirs of f's name, brand, basis and source, archived as
+// f is, which the save then writes whole. It returns the group, "" when
+// userID is in no household or left the food, and the members it seated
+// (fresh), whose food is to be written whole. A food of the name and brand that is
 // another of a member's is ErrShareNameTaken.
 func householdSeats(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, now time.Time) (string, []shareMember, error) {
 	mates, err := householdMates(ctx, tx, userID)
@@ -90,7 +90,9 @@ func householdSeats(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Fo
 
 // seatMate gives member m a seat in share of food f, as householdSeats
 // does: it returns their food of it, and whether it seated them (a new
-// seat, or one they left brought back), not a live one they have.
+// seat, or one they left brought back), not a live one they have. A new
+// seat's food is archived as f is: a food saved withdrawn comes to no
+// one in use.
 func seatMate(ctx context.Context, tx *sql.Tx, share string, m uuid.UUID, f food.Food, now time.Time) (shareMember, bool, error) {
 	var id string
 	var left sql.NullString
@@ -113,7 +115,7 @@ func seatMate(ctx context.Context, tx *sql.Tx, share string, m uuid.UUID, f food
 	if err := checkMemberName(ctx, tx, to, f); err != nil {
 		return shareMember{}, false, err
 	}
-	if err := insertFood(ctx, tx, m, food.Food{ID: to.Food, Name: f.Name, Brand: f.Brand, Basis: f.Basis, Source: f.Source},
+	if err := insertFood(ctx, tx, m, food.Food{ID: to.Food, Name: f.Name, Brand: f.Brand, Basis: f.Basis, Source: f.Source, Archived: f.Archived},
 		food.Key(f.Name), food.Key(f.Brand), now); err != nil {
 		return shareMember{}, false, err
 	}

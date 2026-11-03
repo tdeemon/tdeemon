@@ -39,7 +39,8 @@ import (
 //     are both sides', but one another food has, and as many as a food
 //     may have (food.MaxBarcodes), H's first.
 //  3. A food of one side without a match is copied to each member of the
-//     other: its shared fields, no note or aliases.
+//     other: its shared fields, no note or aliases, archived when every
+//     member who has it has it archived (withdrawn, it comes so).
 //  4. A recipe's ingredients are H's in a match; each member's recipe
 //     names each ingredient's food by their own copy of it.
 //  5. A recipe of U's in a share group with users outside keeps it, the
@@ -662,13 +663,28 @@ func (p *mergePlan) apply(ctx context.Context, tx *sql.Tx, now time.Time) error 
 }
 
 // copyOf is the food member m's copy of it is after the merge: its
-// shared fields, and m's own note, aliases and archived.
+// shared fields, and m's own note, aliases and archived; a fresh copy
+// archived when every copy before it is (rule 3).
 func (it *mergeItem) copyOf(m uuid.UUID) food.Food {
 	f := it.food
 	f.ID, f.CopyOf = it.copies[m], uuid.Nil()
 	own := it.own[m]
 	f.Note, f.Aliases, f.Archived = own.Note, own.Aliases, own.Archived
+	if it.fresh[m] {
+		f.Archived = it.withdrawn()
+	}
 	return f
+}
+
+// withdrawn reports whether every member's food of it before the merge
+// is archived.
+func (it *mergeItem) withdrawn() bool {
+	for m := range it.own {
+		if !it.own[m].Archived {
+			return false
+		}
+	}
+	return len(it.own) > 0
 }
 
 // foodWrite is a row of a member's the merge writes.

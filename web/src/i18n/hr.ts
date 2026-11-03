@@ -742,7 +742,7 @@ export const hr: Messages = {
     joining: 'Pridružujem…',
     preview: 'Što pridruživanje radi',
     previewHint:
-      'Tvoje i njihove namirnice i recepti postaju jedna kuhinja. Tvoji obroci, kilaža i plan ostaju tvoji.',
+      'Tvoje i njihove namirnice i recepti postaju jedna kuhinja, a one koje su svi arhivirali stižu arhivirane. Tvoji obroci, kilaža i plan ostaju tvoji.',
     merged: 'Spajaju se s njihovima, uz njihove vrijednosti',
     incoming: 'Dolaze tebi',
     given: 'Idu kućanstvu',
