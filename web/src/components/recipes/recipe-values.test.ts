@@ -23,6 +23,8 @@ import {
 } from '@/components/recipes/weighing'
 import { en } from '@/i18n/en'
 import { useFormat } from '@/i18n/format'
+import { hr } from '@/i18n/hr'
+import { setLocale } from '@/i18n/locale'
 
 // The app's formats, in English.
 const f = renderHook(() => useFormat()).result.current
@@ -196,4 +198,30 @@ test('a recipe eaten last is said as a share of it, or portions', () => {
   expect(lastAmountOf(eatenAs({ servings: 0.1, serving: 'recipe' }), en, f)).toBe('⅒ of the recipe')
   expect(lastAmountOf(eatenAs({ servings: 1, serving: 'portion' }), en, f)).toBe('1 portion')
   expect(lastAmountOf(eatenAs({ amount: 100, unit: 'g' }), en, f)).toBe('100 g')
+})
+
+// inPortions is a food of portions eaten last in amount of them.
+function inPortions(amount: number): Food {
+  return {
+    ...rice,
+    basis: 'portion',
+    last_use: {
+      at: '2026-10-21T12:00:00Z',
+      day: '2026-10-21',
+      meal_id: '0193c3a5-0000-7000-8000-0000000000a1',
+      quantity: { portions: amount },
+      amount,
+      unit: 'portion',
+    },
+  }
+}
+
+test("a food of portions eaten last takes its word's form from the number shown", () => {
+  setLocale('hr')
+  const hrf = renderHook(() => useFormat()).result.current
+  // 1.004 is shown as 1, so it is "1 porciju", not "1 porcije".
+  expect(lastAmountOf(inPortions(1.004), hr, hrf, 'accusative')).toBe('1 porciju')
+  expect(lastAmountOf(inPortions(2), hr, hrf, 'accusative')).toBe('2 porcije')
+  expect(lastAmountOf(inPortions(1.5), hr, hrf)).toBe('1,5 porcija')
+  setLocale('en')
 })

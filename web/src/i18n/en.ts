@@ -917,7 +917,6 @@ export const en = {
       'Leave the household? You keep every food and recipe you have, and so do they. Only an invite brings you back.',
     yesLeave: 'Leave',
     left: 'You left the household',
-    // A food's page in a household: who a change reaches.
     // The day's line while an invite waits for the user's answer.
     nudge: (name: string) => `${name} invites you into their household`,
     nudgeSee: 'See',

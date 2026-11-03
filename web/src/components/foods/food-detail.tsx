@@ -115,6 +115,8 @@ export function FoodDetail({ food }: { food: Food }) {
             </Button>
           </div>
           <SaveStatus change={archive} />
+        </div>
+        <div className="space-y-4">
           {(servings.length > 0 || aliases.length > 0 || barcodes.length > 0 || food.note) && (
             <section className={cn(card, 'space-y-4')}>
               {servings.length > 0 && (
@@ -170,35 +172,34 @@ export function FoodDetail({ food }: { food: Food }) {
             </section>
           )}
         </div>
-        <div className="space-y-4">
-          <NutritionTable food={food} />
-          <HouseholdMark className={card} />
-          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 px-1 text-small">
-            <dt className="text-muted-foreground">{t.foods.from}</dt>
-            <dd>{t.foods.sources[food.source]}</dd>
-            {/* Not said when it did not come: the rest of the page holds. */}
-            {!use.isError && (
-              <>
-                <dt className="text-muted-foreground">{t.foods.logged}</dt>
-                <dd>
-                  {use.data === undefined ? (
-                    <span className="inline-block h-3 w-24 animate-pulse rounded-sm bg-surface-2 motion-reduce:animate-none">
-                      <span className="sr-only">{t.loading}</span>
-                    </span>
-                  ) : use.data.last_use === undefined ? (
-                    t.foods.notLogged
-                  ) : (
-                    t.foods.timesLast(
-                      f.number(use.data.meals),
-                      f.calendarDay(use.data.last_use.day, timeZone),
-                    )
-                  )}
-                </dd>
-              </>
-            )}
-          </dl>
-        </div>
       </div>
+      {/* What it brings, across both columns: its amounts' segments whole. */}
+      <NutritionTable food={food} />
+      <HouseholdMark className={card} />
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 px-1 text-small">
+        <dt className="text-muted-foreground">{t.foods.from}</dt>
+        <dd>{t.foods.sources[food.source]}</dd>
+        {/* Not said when it did not come: the rest of the page holds. */}
+        {!use.isError && (
+          <>
+            <dt className="text-muted-foreground">{t.foods.logged}</dt>
+            <dd>
+              {use.data === undefined ? (
+                <span className="inline-block h-3 w-24 animate-pulse rounded-sm bg-surface-2 motion-reduce:animate-none">
+                  <span className="sr-only">{t.loading}</span>
+                </span>
+              ) : use.data.last_use === undefined ? (
+                t.foods.notLogged
+              ) : (
+                t.foods.timesLast(
+                  f.number(use.data.meals),
+                  f.calendarDay(use.data.last_use.day, timeZone),
+                )
+              )}
+            </dd>
+          </>
+        )}
+      </dl>
     </article>
   )
 }

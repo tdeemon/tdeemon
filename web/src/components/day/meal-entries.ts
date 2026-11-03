@@ -558,8 +558,10 @@ export function lastAmountOf(
   if (servings !== undefined && serving !== undefined) {
     return servingsOf(f.number(servings, 2), servings, serving)
   }
+  // The word's form follows the number shown: 1.004 is "1 portion".
+  const shown = Math.round(last.amount * 100) / 100
   return last.unit === 'portion'
-    ? t.recipes.portions(f.number(last.amount, 2), last.amount, grammaticalCase)
+    ? t.recipes.portions(f.number(shown, 2), shown, grammaticalCase)
     : t.unit[last.unit](f.number(last.amount))
 }
 

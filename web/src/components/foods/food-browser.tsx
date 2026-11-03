@@ -190,7 +190,11 @@ export function FoodBrowser({ detail }: { detail?: ReactNode }) {
           <div className="relative min-h-0 space-y-3 overflow-y-auto border-r py-4 pr-5 pl-1">
             {list}
           </div>
-          <div className="@container relative min-h-0 overflow-y-auto pt-4 pb-6 pl-8">{detail}</div>
+          {/* The detail's title stays at its top: a control the focus
+              comes to scrolls clear of it, a title of two lines too. */}
+          <div className="@container relative min-h-0 scroll-pt-36 overflow-y-auto pt-4 pb-6 pl-8">
+            {detail}
+          </div>
         </div>
       )}
     </section>

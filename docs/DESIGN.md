@@ -230,10 +230,12 @@ the energy comes from, as a bar, is the food's page's alone); a
 recipe's page says a portion's energy, and whether the dish was weighed
 (≈ on its grams, and on what is per gram, when not, never on a portion
 or a share); its actions are "Log 1 portion" (the amount eaten last, as
-the verb's object in the language's case: "Upiši 1 porciju"), "Cook
-again" and an Edit icon; its editor is a page, its ingredients found
-as Log a meal finds foods; "Cook again" changes only the amounts, the weight (from
-the pot, the empty pot remembered) and the portions, the last weight
+the verb's object in the language's case: "Upiši 1 porciju"; "Log it"
+for a recipe never eaten), "Cook again" and an Edit icon, and what it
+brings goes across both columns of a desktop's pane; its editor is a
+page, its ingredients found as Log a meal finds foods; "Cook again"
+changes only the amounts, the weight (from the pot, the empty pot
+remembered) and the portions, the last weight
 never taken over. Log a meal finds a recipe as any food, marked, with a
 portion's energy; its amount is a portion (when divided), a share of
 the whole dish or grams, first as it was eaten last, else a portion, or

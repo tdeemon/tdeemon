@@ -325,46 +325,47 @@ export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody 
             <p className="text-caption text-muted-foreground">{t.recipes.valuesOfSave}</p>
           </section>
           <RecipeSharing food={food} className={card} />
-          <NutritionTable food={food} />
-          {food.note && (
-            <section className={cn(card, 'space-y-1.5')}>
-              <h2 className="text-h3">{t.foods.note}</h2>
-              <p className="whitespace-pre-line text-muted-foreground">{food.note}</p>
-            </section>
-          )}
-          <HouseholdMark recipe className={card} />
-          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 px-1 text-small">
-            <dt className="text-muted-foreground">{t.foods.from}</dt>
-            <dd>{t.foods.sources.recipe}</dd>
-            {!use.isError && (
-              <>
-                <dt className="text-muted-foreground">{t.foods.logged}</dt>
-                <dd>
-                  {use.data === undefined ? (
-                    <span className="inline-block h-3 w-24 animate-pulse rounded-sm bg-surface-2 motion-reduce:animate-none">
-                      <span className="sr-only">{t.loading}</span>
-                    </span>
-                  ) : use.data.last_use === undefined ? (
-                    t.foods.notLogged
-                  ) : (
-                    t.foods.timesLast(
-                      f.number(use.data.meals),
-                      f.calendarDay(use.data.last_use.day, timeZone),
-                    )
-                  )}
-                </dd>
-              </>
-            )}
-          </dl>
-          {!food.archived && (
-            // Its status beside it, at the page's end.
-            <div className="space-y-2">
-              <ArchiveButton food={food} archive={archive} small />
-              <SaveStatus change={archive} />
-            </div>
-          )}
         </div>
       </div>
+      {/* What it brings, across both columns: its amounts' segments whole. */}
+      <NutritionTable food={food} />
+      {food.note && (
+        <section className={cn(card, 'space-y-1.5')}>
+          <h2 className="text-h3">{t.foods.note}</h2>
+          <p className="whitespace-pre-line text-muted-foreground">{food.note}</p>
+        </section>
+      )}
+      <HouseholdMark recipe className={card} />
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 px-1 text-small">
+        <dt className="text-muted-foreground">{t.foods.from}</dt>
+        <dd>{t.foods.sources.recipe}</dd>
+        {!use.isError && (
+          <>
+            <dt className="text-muted-foreground">{t.foods.logged}</dt>
+            <dd>
+              {use.data === undefined ? (
+                <span className="inline-block h-3 w-24 animate-pulse rounded-sm bg-surface-2 motion-reduce:animate-none">
+                  <span className="sr-only">{t.loading}</span>
+                </span>
+              ) : use.data.last_use === undefined ? (
+                t.foods.notLogged
+              ) : (
+                t.foods.timesLast(
+                  f.number(use.data.meals),
+                  f.calendarDay(use.data.last_use.day, timeZone),
+                )
+              )}
+            </dd>
+          </>
+        )}
+      </dl>
+      {!food.archived && (
+        // Its status beside it, at the page's end.
+        <div className="space-y-2">
+          <ArchiveButton food={food} archive={archive} small />
+          <SaveStatus change={archive} />
+        </div>
+      )}
       <CookedAgain
         food={food}
         weigh={sheet === 'weigh'}

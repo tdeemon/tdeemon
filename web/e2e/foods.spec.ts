@@ -151,4 +151,30 @@ test("a desktop's foods and food scroll on their own, the food's end in reach an
   await expect(title).toBeInViewport()
   // The list beside it, its search at the top of its own pane.
   await expect(page.getByLabel('Search the foods')).toBeInViewport()
+
+  // What it brings is across both columns: its amounts' segments whole.
+  const amounts = page.getByRole('group', { name: 'Values for' }).locator('label span')
+  await expect(amounts).toHaveText(['1 portion', '100 g', 'Whole recipe'])
+  const cut = await amounts.evaluateAll((spans) =>
+    spans.filter((span) => span.scrollWidth > span.clientWidth).map((span) => span.textContent),
+  )
+  expect(cut).toEqual([])
+
+  // A control the focus comes back to, far above, scrolls clear of the
+  // title that stays at the pane's top.
+  // The pane is scrolled so it is just under the title's top, in the
+  // pane's sight but hidden.
+  await page.getByRole('button', { name: 'Share' }).focus()
+  const edit = page.getByRole('link', { name: 'Edit the recipe' })
+  await edit.evaluate((link) => {
+    const pane = link.closest('.overflow-y-auto')
+    if (pane !== null) {
+      pane.scrollTop += link.getBoundingClientRect().top - pane.getBoundingClientRect().top - 8
+    }
+  })
+  await page.keyboard.press('Shift+Tab')
+  await expect(edit).toBeFocused()
+  const below = await edit.boundingBox()
+  const header = await title.locator('xpath=..').boundingBox()
+  expect(below?.y ?? 0).toBeGreaterThanOrEqual((header?.y ?? 0) + (header?.height ?? 0))
 })
