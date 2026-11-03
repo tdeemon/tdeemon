@@ -488,6 +488,15 @@ test('a food to correct that is not there has the way back, its page no bar of s
   )
 })
 
+test("a food being corrected has only its form's way out", async () => {
+  foodServer()
+  renderAt(`/foods/${id}?edit=true`)
+
+  expect(await screen.findByLabelText('Name')).toBeDefined()
+  expect(screen.queryByRole('link', { name: 'Back to the foods' })).toBeNull()
+  expect(screen.queryByRole('link', { name: 'Settings and account' })).toBeNull()
+})
+
 test('a new food is made, and its page shown', async () => {
   const server = foodServer()
   const router = renderAt('/foods/new')
