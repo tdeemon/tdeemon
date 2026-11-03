@@ -53,10 +53,9 @@ func householdMates(ctx context.Context, tx *sql.Tx, userID uuid.UUID) (map[uuid
 // in the group of userID's food f, which it makes when there is none, in
 // a household seat: the seat they have, brought back if they left it, or
 // a new food of theirs of f's name, brand, basis and source, archived as
-// f is, which the
-// save then writes whole. It returns the group, "" when userID is in no
-// household or left the food, and the members it seated (fresh), whose
-// food is to be written whole. A food of the name and brand that is
+// f is, which the save then writes whole. It returns the group, "" when
+// userID is in no household or left the food, and the members it seated
+// (fresh), whose food is to be written whole. A food of the name and brand that is
 // another of a member's is ErrShareNameTaken.
 func householdSeats(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, now time.Time) (string, []shareMember, error) {
 	mates, err := householdMates(ctx, tx, userID)
