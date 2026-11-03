@@ -18,6 +18,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -78,6 +79,11 @@ type Config struct {
 	// Push sends the notifications by Web Push; none when nil, and the
 	// push operations answer 503.
 	Push *push.Sender
+	// Afterward, if not nil, runs the work a request leaves for after its
+	// answer (an invite's notification, whose time would otherwise say
+	// whether a user has the address); the server waits for it before the
+	// database closes. Nil does that work before the answer.
+	Afterward *sync.WaitGroup
 }
 
 // NewHandler returns the root HTTP handler with every route registered.

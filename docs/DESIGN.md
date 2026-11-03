@@ -355,7 +355,10 @@ explicit share keeps them in its group; members in it by the
 household's seats alone take their copies to a group of their own, so
 neither side's save reaches the other. The leaver's invites waiting
 go; the leave is their event (`household.leave`), which undo refuses
-and never goes past. A deleted account leaves first. An admin who must
+and never goes past. A deleted account leaves first; an invite to its
+address stays until it expires or is revoked, the inviter's own row,
+and whoever has the address next may answer it, as an invite's
+vanishing would say an account had it. An admin who must
 take a member out does it by hand, with the statements the leave runs
 (`internal/store/household_leave.sql`, which a test holds to this
 copy), the member's id bound to `:user`, in one transaction:

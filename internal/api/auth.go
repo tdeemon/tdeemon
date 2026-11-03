@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -51,6 +52,9 @@ type sessions struct {
 	offLookups    *limiter
 	// addressInvites limits a user's invites and shares by address.
 	addressInvites *limiter
+	// afterward runs what a request leaves for after its answer
+	// (afterAnswer), when not nil.
+	afterward *sync.WaitGroup
 	// push sends the notifications by Web Push, when not nil.
 	push *push.Sender
 }
@@ -68,6 +72,7 @@ func newSessions(cfg Config) *sessions {
 		offLookups:      newLimiter(offLookups, offWindow, cfg.Now),
 		addressInvites:  newLimiter(addressInvites, addressWindow, cfg.Now),
 		push:            cfg.Push,
+		afterward:       cfg.Afterward,
 	}
 }
 

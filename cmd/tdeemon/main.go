@@ -16,6 +16,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/debug"
+	"sync"
 	"syscall"
 	"time"
 
@@ -211,6 +212,11 @@ func serve(ctx context.Context, lookup config.LookupFunc, logOut io.Writer) erro
 	if apiCfg.Push, err = push.NewSender(cfg.SecretKey, cfg.BaseURL.String()); err != nil {
 		return fmt.Errorf("push: %w", err)
 	}
+	// What a request leaves for after its answer ends before the database
+	// closes: this wait is deferred after the Close, so it runs first.
+	var afterward sync.WaitGroup
+	apiCfg.Afterward = &afterward
+	defer afterward.Wait()
 	handler, err := api.NewHandler(apiCfg)
 	if err != nil {
 		return fmt.Errorf("api: %w", err)

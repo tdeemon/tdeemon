@@ -316,11 +316,15 @@ func (s *sessions) inviteToHousehold(ctx context.Context, in *inviteToHouseholdI
 	case err != nil:
 		return nil, internalError("inviting failed", err)
 	}
-	if invited, err := s.db.UserByEmail(ctx, email); err == nil && invited.DisabledAt == nil {
-		s.tellHousehold(ctx, []user.User{invited}, invitedWords, p.User.Name, "household-invite-"+inv.ID.String())
-	} else if err != nil && !errors.Is(err, store.ErrNotFound) {
-		s.logger.WarnContext(ctx, "telling of an invite failed", "error", err)
-	}
+	// Who is told, if anyone, is after the answer, which takes as long
+	// for an address of none.
+	s.afterAnswer(ctx, func(ctx context.Context) {
+		if invited, err := s.db.UserByEmail(ctx, email); err == nil && invited.DisabledAt == nil {
+			s.tellHousehold(ctx, []user.User{invited}, invitedWords, p.User.Name, "household-invite-"+inv.ID.String())
+		} else if err != nil && !errors.Is(err, store.ErrNotFound) {
+			s.logger.WarnContext(ctx, "telling of an invite failed", "error", err)
+		}
+	})
 	return &householdInviteOutput{Body: newHouseholdInviteBody(&inv)}, nil
 }
 
@@ -473,4 +477,23 @@ func (s *sessions) tellHousehold(ctx context.Context, to []user.User, words map[
 			s.logger.WarnContext(ctx, "telling the household failed", "user_id", u.ID.String(), "error", r.Err)
 		}
 	}
+}
+
+// afterAnswerTimeout bounds the work a request leaves for after its
+// answer.
+const afterAnswerTimeout = time.Minute
+
+// afterAnswer runs f once the request is answered, of ctx's values but
+// not its end, within afterAnswerTimeout; or at once, before the answer,
+// when the server keeps no work for afterward (Config.Afterward).
+func (s *sessions) afterAnswer(ctx context.Context, f func(context.Context)) {
+	if s.afterward == nil {
+		f(ctx)
+		return
+	}
+	s.afterward.Go(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), afterAnswerTimeout)
+		defer cancel()
+		f(ctx)
+	})
 }

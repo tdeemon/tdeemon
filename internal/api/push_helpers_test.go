@@ -19,10 +19,18 @@ type pushServices struct {
 	status map[string]int
 	// sent are the endpoints that got a request, in order.
 	sent []string
+	// hold, when not nil, keeps each request waiting until it is closed.
+	hold chan struct{}
 }
 
 func (p *pushServices) RoundTrip(r *http.Request) (*http.Response, error) {
 	_, _ = io.Copy(io.Discard, r.Body)
+	p.mu.Lock()
+	hold := p.hold
+	p.mu.Unlock()
+	if hold != nil {
+		<-hold
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.sent = append(p.sent, r.URL.String())

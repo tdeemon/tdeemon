@@ -17,8 +17,8 @@ export const householdQuery = $api.queryOptions('get', '/api/v1/household')
 const householdKey = householdQuery.queryKey
 
 // codeOf is the code a household's refusal says at where (body.email,
-// path.id, body.fingerprint): no_user, self, deactivated, member,
-// other_household, waiting, recipe_cycle or merge_changed; undefined for
+// path.id, body.fingerprint): self, member, other_household, waiting,
+// recipe_cycle or merge_changed; undefined for
 // any other error.
 export function codeOf(error: unknown, where: string): string | undefined {
   if (typeof error !== 'object' || error === null || !('errors' in error)) {

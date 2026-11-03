@@ -190,7 +190,7 @@ test('an invite refused says why by its code, or too many today, in Croatian too
   })
   fireEvent.click(hr.getByRole('button', { name: 'Pozovi' }))
   expect((await hr.findByRole('alert')).textContent).toBe(
-    'Danas je poslano previše pozivnica. Pokušaj ponovno sutra.',
+    'Previše pozivnica i dijeljenja u zadnja 24 sata. Pokušaj ponovno kasnije.',
   )
 })
 

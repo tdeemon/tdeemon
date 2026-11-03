@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"slices"
 	"strings"
@@ -334,6 +335,46 @@ func invitesAlike(t *testing.T, in *instance, session []*http.Cookie, addresses 
 	}
 }
 
+// An invite is answered before its user, if any, is told: the answer
+// takes as long for an address of a user as for one of none.
+func TestHouseholdInviteAnswersBeforeTelling(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	ana := []*http.Cookie{sessionOf(t, in)}
+	eva := newIsolationUser(t, in.db, "eva@example.com", "Eva", in.clock.Now())
+	subscribe(t, in, sessionOfUser(t, in, user.User{ID: eva})[0], "https://web.push.apple.com/eva", "")
+	in.pushes.endpoints()
+	hold := make(chan struct{})
+	in.pushes.mu.Lock()
+	in.pushes.hold = hold
+	in.pushes.mu.Unlock()
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/household/invites", strings.NewReader(`{"email": "eva@example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	for _, c := range ana {
+		req.AddCookie(c)
+	}
+	rec := httptest.NewRecorder()
+	answered := make(chan struct{})
+	go func() {
+		in.h.ServeHTTP(rec, req)
+		close(answered)
+	}()
+	select {
+	case <-answered:
+	case <-time.After(10 * time.Second):
+		close(hold)
+		t.Fatal("the invite waited for Eva's push service to answer")
+	}
+	if rec.Code != http.StatusCreated {
+		t.Errorf("the invite: %d %s", rec.Code, rec.Body.String())
+	}
+	close(hold)
+	in.afterward.Wait()
+	told(t, in, "the invite", "https://web.push.apple.com/eva")
+}
+
 // A user makes 30 invites and recipe shares by address a day; the next
 // is a 429 with Retry-After, whatever the address, until a day passed.
 func TestHouseholdInvitesAreLimited(t *testing.T) {
@@ -362,6 +403,9 @@ func TestHouseholdInvitesAreLimited(t *testing.T) {
 			t.Errorf("%s %s past the limit: %d %v, want 429 with Retry-After", c.path, c.body, rec.Code, rec.Header())
 		}
 	}
+	// The limit is Ana's: another user invites still.
+	zoe := in.addUser(t, user.RoleUser)
+	inviteByAPI(t, in, sessionOfUser(t, in, zoe), "more@example.com")
 	in.clock.Set(in.clock.Now().Add(24 * time.Hour))
 	inviteByAPI(t, in, ana, "more@example.com")
 }

@@ -741,7 +741,9 @@ test("a share past the day's limit says so", async () => {
   })
   fireEvent.click(within(sheet).getByRole('button', { name: 'Share' }))
   expect(
-    await within(sheet).findByText('You have shared too many times today. Try again tomorrow.'),
+    await within(sheet).findByText(
+      'Too many invites and shares in the last 24 hours. Try again later.',
+    ),
   ).toBeDefined()
 })
 
