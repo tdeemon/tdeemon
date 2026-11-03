@@ -48,11 +48,11 @@ func TestReviewMessages(t *testing.T) {
 		{autopilot.Proposed, autopilot.ReasonCutSlow, "past your drift limit (−200 of 390 kcal)", "preko granice odstupanja (−200 od 390 kcal)", true, false},
 		{autopilot.Proposed, autopilot.ReasonUnderweight, "Your BMI is 18.4", "BMI ti je 18,4", false, false},
 		{autopilot.Hold, autopilot.ReasonOnTarget, "Holding: pace on plan", "Bez promjene: tempo u planu", false, true},
-		{autopilot.Hold, autopilot.ReasonIntake, "The target stays 2179 kcal a day.", "Cilj ostaje 2179 kcal dnevno.", false, true},
+		{autopilot.Hold, autopilot.ReasonIntake, "The target stays 2,179 kcal a day.", "Cilj ostaje 2.179 kcal dnevno.", false, true},
 		{autopilot.Hold, autopilot.ReasonStepsGuard, "but your steps fell 34 %", "ali koraka je 34 % manje", false, true},
 		{autopilot.Hold, autopilot.ReasonRejected, "You rejected its last step", "Zadnji korak je odbijen", false, true},
 		{autopilot.Skipped, autopilot.ReasonFewData, "No step: 3/4 logged days", "Bez koraka: 3/4 upisana dana", false, true},
-		{autopilot.Skipped, autopilot.ReasonNotTrusted, "about 2540 ± 310 kcal. A first step about Nov 18", "oko 2540 ± 310 kcal. Prvi korak oko 18. 11.", false, true},
+		{autopilot.Skipped, autopilot.ReasonNotTrusted, "about 2,540 ± 310 kcal. A first step about Nov 18", "oko 2.540 ± 310 kcal. Prvi korak oko 18. 11.", false, true},
 		{autopilot.Skipped, autopilot.ReasonFirstWait, "No step: too soon after a change", "Bez koraka: prerano nakon promjene", false, true},
 		{autopilot.Skipped, autopilot.ReasonInterval, "a step a week at most", "najviše korak tjedno", false, true},
 		{autopilot.Skipped, autopilot.ReasonNoPlan, "Set a phase and a kcal target", "Postavi fazu i cilj kcal", false, true},
@@ -98,7 +98,7 @@ func TestTheMorningLineOfAReview(t *testing.T) {
 	t.Parallel()
 
 	r := reviewOf(autopilot.Applied, autopilot.ReasonCutSlow)
-	if got, want := reviewLine(r, "hr"), "Autopilot: cilj −100 kcal dnevno, 2079 kcal dnevno"; got != want {
+	if got, want := reviewLine(r, "hr"), "Autopilot: cilj −100 kcal dnevno, 2.079 kcal dnevno"; got != want {
 		t.Errorf("reviewLine = %q, want %q", got, want)
 	}
 	m := morningData{review: &r, reviewToday: true}

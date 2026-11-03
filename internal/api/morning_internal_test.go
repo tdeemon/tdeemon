@@ -49,8 +49,8 @@ func TestMorningText(t *testing.T) {
 			want: `Jutarnji sažetak, petak 23. 10.
 San: 7 h 12 min
 Težina: 132,4 kg · trend 133,1 kg · tjelesna mast 31,2 %
-Jučer (dan treninga): 2310/2400 kcal · P 176/175 g · UH 210/230 g · M 70/75 g
-Aktivnost jučer: koraci 6512 · aktivne 520 kcal · vježbanje 45 min
+Jučer (dan treninga): 2.310/2.400 kcal · P 176/175 g · UH 210/230 g · M 70/75 g
+Aktivnost jučer: koraci 6.512 · aktivne 520 kcal · vježbanje 45 min
 Kalibracija: tempo −0,62 %/tj, cilj −0,70 %/tj, u planu
 Oporavak: kratak san (prosjek 6,1 h) · nizak HRV (38 ms) · povišen puls u mirovanju (61 bpm)`,
 		},
@@ -72,7 +72,7 @@ Kalibracija: nema plana (faze i cilja), pa nema tempa za ocijeniti`,
 			sum: summaryBody{Trend: &trendBody{Kg: 80, Date: "2026-10-20"}, Verdict: verdictBody{Rate: "none", Reasons: []string{"not_trusted"}}},
 			want: `Jutarnji sažetak, petak 23. 10.
 Težina: trend 80,0 kg (od 20. 10.)
-Jučer (dan treninga, izuzet iz kalibracije): 1800 kcal · P 121 g · UH 150 g · M 60 g
+Jučer (dan treninga, izuzet iz kalibracije): 1.800 kcal · P 121 g · UH 150 g · M 60 g
 Kalibracija: još nema pouzdane procjene`,
 		},
 	} {
@@ -112,8 +112,113 @@ func TestCalibrationLine(t *testing.T) {
 			"tempo 0,00 %/tj, cilj 0,00 %/tj, u planu; prijedlog: prijeđi na održavanje",
 		},
 	} {
-		if got := (writer{croatian}).calibrationLine(tc.v); !strings.Contains(got, tc.want) {
+		if got := (writer{croatian}).calibrationLine(tc.v, tdeeBody{}); !strings.Contains(got, tc.want) {
 			t.Errorf("%+v = %q, want %q in it", tc.v, got, tc.want)
+		}
+	}
+}
+
+// Without a verdict, calibration's line says what it knows: a TDEE
+// measured, and why there is no verdict, in both languages; without a
+// TDEE, about when one comes.
+func TestCalibrationLineWithoutAVerdict(t *testing.T) {
+	t.Parallel()
+
+	trusted := tdeeBody{Measured: true, Trusted: true, Kcal: new(1956.4), HalfWidth: new(21.0)}
+	beforePhase := trusted
+	beforePhase.BeforePhase, beforePhase.BeforePhaseUntil = true, "2026-11-29"
+	untrustedBefore := beforePhase
+	untrustedBefore.Trusted = false
+	untrusted := trusted
+	untrusted.Trusted = false
+	for _, tc := range []struct {
+		name   string
+		v      verdictBody
+		tdee   tdeeBody
+		hr, en string
+	}{
+		{
+			"a phase just begun",
+			verdictBody{Rate: "none", Reasons: []string{"before_phase"}},
+			beforePhase,
+			"Kalibracija: TDEE 1.956 kcal; faza je tek počela, prva ocjena oko 30. 11.",
+			"Calibration: TDEE 1,956 kcal; the phase has just begun, its first verdict about Nov 30",
+		},
+		{
+			"a phase just begun, its TDEE not trusted",
+			verdictBody{Rate: "none", Reasons: []string{"before_phase"}},
+			untrustedBefore,
+			"Kalibracija: TDEE 1.956 kcal, još nije pouzdan; faza je tek počela, prva ocjena oko 30. 11.",
+			"Calibration: TDEE 1,956 kcal, not trusted yet; the phase has just begun, its first verdict about Nov 30",
+		},
+		{
+			"a TDEE of 0 or less",
+			verdictBody{Rate: "none", Reasons: []string{"no_tdee"}},
+			tdeeBody{Measured: true, Trusted: true, Kcal: new(-150.0)},
+			"Kalibracija: TDEE je ispao 0 ili manji: jesu li svi obroci upisani?",
+			"Calibration: the TDEE came out at 0 or less: are the meals all logged?",
+		},
+		{
+			"no plan, a TDEE not trusted",
+			verdictBody{Rate: "none", Reasons: []string{"no_phase"}},
+			untrusted,
+			"Kalibracija: TDEE 1.956 kcal, još nije pouzdan; nema plana (faze i cilja), pa nema tempa za ocijeniti",
+			"Calibration: TDEE 1,956 kcal, not trusted yet; no plan (a phase and a target), so no rate to judge",
+		},
+		{
+			"no plan",
+			verdictBody{Rate: "none", Reasons: []string{"no_phase", "no_target"}},
+			trusted,
+			"Kalibracija: TDEE 1.956 kcal; nema plana (faze i cilja), pa nema tempa za ocijeniti",
+			"Calibration: TDEE 1,956 kcal; no plan (a phase and a target), so no rate to judge",
+		},
+		{
+			"not trusted",
+			verdictBody{Rate: "none", Reasons: []string{"not_trusted"}},
+			untrusted,
+			"Kalibracija: TDEE 1.956 kcal, još nije pouzdan",
+			"Calibration: TDEE 1,956 kcal, not trusted yet",
+		},
+		{
+			"none yet",
+			verdictBody{Rate: "none", Reasons: []string{"no_estimate"}},
+			tdeeBody{Expected: "2026-11-20"},
+			"Kalibracija: još nema pouzdane procjene, prva oko 20. 11.",
+			"Calibration: no estimate to trust yet, the first about Nov 20",
+		},
+	} {
+		if got := (writer{croatian}).calibrationLine(tc.v, tc.tdee); got != tc.hr {
+			t.Errorf("%s: %q, want %q", tc.name, got, tc.hr)
+		}
+		if got := (writer{english}).calibrationLine(tc.v, tc.tdee); got != tc.en {
+			t.Errorf("%s: %q, want %q", tc.name, got, tc.en)
+		}
+	}
+}
+
+// A number is written as the app writes it: its thousands grouped, by a
+// point in Croatian, which has a decimal comma, and by a comma in
+// English.
+func TestMorningNumbersGroupThousands(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		v      float64
+		prec   int
+		hr, en string
+	}{
+		{1648, 0, "1.648", "1,648"},
+		{6900, 0, "6.900", "6,900"},
+		{648, 0, "648", "648"},
+		{1234567.25, 1, "1.234.567,3", "1,234,567.3"},
+		{70.64, 1, "70,6", "70.6"},
+		{-1500, 0, "-1.500", "-1,500"},
+	} {
+		if got := (writer{croatian}).num(tc.v, tc.prec); got != tc.hr {
+			t.Errorf("hr %v = %q, want %q", tc.v, got, tc.hr)
+		}
+		if got := (writer{english}).num(tc.v, tc.prec); got != tc.en {
+			t.Errorf("en %v = %q, want %q", tc.v, got, tc.en)
 		}
 	}
 }
@@ -140,8 +245,8 @@ func TestMorningTextInEnglish(t *testing.T) {
 	want := `Morning summary, Friday Oct 23
 Sleep: 6 h 45 min
 Weight: 80.3 kg · trend 80.6 kg (since Oct 19)
-Yesterday (training day): 2010/2100 kcal · P 150/150 g · C 200/220 g · F 60/65 g
-Activity yesterday: steps 8000
+Yesterday (training day): 2,010/2,100 kcal · P 150/150 g · C 200/220 g · F 60/65 g
+Activity yesterday: steps 8,000
 Calibration: rate −1.05 %/wk, target −0.70 %/wk, below plan; proposed: +120 kcal/day
 Recovery: short sleep (average 6.2 h)`
 	for _, locale := range []string{"en", "de"} {
@@ -190,12 +295,12 @@ func TestMorningShort(t *testing.T) {
 				yd:    dayBody{Meals: []MealBody{{}}, Total: nutrientsBody{Kcal: 2140.4}, Target: &dayTargetBody{Kcal: 2300}},
 				waits: today.AddDays(6),
 			},
-			want: "Jučer 2140/2300 kcal · 82,1 kg · san 7 h 10 min · promjena plana čeka",
+			want: "Jučer 2.140/2.300 kcal · 82,1 kg · san 7 h 10 min · promjena plana čeka",
 		},
 		{
 			name: "no target", locale: "en",
 			m:    morningData{date: today, yd: dayBody{Meals: []MealBody{{}}, Total: nutrientsBody{Kcal: 1980}}},
-			want: "Yesterday 1980 kcal",
+			want: "Yesterday 1,980 kcal",
 		},
 		{
 			name: "nothing came", locale: "en",

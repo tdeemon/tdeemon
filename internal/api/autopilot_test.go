@@ -138,7 +138,7 @@ func TestAutopilotReviewJobTakesAStep(t *testing.T) {
 	if len(sent) != 1 {
 		t.Fatalf("sent %q, want one message", sent)
 	}
-	wantIn(t, sent[0], "Autopilot · weekly review, Monday Oct 26", "Target −100 kcal a day", "New average 2300 kcal a day",
+	wantIn(t, sent[0], "Autopilot · weekly review, Monday Oct 26", "Target −100 kcal a day", "New average 2,300 kcal a day",
 		"Drift: −100 of", "Take it back in the plan: /plan")
 	// A run again, as after a crash, changes and sends nothing.
 	if err := job.Run(t.Context(), ana, occurrence, now); err != nil {
@@ -152,7 +152,7 @@ func TestAutopilotReviewJobTakesAStep(t *testing.T) {
 	if err := morning.Run(t.Context(), ana, occurrence, now.Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	if sent := chat.messages(); len(sent) != 2 || !strings.Contains(sent[1], "Autopilot: target −100 kcal a day, 2300 kcal a day") {
+	if sent := chat.messages(); len(sent) != 2 || !strings.Contains(sent[1], "Autopilot: target −100 kcal a day, 2,300 kcal a day") {
 		t.Errorf("the morning summary %q, want the autopilot's line", sent[len(sent)-1])
 	}
 }

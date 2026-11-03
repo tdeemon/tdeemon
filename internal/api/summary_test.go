@@ -2,10 +2,12 @@ package api_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"maps"
 	"math"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -650,6 +652,49 @@ func TestGetSummarySaysUntilWhenTheTDEEIsFromBefore(t *testing.T) {
 	if !b.Measured || !b.BeforePhase || b.BeforePhaseUntil != today.AddDays(27).String() || b.Expected != "" {
 		t.Errorf("measured %v, before the phase %v until %s, expected %q; want before it until %s",
 			b.Measured, b.BeforePhase, b.BeforePhaseUntil, b.Expected, today.AddDays(27))
+	}
+}
+
+// The morning summary of a phase just begun says the TDEE of the days
+// before it, and the first day the summary judges the phase on its own:
+// the day after the last of that TDEE.
+func TestMorningSummaryOfAPhaseJustBegun(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	today := userToday(t, in)
+	saveDays(t, in, today.AddDays(-60), today.AddDays(-1))
+	if err := in.db.SetPhase(t.Context(), in.user.ID, isolationActor, plan.Phase{Type: plan.Cut, Start: today, RatePctWeek: -0.5}, in.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	d := plan.DayTarget{Kcal: 2000, Protein: 150, Fat: 60}
+	if err := in.db.SetTarget(t.Context(), in.user.ID, isolationActor, plan.Target{EffectiveFrom: today, Training: d, Rest: d}, in.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if !calibrationOf(t, in).TDEE.Measured {
+		t.Fatal("no TDEE of the days before the phase")
+	}
+	rec := in.do(t, http.MethodGet, "/api/v1/morning", "", []*http.Cookie{sessionOf(t, in)}, nil)
+	var got struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || rec.Code != http.StatusOK {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	first := today.AddDays(28)
+	want := fmt.Sprintf("faza je tek počela, prva ocjena oko %d. %d.", first.Day, int(first.Month))
+	if !strings.Contains(got.Text, "Kalibracija: TDEE ") || !strings.Contains(got.Text, want) {
+		t.Errorf("the morning summary:\n%s\nwant the TDEE and %q", got.Text, want)
+	}
+	// The day before, the summary is still of the days before the phase;
+	// on that day, of the phase's own.
+	in.clock.Set(in.clock.Now().Add(27 * 24 * time.Hour))
+	if b := calibrationOf(t, in).TDEE; !b.BeforePhase {
+		t.Errorf("on %s the TDEE is of the phase's days already", first.AddDays(-1))
+	}
+	in.clock.Set(in.clock.Now().Add(24 * time.Hour))
+	if b := calibrationOf(t, in).TDEE; b.BeforePhase {
+		t.Errorf("on %s the TDEE is still of the days before the phase", first)
 	}
 }
 

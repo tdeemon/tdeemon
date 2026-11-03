@@ -189,7 +189,7 @@ func morningText(today day.Date, td, yd dayBody, sum summaryBody, waits day.Date
 	lines := []string{w.title + ", " + w.date(today)}
 	for _, l := range []string{
 		w.sleepLine(td), w.weightLine(td, sum, today), w.yesterdayLine(yd), w.activityLine(yd),
-		w.calibrationLine(sum.Verdict), autopilotLine(review, locale), w.planLine(waits), w.recoveryLine(sum.Recovery),
+		w.calibrationLine(sum.Verdict, sum.TDEE), autopilotLine(review, locale), w.planLine(waits), w.recoveryLine(sum.Recovery),
 	} {
 		if l != "" {
 			lines = append(lines, l)
@@ -200,16 +200,17 @@ func morningText(today day.Date, td, yd dayBody, sum summaryBody, waits day.Date
 
 // phrases are the words of the morning summary in a language.
 type phrases struct {
-	title, sleep, weight, trend, since, bodyFat            string
-	yesterday, trainingDay, excluded, nothingLogged        string
-	activity, steps, active, exercise                      string
-	calibration, noPlan, noEstimate, pace, perWeek, target string
-	onTarget, below, above, proposal, perDay               string
-	plan, waits, proposalWaits                             string
-	moreProteinOrKcal, smallerSurplus, toMaintenance       string
-	recovery, shortSleep, average, highRestingHR, lowHRV   string
-	weekdays                                               [7]string
-	decimalComma                                           bool
+	title, sleep, weight, trend, since, bodyFat                 string
+	yesterday, trainingDay, excluded, nothingLogged             string
+	activity, steps, active, exercise                           string
+	calibration, noPlan, noEstimate, pace, perWeek, target      string
+	phaseBegun, firstVerdict, firstEstimate, notTrusted, noTDEE string
+	onTarget, below, above, proposal, perDay                    string
+	plan, waits, proposalWaits                                  string
+	moreProteinOrKcal, smallerSurplus, toMaintenance            string
+	recovery, shortSleep, average, highRestingHR, lowHRV        string
+	weekdays                                                    [7]string
+	decimalComma                                                bool
 	// date writes a day with its weekday, short without it.
 	date, short func(p phrases, d day.Date) string
 }
@@ -220,6 +221,8 @@ var english = phrases{
 	activity: "Activity yesterday", steps: "steps", active: "active", exercise: "exercise",
 	calibration: "Calibration", noPlan: "no plan (a phase and a target), so no rate to judge",
 	noEstimate: "no estimate to trust yet", pace: "rate", perWeek: "%/wk", target: "target",
+	phaseBegun: "the phase has just begun", firstVerdict: "its first verdict about", firstEstimate: "the first about",
+	notTrusted: "not trusted yet", noTDEE: "the TDEE came out at 0 or less: are the meals all logged?",
 	onTarget: "on plan", below: "below plan", above: "above plan", proposal: "proposed", perDay: "kcal/day",
 	plan: "Plan", waits: "a proposed change waits for your answer, until", proposalWaits: "a change of the plan waits",
 	moreProteinOrKcal: "more protein or kcal", smallerSurplus: "a smaller surplus", toMaintenance: "move to maintenance",
@@ -237,6 +240,8 @@ var croatian = phrases{
 	activity: "Aktivnost jučer", steps: "koraci", active: "aktivne", exercise: "vježbanje",
 	calibration: "Kalibracija", noPlan: "nema plana (faze i cilja), pa nema tempa za ocijeniti",
 	noEstimate: "još nema pouzdane procjene", pace: "tempo", perWeek: "%/tj", target: "cilj",
+	phaseBegun: "faza je tek počela", firstVerdict: "prva ocjena oko", firstEstimate: "prva oko",
+	notTrusted: "još nije pouzdan", noTDEE: "TDEE je ispao 0 ili manji: jesu li svi obroci upisani?",
 	onTarget: "u planu", below: "ispod plana", above: "iznad plana", proposal: "prijedlog", perDay: "kcal/dan",
 	plan: "Plan", waits: "prijedlog promjene čeka tvoj odgovor, do", proposalWaits: "promjena plana čeka",
 	moreProteinOrKcal: "više proteina ili kcal", smallerSurplus: "manji suficit", toMaintenance: "prijeđi na održavanje",
@@ -361,17 +366,63 @@ func (w writer) activityLine(yd dayBody) string {
 	return w.activity + ": " + strings.Join(parts, " · ")
 }
 
-// calibrationLine says calibration's verdict in a line: why there is
-// none, or the measured rate against the target and what it proposes.
-func (w writer) calibrationLine(v verdictBody) string {
+// calibrationLine says calibration's verdict in a line: the measured
+// rate against the target and what it proposes, or, without one, what
+// calibration knows: the TDEE measured, and why there is no verdict
+// (no plan, a phase just begun, until about when its first comes, or a
+// TDEE not trusted yet); without a TDEE, about when one comes.
+func (w writer) calibrationLine(v verdictBody, tdee tdeeBody) string {
 	label := w.calibration + ": "
-	switch {
-	case slices.Contains(v.Reasons, "no_phase") || slices.Contains(v.Reasons, "no_target"):
-		return label + w.noPlan
-	case v.Rate == "none" || v.MeasuredPctWeek == nil || v.TargetPctWeek == nil:
-		return label + w.noEstimate
+	if v.Rate != "none" && v.MeasuredPctWeek != nil && v.TargetPctWeek != nil {
+		return label + w.verdictLine(v)
 	}
-	line := label + w.pace + " " + w.signed(*v.MeasuredPctWeek, 2) + " " + w.perWeek + ", " + w.target + " " + w.signed(*v.TargetPctWeek, 2) + " " + w.perWeek
+	noPlan := slices.Contains(v.Reasons, "no_phase") || slices.Contains(v.Reasons, "no_target")
+	switch {
+	case !tdee.Measured || tdee.Kcal == nil:
+		return label + w.withoutTDEE(noPlan, tdee)
+	case slices.Contains(v.Reasons, "no_tdee") || math.Round(*tdee.Kcal) <= 0:
+		return label + w.noTDEE
+	}
+	return label + w.withTDEE(v, tdee, noPlan)
+}
+
+// withTDEE says the TDEE measured and why there is no verdict on it: no
+// plan, a phase just begun (until about when its first comes), or a TDEE
+// not trusted yet.
+func (w writer) withTDEE(v verdictBody, tdee tdeeBody, noPlan bool) string {
+	line := "TDEE " + w.num(*tdee.Kcal, 0) + " kcal"
+	if !tdee.Trusted {
+		line += ", " + w.notTrusted
+	}
+	switch {
+	case noPlan:
+		return line + "; " + w.noPlan
+	case tdee.BeforePhase || slices.Contains(v.Reasons, "before_phase"):
+		line += "; " + w.phaseBegun
+		if d, err := day.ParseDate(tdee.BeforePhaseUntil); err == nil {
+			// The first summary of the phase's own days is the day after.
+			line += ", " + w.firstVerdict + " " + w.shortDate(d.AddDays(1))
+		}
+	}
+	return line
+}
+
+// withoutTDEE says why calibration has nothing to say yet, without a
+// TDEE measured: no plan, or no estimate, until about when one comes.
+func (w writer) withoutTDEE(noPlan bool, tdee tdeeBody) string {
+	if noPlan {
+		return w.noPlan
+	}
+	if d, err := day.ParseDate(tdee.Expected); err == nil {
+		return w.noEstimate + ", " + w.firstEstimate + " " + w.shortDate(d)
+	}
+	return w.noEstimate
+}
+
+// verdictLine is the measured rate against the target, and what the
+// verdict proposes.
+func (w writer) verdictLine(v verdictBody) string {
+	line := w.pace + " " + w.signed(*v.MeasuredPctWeek, 2) + " " + w.perWeek + ", " + w.target + " " + w.signed(*v.TargetPctWeek, 2) + " " + w.perWeek
 	switch v.Rate {
 	case "on_target":
 		line += ", " + w.onTarget
@@ -438,14 +489,32 @@ func (w writer) recoveryLine(r recoveryBody) string {
 }
 
 // num writes v rounded to prec decimals, halves away from 0 as the rest
-// of tdeemon rounds, with a decimal comma where the language has one.
+// of tdeemon rounds, its thousands grouped as the app writes them: a
+// decimal point and grouping commas, or a decimal comma and grouping
+// points where the language has one (1,648.5 and 1.648,5).
 func (w writer) num(v float64, prec int) string {
 	p := math.Pow(10, float64(prec))
 	s := strconv.FormatFloat(math.Round(v*p)/p, 'f', prec, 64)
-	if w.decimalComma {
-		s = strings.Replace(s, ".", ",", 1)
+	sign := ""
+	if strings.HasPrefix(s, "-") {
+		sign, s = "-", s[1:]
 	}
-	return s
+	whole, frac, _ := strings.Cut(s, ".")
+	group, point := ",", "."
+	if w.decimalComma {
+		group, point = ".", ","
+	}
+	var b strings.Builder
+	for i, c := range whole {
+		if i > 0 && (len(whole)-i)%3 == 0 {
+			b.WriteString(group)
+		}
+		b.WriteRune(c)
+	}
+	if frac != "" {
+		b.WriteString(point + frac)
+	}
+	return sign + b.String()
 }
 
 // signed writes v as num does, with its sign once rounded: none for 0.
