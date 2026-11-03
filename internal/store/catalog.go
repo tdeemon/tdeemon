@@ -47,16 +47,20 @@ type catalogState struct {
 }
 
 // syncCatalog puts userID's food f, as its save of event saved it, into
-// the catalog, unless it is not catalogued or userID is no admin (whose
-// copy of a row is linked to it alone), links f to its row, and
+// the catalog, unless it is not catalogued (a user's, no admin's, then
+// leaves its row) or userID is no admin (whose copy of a row is linked
+// to it alone), links f to its row, and
 // records what it did for the save's undo (catalog_saves). The row is
 // the product of f's name and brand; else the row f names already,
 // renamed to f's; else the row of one of f's barcodes; else a new one.
 // Its values and servings become f's, and f's barcodes its, but those
 // another row has: a barcode stays the product's that had it first.
 func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, saved uuid.UUID, now time.Time) error {
-	if !catalogued(f) || saved == uuid.Nil() {
+	if saved == uuid.Nil() {
 		return nil
+	}
+	if !catalogued(f) {
+		return leaveRow(ctx, tx, userID, f, saved)
 	}
 	nameKey, brandKey := food.Key(f.Name), food.Key(f.Brand)
 	link, err := foodCatalogID(ctx, tx, userID, f.ID)
@@ -109,6 +113,29 @@ func linkedAlone(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food,
 	}
 	admin, err := isAdmin(ctx, tx, userID)
 	return !admin, err
+}
+
+// leaveRow unlinks userID's food f, of no declared values as their save
+// of event saved left it, from its row, unless userID is an admin: a
+// user's estimate (or archived food) hides no row from the others, as
+// they write none. Its undo links it back alone, as a copy's
+// (copyVersion).
+func leaveRow(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, saved uuid.UUID) error {
+	admin, err := isAdmin(ctx, tx, userID)
+	if err != nil || admin {
+		return err
+	}
+	link, err := foodCatalogID(ctx, tx, userID, f.ID)
+	if err != nil || !link.Valid {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE foods SET catalog_id = NULL WHERE user_id = ? AND id = ?",
+		userID.String(), f.ID.String()); err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO catalog_saves (user_id, event_id, catalog_id, version, before_state, link_before)
+		VALUES (?, ?, ?, ?, NULL, ?)`, userID.String(), saved.String(), link.String, copyVersion, link)
+	return err
 }
 
 // isAdmin reports whether userID is an admin of the instance, active:
@@ -454,18 +481,16 @@ func foodCatalogID(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID) (sql.N
 const catalogColumns = `c.id, c.name, c.brand, c.basis, c.kcal, c.protein, c.carbs, c.fat,
 	c.fiber, c.saturated_fat, c.sugars, c.salt, c.polyols, c.alcohol, c.portion_g, c.source, '', 0`
 
-// catalogShown holds a row of the catalog c to be shown: one an admin's
-// food of declared values names, archived too, or no admin's food at all
-// (their users gone, or users' copies of it alone). A row all of whose
-// admins' foods are of no declared values now, such as a plate first
-// saved as a label's and then as an estimate, is not: no one says its
-// values are a label's. Another user's food counts for nothing, so their
-// copy made an estimate hides the row from no one. The foods keep their
-// link, so a save of one as declared again, or an undo, shows it again.
-const catalogShown = `(NOT EXISTS (SELECT 1 FROM foods AS l JOIN users AS u ON u.id = l.user_id
-		WHERE l.catalog_id = c.id AND u.role = 'admin')
-	OR EXISTS (SELECT 1 FROM foods AS l JOIN users AS u ON u.id = l.user_id
-		WHERE l.catalog_id = c.id AND u.role = 'admin' AND l.source IN ('label', 'off', 'reference')))`
+// catalogShown holds a row of the catalog c to be shown: one a food of
+// declared values names, archived too, or none at all (its users gone).
+// A row all of whose foods are of no declared values now, such as a
+// plate first saved as a label's and then as an estimate, is not: no one
+// says its values are a label's. The foods keep their link, so a save of
+// one as declared again, or an undo, shows it again. A user's food of no
+// declared values who is no admin names no row (leaveRow), so it hides
+// none.
+const catalogShown = `(NOT EXISTS (SELECT 1 FROM foods AS l WHERE l.catalog_id = c.id)
+	OR EXISTS (SELECT 1 FROM foods AS l WHERE l.catalog_id = c.id AND l.source IN ('label', 'off', 'reference')))`
 
 // FindCatalog returns up to limit of the catalog's foods that match
 // query as FindFoods matches, but the ones userID has already: a food of

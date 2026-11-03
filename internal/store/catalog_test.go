@@ -689,3 +689,30 @@ func TestCatalogTakesAnAdminsFoodsAlone(t *testing.T) {
 		t.Errorf("Eva's catalog of tuna after Ivo's copy became an estimate = %v, want Ana's row", found)
 	}
 }
+
+// A household member who is no admin, saving the household's food of a
+// row as an estimate, hides the row from no one; nor does an admin's
+// estimate come back into view when they are an admin no longer.
+func TestNoAdminHidesARow(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo, eva := withHousehold(t)
+	makeUser(t, db, ivo)
+	saveFood(t, db, ana, tuna(116))
+	ivos := copyNamed(t, db, ivo, tuna(116).Name)
+	ivos.Source, ivos.Nutrients.Kcal = food.Estimate, 500
+	saveFood(t, db, ivo, ivos)
+	if found := findCatalog(t, db, eva, "tuna"); len(found) != 1 || found[0].Nutrients.Kcal != 116 {
+		t.Errorf("Eva's catalog of tuna after Ivo's estimate = %v, want Ana's row", found)
+	}
+
+	plate := tuna(116)
+	plate.Name, plate.Barcodes, plate.Aliases = "Plate", nil, nil
+	plate = saveFood(t, db, eva, plate)
+	plate.Source = food.Estimate
+	saveFood(t, db, eva, plate)
+	makeUser(t, db, eva)
+	if found := findCatalog(t, db, ivo, "plate"); len(found) != 0 {
+		t.Errorf("Ivo's catalog of the plate Eva made an estimate, then no admin = %v, want none", found)
+	}
+}

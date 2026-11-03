@@ -169,10 +169,15 @@ user's word, a dish, a recipe or an archived food never does. Another
 user's food stays theirs, declared too: no one but an admin changes
 what every user finds (decided 3 November 2026, after QA round 2,
 where a user's "reference" banana rewrote everyone's); a user's copy of
-a row is linked to it, and changes it in nothing. A row all of whose
-admins' foods are of those sources now (a plate first saved as a
-label's, then as an estimate) is shown no more, till one says it is
-declared again; a user's copy counts for nothing there. One
+a row is linked to it, and changes it in nothing, and their food of no
+declared values (an estimate, or archived) names no row, so it hides
+none. A row all of whose foods are of those sources now (an admin's
+plate first saved as a label's, then as an estimate) is shown no more,
+till one says it is declared again. A household's food is each
+member's, so a member's change of one an admin keeps is the admin's
+food's too, and goes into the row with the admin's next save. Rows
+users wrote before the rule stay, and a former admin's undo still puts
+back what their own save did. One
 product is one row, by its name and brand, else the row the food went
 into before (renamed with it), else one of its barcodes; the latest
 save of an admin's food wins, but a barcode stays the product's that
