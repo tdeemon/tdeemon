@@ -491,7 +491,7 @@ in `web/`.
     Telegram chat for the bot's commands), and the only
     other exceptions are housekeeping that shows or changes no one's data
     (removing expired sessions) and the catalog, the instance's foods,
-    no user's, which a declared food's save writes and every user's
+    no user's, which an admin's save of a declared food writes and every user's
     search reads (docs/DESIGN.md §4);
   - the one exception the users make themselves is a shared recipe
     (docs/DESIGN.md §4, "Shared recipes"): a save of a member's recipe

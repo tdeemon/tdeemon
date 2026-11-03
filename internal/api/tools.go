@@ -312,7 +312,7 @@ func (s *sessions) tools() []tool {
 			Description: "Your foods whose name, brand or an alias has words starting with each word of a query, in any case and without the diacritics: " +
 				"the name's matches first, then the shorter name. Send a meal's foods at once, one query each: each food says which queries found it. " +
 				"Each has how much a meal had of it last. Archived foods are left out, or alone found with archived. " +
-				"Within the limit after yours, the instance's catalog's foods you have not (catalog), a label's values every user's saves keep: an item's catalog_id logs one, which makes it yours.",
+				"Within the limit after yours, the instance's catalog's foods you have not (catalog), a label's values an admin's saves keep: an item's catalog_id logs one, which makes it yours.",
 			Errors: []int{http.StatusUnauthorized},
 		}, s.findFoods).
 			briefly("The user's foods whose name, brand or an alias has words starting with a query's, in any case, without diacritics, " +

@@ -525,7 +525,7 @@ export const en = {
     list: { all: 'All', recent: 'Recent', frequent: 'Frequent', meals: 'Meals' },
     results: 'What there is to add',
     lastAmount: (amount: string) => `last ${amount}`,
-    // A food of the instance's catalog, which other users entered.
+    // A food of the instance's catalog, which an admin entered.
     catalog: 'catalog',
     addOf: (name: string) => `Add: ${name}`,
     // A serving's chip, one of it, by its name alone, which may hold a

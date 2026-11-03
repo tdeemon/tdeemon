@@ -127,7 +127,7 @@ type foodsOutput struct {
 }
 
 // catalogFoodBody is a food of the instance's catalog: the declared
-// values of a product, which every user's saves keep, no user's own.
+// values of a product, which an admin's saves keep, no user's own.
 type catalogFoodBody struct {
 	ID string `json:"id" format:"uuid" doc:"The catalog's id of it, no food of yours: an item's catalog_id."`
 	FoodFields

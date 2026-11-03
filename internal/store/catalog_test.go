@@ -11,6 +11,7 @@ import (
 	"uuid"
 
 	"github.com/zarnautovic/tdeemon/internal/domain/food"
+	"github.com/zarnautovic/tdeemon/internal/domain/user"
 	"github.com/zarnautovic/tdeemon/internal/store"
 )
 
@@ -628,5 +629,107 @@ func TestAnEstimateLeavesASharedRow(t *testing.T) {
 	}
 	if found := findCatalog(t, db, eva, "tuna"); len(found) != 1 {
 		t.Errorf("Eva's catalog of tuna with Ivo's archived = %v, want the row", found)
+	}
+}
+
+// makeUser makes userID a user of no admin's role.
+func makeUser(t *testing.T, db *store.DB, userID uuid.UUID) {
+	t.Helper()
+	role := user.RoleUser
+	if _, err := db.ChangeUser(t.Context(), userID, store.UserChange{Role: &role}, t0); err != nil {
+		t.Fatalf("ChangeUser: %v", err)
+	}
+}
+
+// Only an admin's save writes the catalog: another user's declared food,
+// a product the catalog has or a new one, stays theirs, and leaves the
+// row as the admin's save left it. Their copy of a row is linked to it,
+// and made an estimate it hides the row from no one.
+func TestCatalogTakesAnAdminsFoodsAlone(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	eva := addEva(t, db)
+	makeUser(t, db, ivo)
+	saveFood(t, db, ana, tuna(116))
+	row, err := db.CatalogFoodByBarcode(t.Context(), "3850104000010")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ivos := tuna(300)
+	ivos.Barcodes = []string{"3850104000027"}
+	saveFood(t, db, ivo, ivos)
+	banana := tuna(89)
+	banana.Name, banana.Brand, banana.Source, banana.Aliases = "Banana", "", food.Reference, nil
+	banana.Barcodes = []string{"2000000000015"}
+	saveFood(t, db, ivo, banana)
+	if got, err := db.CatalogFood(t.Context(), row.ID); err != nil || got.Nutrients.Kcal != 116 || slices.Contains(got.Barcodes, "3850104000027") {
+		t.Errorf("the row after Ivo's tuna = %+v, %v; want Ana's", got, err)
+	}
+	if n := catalogRows(t, db); n != 1 {
+		t.Errorf("the catalog after Ivo's banana has %d rows, want Ana's tuna alone", n)
+	}
+	if found := findCatalog(t, db, eva, "banana"); len(found) != 0 {
+		t.Errorf("Eva's catalog of banana = %v, want none", found)
+	}
+	if _, err := db.CatalogFoodByBarcode(t.Context(), "2000000000015"); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("the catalog's food of Ivo's barcode: %v, want ErrNotFound", err)
+	}
+
+	copied := row
+	copied.ID, copied.CopyOf, copied.Barcodes = uuid.NewV7(), row.ID, nil
+	copied = saveFood(t, db, ivo, copied)
+	if _, err := db.DeleteUser(t.Context(), ana); err != nil {
+		t.Fatal(err)
+	}
+	copied.Source = food.Estimate
+	saveFood(t, db, ivo, copied)
+	if found := findCatalog(t, db, eva, "tuna"); len(found) != 1 || found[0].ID != row.ID {
+		t.Errorf("Eva's catalog of tuna after Ivo's copy became an estimate = %v, want Ana's row", found)
+	}
+}
+
+// A household member who is no admin, saving the household's food of a
+// row as an estimate, hides the row from no one; nor does an admin's
+// estimate come back into view when they are an admin no longer.
+func TestNoAdminHidesARow(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo, eva := withHousehold(t)
+	makeUser(t, db, ivo)
+	saveFood(t, db, ana, tuna(116))
+	ivos := copyNamed(t, db, ivo, tuna(116).Name)
+	ivos.Source, ivos.Nutrients.Kcal = food.Estimate, 500
+	saveFood(t, db, ivo, ivos)
+	if found := findCatalog(t, db, eva, "tuna"); len(found) != 1 || found[0].Nutrients.Kcal != 116 {
+		t.Errorf("Eva's catalog of tuna after Ivo's estimate = %v, want Ana's row", found)
+	}
+
+	// Ana saves the household's estimate as an estimate of hers: no food
+	// of the row is declared now, so her save hides it.
+	estimate := copyNamed(t, db, ana, tuna(116).Name)
+	estimate.Nutrients.Kcal = 510
+	saveFood(t, db, ana, estimate)
+	if found := findCatalog(t, db, eva, "tuna"); len(found) != 0 {
+		t.Errorf("Eva's catalog of tuna after Ana's estimate = %v, want none", found)
+	}
+	// Ana renames her tuna, the household's estimate: still one row,
+	// which her declared save shows anew.
+	anas := copyNamed(t, db, ana, tuna(116).Name)
+	anas.Name, anas.Source, anas.Nutrients.Kcal, anas.Barcodes = "Tuna", food.Label, 120, nil
+	saveFood(t, db, ana, anas)
+	if found := findCatalog(t, db, eva, "tuna"); len(found) != 1 || found[0].Name != "Tuna" || catalogRows(t, db) != 1 {
+		t.Errorf("Eva's catalog of tuna after Ana's rename = %v (%d rows), want her row renamed", found, catalogRows(t, db))
+	}
+
+	plate := tuna(116)
+	plate.Name, plate.Barcodes, plate.Aliases = "Plate", nil, nil
+	plate = saveFood(t, db, eva, plate)
+	plate.Source = food.Estimate
+	saveFood(t, db, eva, plate)
+	makeUser(t, db, eva)
+	if found := findCatalog(t, db, ivo, "plate"); len(found) != 0 {
+		t.Errorf("Ivo's catalog of the plate Eva made an estimate, then no admin = %v, want none", found)
 	}
 }

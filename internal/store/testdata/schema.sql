@@ -80,7 +80,9 @@ CREATE TABLE catalog_foods (
     -- the save before the catalog it was made of, whose undo puts it
     -- back (catalog_saves records the saves after).
     legacy_save TEXT CHECK (legacy_save IS NULL OR length(legacy_save) = 36)
-) STRICT;
+, hidden INTEGER NOT NULL DEFAULT 0 CHECK (
+    hidden IN (0, 1)
+)) STRICT;
 
 CREATE UNIQUE INDEX catalog_foods_name_brand ON catalog_foods (
     name_key, brand_key

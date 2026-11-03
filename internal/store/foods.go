@@ -289,7 +289,7 @@ func recordFood(ctx context.Context, tx *sql.Tx, userID uuid.UUID, a event.Actor
 	// The food as stored, of the catalog's food f was copied of.
 	synced := stored
 	synced.CopyOf = f.CopyOf
-	if err := syncCatalog(ctx, tx, userID, synced, id, now); err != nil {
+	if err := syncCatalog(ctx, tx, userID, synced, before, id, now); err != nil {
 		return food.Food{}, uuid.Nil(), err
 	}
 	copies, err := householdCopies(ctx, tx, share, userID)
