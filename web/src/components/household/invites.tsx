@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 
 import { statusOf } from '@/api/errors'
-import { useDeleteInvite, type HouseholdInvite } from '@/api/household'
+import { focusLater, useDeleteInvite, type HouseholdInvite } from '@/api/household'
 import { Ask } from '@/components/ask'
 import { Sheet } from '@/components/sheet'
 import { Button } from '@/components/ui/button'
@@ -17,15 +17,18 @@ import { JoinPreview } from './join-preview'
 // it asks, or those waiting for the user's answer (received), each seen
 // in a sheet of what joining does and joined there, or declined after it
 // asks. The focus goes to Keep, and back to what asked, or to the heading
-// once the invite is gone.
+// once the invite is gone; to fallback when the list went with it, or the
+// household was joined.
 export function Invites({
   kind,
   invites,
   timeZone,
+  fallback,
 }: {
   kind: 'sent' | 'received'
   invites: readonly HouseholdInvite[]
   timeZone: string
+  fallback: RefObject<HTMLElement | null>
 }) {
   const t = useMessages()
   const f = useFormat()
@@ -58,7 +61,7 @@ export function Invites({
       sayChange({ title: h.declined(inv.by.name) })
     }
     setAsking(undefined)
-    heading.current?.focus()
+    focusLater(heading, fallback)
   }
 
   return (
@@ -157,6 +160,7 @@ export function Invites({
               invite={seeing}
               onDone={() => {
                 setSeeing(undefined)
+                focusLater(fallback)
               }}
             />
           )}

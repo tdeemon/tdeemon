@@ -709,7 +709,7 @@ export const hr: Messages = {
     refused: (detail: string) => `Server nije prihvatio ovu namirnicu: ${detail}`,
   },
   household: {
-    hint: 'Dijeli sve namirnice i recepte s onima s kojima kuhaš. Obroci, kilaža i planovi ostaju svačiji.',
+    hint: 'Dijeli sve namirnice i recepte s onima s kojima kuhaš. Tvoji obroci, kilaža i plan ostaju samo tvoji.',
     members: 'Članovi',
     you: 'Ti',
     none: 'Nisi ni u jednom kućanstvu. Pozovi nekoga s kim kuhaš ili prihvati pozivnicu.',

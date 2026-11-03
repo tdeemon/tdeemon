@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
+import { $api } from '@/api/client'
 import type { components } from '@/api/schema'
 import { setLocale } from '@/i18n/locale'
 import { fakeServer, renderAt, signedIn, type Handler } from '@/test/app'
@@ -43,6 +44,13 @@ const report: Report = {
   renamed: [{ from: 'Porridge', to: 'Porridge (2)' }],
   dropped: [{ food: 'Kefir', code: '3850000000015' }],
 }
+
+// foodsAsked are the foods' queries a page of them would have asked: a
+// join and a leave must have them asked again.
+const foodsAsked = [
+  $api.queryOptions('get', '/api/v1/foods/list').queryKey,
+  $api.queryOptions('get', '/api/v1/foods', { params: { query: { query: ['oat'] } } }).queryKey,
+]
 
 // problemOf is a refusal of status whose error at where has code as its
 // value, as the household's refusals say why.
@@ -188,7 +196,10 @@ test('an invite refused says why by its code, in Croatian too', async () => {
 
 test('an invite for the user shows what joining does, and joins with its fingerprint', async () => {
   const { sent } = server({ ...none, received: [fromMia] })
-  renderAt('/settings/household')
+  const queryClient = renderAt('/settings/household').options.context.queryClient
+  for (const key of foodsAsked) {
+    queryClient.setQueryData(key, {})
+  }
 
   const received = within(await screen.findByRole('region', { name: 'Invites for you' }))
   expect(received.getByText('Mia invites you into their household')).toBeDefined()
@@ -204,6 +215,14 @@ test('an invite for the user shows what joining does, and joins with its fingerp
 
   expect(await screen.findByText('You joined Mia’s household')).toBeDefined()
   expect(sent.accept).toEqual([{ fingerprint: 'f1' }])
+  // The kitchens merged: the foods are asked again.
+  for (const key of foodsAsked) {
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true)
+  }
+  // The sheet's opener went with the invite: the focus stays on the page.
+  await waitFor(() => {
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Invite someone' }))
+  })
   const members = within(await screen.findByRole('region', { name: 'Members' }))
   expect(members.getByText('Mia')).toBeDefined()
   expect(screen.queryByRole('region', { name: 'Invites for you' })).toBeNull()
@@ -266,6 +285,9 @@ test('an invite for the user is declined after it asks', async () => {
   await waitFor(() => {
     expect(screen.queryByRole('region', { name: 'Invites for you' })).toBeNull()
   })
+  await waitFor(() => {
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Invite someone' }))
+  })
 })
 
 test('an invite the household sent is revoked after it asks; Keep keeps it', async () => {
@@ -287,11 +309,17 @@ test('an invite the household sent is revoked after it asks; Keep keeps it', asy
     expect(screen.queryByRole('region', { name: 'Invites sent' })).toBeNull()
   })
   expect(sent[`DELETE ${ofZoe.id}`]).toHaveLength(1)
+  await waitFor(() => {
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Invite someone' }))
+  })
 })
 
 test('a member leaves after it asks what everyone keeps', async () => {
   const { sent } = server(withZoe)
-  renderAt('/settings/household')
+  const queryClient = renderAt('/settings/household').options.context.queryClient
+  for (const key of foodsAsked) {
+    queryClient.setQueryData(key, {})
+  }
 
   const members = within(await screen.findByRole('region', { name: 'Members' }))
   fireEvent.click(members.getByRole('button', { name: 'Leave the household' }))
@@ -300,5 +328,68 @@ test('a member leaves after it asks what everyone keeps', async () => {
 
   expect(await screen.findByText('You left the household')).toBeDefined()
   expect(sent['POST /api/v1/household/leave']).toHaveLength(1)
+  for (const key of foodsAsked) {
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true)
+  }
   expect(await screen.findByText(/You are in no household/)).toBeDefined()
+  await waitFor(() => {
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Invite someone' }))
+  })
+})
+
+test('a new preview that fails after the merge changed leaves nothing to join', async () => {
+  let previews = 0
+  server(
+    { ...none, received: [fromMia] },
+    {
+      [`GET /api/v1/household/invites/${fromMia.id}/preview`]: () => {
+        previews++
+        return previews === 1
+          ? Response.json({ report, fingerprint: 'f1' })
+          : problemOf(404, 'path.id', 'gone')
+      },
+      [`POST /api/v1/household/invites/${fromMia.id}/accept`]: () =>
+        problemOf(409, 'body.fingerprint', 'merge_changed'),
+    },
+  )
+  renderAt('/settings/household')
+
+  fireEvent.click(await screen.findByRole('button', { name: 'See what joining does' }))
+  const sheet = within(await screen.findByRole('dialog', { name: 'What joining does' }))
+  await sheet.findByText('2 foods')
+  fireEvent.click(sheet.getByRole('button', { name: 'Join the household' }))
+
+  expect((await sheet.findByRole('alert')).textContent).toBe(
+    'The invite is gone: it expired, or was revoked.',
+  )
+  expect(sheet.queryByText(/The foods changed since/)).toBeNull()
+  expect(sheet.getByRole('button', { name: 'Join the household' }).hasAttribute('disabled')).toBe(
+    true,
+  )
+})
+
+test('an invite answered after its sheet was closed still says so', async () => {
+  let answer: ((r: Response) => void) | undefined
+  server(none, {
+    'POST /api/v1/household/invites': () =>
+      new Promise<Response>((resolve) => {
+        answer = resolve
+      }),
+  })
+  renderAt('/settings/household')
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Invite someone' }))
+  const sheet = within(await screen.findByRole('dialog', { name: 'Invite someone' }))
+  fireEvent.change(sheet.getByLabelText('Their email address'), {
+    target: { value: 'zoe@example.com' },
+  })
+  fireEvent.click(sheet.getByRole('button', { name: 'Invite' }))
+  await sheet.findByRole('button', { name: 'Inviting…' })
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: 'Invite someone' })).toBeNull()
+  })
+
+  answer?.(Response.json(ofZoe, { status: 201 }))
+  expect(await screen.findByText('Invited zoe@example.com')).toBeDefined()
 })

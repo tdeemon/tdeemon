@@ -839,7 +839,7 @@ export const en = {
   // A household: users who keep one kitchen, every food and recipe of a
   // member each member's.
   household: {
-    hint: 'Share every food and recipe with the people you cook with. Meals, weight and plans stay each one’s.',
+    hint: 'Share every food and recipe with the people you cook with. Your meals, weight and plan stay yours alone.',
     members: 'Members',
     you: 'You',
     none: 'You are in no household. Invite someone you cook with, or accept an invite.',

@@ -1,8 +1,8 @@
 import { LogOut } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useRef, useState, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 
-import { useLeave, type Household } from '@/api/household'
+import { focusLater, useLeave, type Household } from '@/api/household'
 import { Ask } from '@/components/ask'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,8 +12,14 @@ import { sayChange } from '@/lib/toast'
 
 // Members are the household's members, by name and address, the user
 // marked, and the way out, after it asks what everyone keeps. No member
-// removes another.
-export function Members({ members }: { members: Household['members'] }) {
+// removes another. Left, the focus goes to fallback.
+export function Members({
+  members,
+  fallback,
+}: {
+  members: Household['members']
+  fallback: RefObject<HTMLElement | null>
+}) {
   const t = useMessages()
   const h = t.household
   const opener = useRef<HTMLButtonElement>(null)
@@ -31,6 +37,7 @@ export function Members({ members }: { members: Household['members'] }) {
     }
     setAsking(false)
     sayChange({ title: h.left })
+    focusLater(fallback)
   }
 
   return (

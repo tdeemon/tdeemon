@@ -42,9 +42,9 @@ export function HouseholdPage() {
     const { members, sent, received } = household.data
     body = (
       <>
-        <Invites kind="received" invites={received} timeZone={timeZone} />
+        <Invites kind="received" invites={received} timeZone={timeZone} fallback={opener} />
         {members.length > 0 ? (
-          <Members members={members} />
+          <Members members={members} fallback={opener} />
         ) : (
           <p className="rounded-lg border bg-card p-4">{t.household.none}</p>
         )}
@@ -57,7 +57,7 @@ export function HouseholdPage() {
           <UserPlus aria-hidden />
           {t.household.invite}
         </Button>
-        <Invites kind="sent" invites={sent} timeZone={timeZone} />
+        <Invites kind="sent" invites={sent} timeZone={timeZone} fallback={opener} />
       </>
     )
   }

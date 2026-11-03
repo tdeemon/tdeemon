@@ -1,4 +1,5 @@
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
+import type { RefObject } from 'react'
 
 import { $api } from './client'
 import type { components } from './schema'
@@ -50,11 +51,24 @@ function kitchenChanged(queryClient: QueryClient) {
   ])
 }
 
-// useInvite invites a user by their address; the household is asked again.
-export function useInvite() {
+// focusLater gives the focus to the first of refs that is still there,
+// once what an answer changed is shown: what had it may be gone with it.
+export function focusLater(...refs: readonly RefObject<HTMLElement | null>[]) {
+  setTimeout(() => {
+    refs.find((r) => r.current?.isConnected === true)?.current?.focus()
+  })
+}
+
+// useInvite invites a user by their address; the household is asked
+// again, and onInvited told the address of the one invited, which it is
+// even when what asked is gone.
+export function useInvite(onInvited: (email: string) => void) {
   const queryClient = useQueryClient()
   return $api.useMutation('post', '/api/v1/household/invites', {
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: householdKey }),
+    onSuccess: async (invite) => {
+      onInvited(invite.invited.email)
+      await queryClient.invalidateQueries({ queryKey: householdKey })
+    },
   })
 }
 

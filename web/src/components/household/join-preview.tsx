@@ -96,8 +96,12 @@ export function JoinPreview({ invite, onDone }: { invite: HouseholdInvite; onDon
   if (preview.isPending) {
     return <Skeleton blocks={['h-32', 'h-10']} />
   }
-  if (preview.data === undefined) {
-    return statusOf(preview.error) === 404 || statusOf(preview.error) === 409 ? (
+  // A preview that failed, the first or a new one after the merge
+  // changed: the invite gone, a refusal, or what failed, with a way to ask
+  // again. An old one is no merge to accept.
+  const failed =
+    preview.error === null ? null : statusOf(preview.error) === 404 ||
+      statusOf(preview.error) === 409 ? (
       <p role="alert" className="text-sm text-destructive">
         {refusal(t, preview.error)}
       </p>
@@ -108,6 +112,8 @@ export function JoinPreview({ invite, onDone }: { invite: HouseholdInvite; onDon
         onRetry={() => void preview.refetch()}
       />
     )
+  if (preview.data === undefined) {
+    return failed
   }
   const { report, fingerprint } = preview.data
 
@@ -133,8 +139,9 @@ export function JoinPreview({ invite, onDone }: { invite: HouseholdInvite; onDon
   return (
     <div className="space-y-4">
       <p className="text-small text-muted-foreground">{t.household.previewHint}</p>
-      {changed && (
-        <output className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+      {failed}
+      {changed && failed === null && (
+        <output className="block rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
           {t.household.changed}
         </output>
       )}
@@ -146,7 +153,7 @@ export function JoinPreview({ invite, onDone }: { invite: HouseholdInvite; onDon
       )}
       <Button
         className="w-full"
-        disabled={accept.isPending || preview.isFetching}
+        disabled={accept.isPending || preview.isFetching || failed !== null}
         onClick={() => void join()}
       >
         {accept.isPending ? t.household.joining : t.household.join}

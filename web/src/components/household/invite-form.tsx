@@ -30,7 +30,10 @@ export function InviteForm({
   const t = useMessages()
   const id = useId()
   const [address, setAddress] = useState('')
-  const invite = useInvite()
+  // Said by the hook, so a sheet closed before the answer says it too.
+  const invite = useInvite((invited) => {
+    sayChange({ title: t.household.invited(invited) })
+  })
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -38,15 +41,7 @@ export function InviteForm({
     if (typed === '') {
       return
     }
-    invite.mutate(
-      { body: { email: typed } },
-      {
-        onSuccess: () => {
-          sayChange({ title: t.household.invited(typed) })
-          onDone()
-        },
-      },
-    )
+    invite.mutate({ body: { email: typed } }, { onSuccess: onDone })
   }
 
   return (
