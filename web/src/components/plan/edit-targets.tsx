@@ -10,7 +10,8 @@ import { useMessages } from '@/i18n/messages'
 type Plan = components['schemas']['PlanBody']
 
 // EditTargets is the button that edits the targets by type of day, from
-// today on, in a sheet.
+// today on, or, before the plan's first target, that one from its day,
+// in a sheet.
 export function EditTargets({ plan }: { plan: Plan }) {
   const t = useMessages()
   const [open, setOpen] = useState(false)
