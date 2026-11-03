@@ -393,3 +393,18 @@ test('an invite answered after its sheet was closed still says so', async () => 
   answer?.(Response.json(ofZoe, { status: 201 }))
   expect(await screen.findByText('Invited zoe@example.com')).toBeDefined()
 })
+
+test('today has a line while an invite waits, which opens the household', async () => {
+  server({ ...none, received: [fromMia] })
+  renderAt('/')
+
+  const line = await screen.findByRole('link', { name: /Mia invites you into their household/ })
+  fireEvent.click(line)
+  expect(await screen.findByRole('heading', { name: 'Household', level: 1 })).toBeDefined()
+  cleanup()
+
+  server(withZoe)
+  renderAt('/')
+  expect(await screen.findByRole('heading', { name: 'Today', level: 1 })).toBeDefined()
+  expect(screen.queryByRole('link', { name: /invites you into/ })).toBeNull()
+})

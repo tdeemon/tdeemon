@@ -5,6 +5,7 @@ import { statusOf } from '@/api/errors'
 import { BackToFoods } from '@/components/foods/back-to-foods'
 import { FoodDetail } from '@/components/foods/food-detail'
 import { FoodForm } from '@/components/foods/food-form'
+import { HouseholdMark } from '@/components/household/household-mark'
 import { LoadError } from '@/components/load-error'
 import { RecipeDetail } from '@/components/recipes/recipe-detail'
 import { RecipeEditor } from '@/components/recipes/recipe-editor'
@@ -87,6 +88,7 @@ export function FoodPage() {
   return (
     <div className="space-y-3">
       {!edit && <BackToFoods />}
+      {food.data !== undefined && <HouseholdMark />}
       {body}
     </div>
   )

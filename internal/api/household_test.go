@@ -440,6 +440,12 @@ func TestHouseholdClashesAreConflicts(t *testing.T) {
 	if err != nil || len(members) != 2 {
 		t.Fatalf("the pudding's members = %+v, %v; want Ana and Zoe", members, err)
 	}
+	// Her recipe's answer marks Zoe, of her household, and not her.
+	rec = in.do(t, http.MethodGet, "/api/v1/foods/"+pudding.ID.String(), "", ana, nil)
+	if body := rec.Body.String(); rec.Code != http.StatusOK || !strings.Contains(body, `"name":"Zoe","household":true`) ||
+		strings.Contains(body, `"you":true,"household":true`) {
+		t.Errorf("the pudding: %d %s, want Zoe marked of the household", rec.Code, body)
+	}
 	for _, m := range members {
 		path := fmt.Sprintf("/api/v1/recipes/%s/shares/%d", pudding.ID, m.Seat)
 		if rec := in.do(t, http.MethodDelete, path, "", ana, nil); rec.Code != http.StatusConflict {

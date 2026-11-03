@@ -25,6 +25,8 @@ type recipeMemberBody struct {
 	Seat int    `json:"seat" doc:"What a stop names."`
 	Name string `json:"name"`
 	You  bool   `json:"you,omitempty" doc:"A stop of your seat leaves the recipe."`
+	// Household names the members no stop takes out.
+	Household bool `json:"household,omitempty" doc:"A member of your household: no stop takes them out, and your leave takes them with you, refused when no one else would stay."`
 }
 
 // The inputs name the recipe by its food's id, each its own field: huma

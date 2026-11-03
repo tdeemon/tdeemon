@@ -43,6 +43,10 @@ export function RecipeSharing({ food, className }: { food: Food; className?: str
   const [open, setOpen] = useState(false)
   const opener = useRef<HTMLButtonElement>(null)
   const members = food.recipe?.shared_with ?? []
+  // A member of the user's household no one takes out; the user leaves
+  // with their household, and only while someone else stays.
+  const withHousehold = members.some((m) => m.household === true)
+  const canLeave = members.some((m) => m.you !== true && m.household !== true)
   const undo = (action: 'recipe.share' | 'recipe.unshare') => ({
     last: { action, entity: food.id },
     date: 'today',
@@ -97,31 +101,38 @@ export function RecipeSharing({ food, className }: { food: Food; className?: str
                 {m.you === true && (
                   <span className="text-muted-foreground"> · {t.sharing.you}</span>
                 )}
-              </span>
-              <Button
-                variant="ghost"
-                size={m.you === true ? 'sm' : 'icon'}
-                disabled={stop.isPending}
-                aria-label={m.you === true ? t.sharing.leave : t.sharing.remove(m.name)}
-                onClick={() => {
-                  void remove(m.seat, m.name, m.you === true)
-                }}
-              >
-                {m.you === true ? (
-                  <>
-                    <LogOut aria-hidden />
-                    {t.sharing.leave}
-                  </>
-                ) : (
-                  <X aria-hidden />
+                {m.household === true && (
+                  <span className="text-muted-foreground"> · {t.sharing.household}</span>
                 )}
-              </Button>
+              </span>
+              {(m.you === true ? canLeave : m.household !== true) && (
+                <Button
+                  variant="ghost"
+                  size={m.you === true ? 'sm' : 'icon'}
+                  disabled={stop.isPending}
+                  aria-label={m.you === true ? t.sharing.leave : t.sharing.remove(m.name)}
+                  onClick={() => {
+                    void remove(m.seat, m.name, m.you === true)
+                  }}
+                >
+                  {m.you === true ? (
+                    <>
+                      <LogOut aria-hidden />
+                      {t.sharing.leave}
+                    </>
+                  ) : (
+                    <X aria-hidden />
+                  )}
+                </Button>
+              )}
             </li>
           ))}
         </ul>
       )}
-      {members.some((m) => m.you === true) && (
-        <p className="text-caption text-muted-foreground">{t.sharing.leaveHint}</p>
+      {members.some((m) => m.you === true) && canLeave && (
+        <p className="text-caption text-muted-foreground">
+          {withHousehold ? t.sharing.leaveWithHousehold : t.sharing.leaveHint}
+        </p>
       )}
       {stop.isError && (
         <p role="alert" className="text-sm text-destructive">

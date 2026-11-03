@@ -425,6 +425,7 @@ func TestShareWithAHousehold(t *testing.T) {
 	if members, err := db.RecipeMembers(t.Context(), eva, evas.Food.ID); err != nil || len(members) != 3 {
 		t.Errorf("the curry's members after the undo = %+v, %v; want the household back", members, err)
 	}
+	householdMarked(t, db, ana, ivo, eva)
 
 	stew := curryOf(t, saveFood(t, db, ana, chickenBreast()), saveFood(t, db, ana, kefir()))
 	stew.Food.Name = "Stew"
@@ -493,5 +494,29 @@ func TestHouseholdIngredientOfBeforeKeepsItsRow(t *testing.T) {
 	ivos := copyNamed(t, db, ivo, chicken.Name)
 	if a, i := catalogLink(t, db, ana, chicken.ID), catalogLink(t, db, ivo, ivos.ID); a == "" || a != i {
 		t.Errorf("the chicken's rows: Ana's %q, Ivo's %q; want one", a, i)
+	}
+}
+
+// householdMarked fails unless the curry's members mark each one's
+// household to them alone: Ivo, Ana's mate, to Ana; no one to Eva,
+// outside.
+func householdMarked(t *testing.T, db *store.DB, ana, ivo, eva uuid.UUID) {
+	t.Helper()
+	for _, c := range []struct {
+		who  uuid.UUID
+		want map[uuid.UUID]bool
+	}{
+		{ana, map[uuid.UUID]bool{ana: false, ivo: true, eva: false}},
+		{eva, map[uuid.UUID]bool{ana: false, ivo: false, eva: false}},
+	} {
+		members, err := db.RecipeMembers(t.Context(), c.who, recipeOf(t, db, c.who).Food.ID)
+		if err != nil || len(members) != 3 {
+			t.Fatalf("the curry's members to %v = %+v, %v", c.who, members, err)
+		}
+		for _, m := range members {
+			if m.Household != c.want[m.ID] {
+				t.Errorf("to %v, %s's household = %v, want %v", c.who, m.Name, m.Household, c.want[m.ID])
+			}
+		}
 	}
 }
