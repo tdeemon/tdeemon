@@ -167,6 +167,22 @@ test("before the plan's first target, that target is edited from its day; a late
   })
 })
 
+test('a target edited today names one planned later, in Croatian too', async () => {
+  const later = { ...plan.targets![0]!, effective_from: '2026-11-07' }
+  fakeServer({
+    ...signedIn('hr'),
+    'GET /api/v1/limits': () => Response.json(limitsBody()),
+    'GET /api/v1/plan': () =>
+      Response.json(planBody({ ...plan, targets: [plan.targets![0]!, later] })),
+  })
+  setLocale('hr')
+  renderAt('/plan')
+  const card = within(await screen.findByRole('region', { name: 'Ciljevi po tipu dana' }))
+  fireEvent.click(card.getByRole('button', { name: 'Uredi ciljeve' }))
+  const sheet = within(await screen.findByRole('dialog', { name: 'Ciljevi po tipu dana' }))
+  sheet.getByText('Od danas nadalje, do promjene. Tada ga zamjenjuje cilj planiran od 7. stu.')
+})
+
 test('a target that is no number, or more fat and protein than its kcal, is not sent', async () => {
   const { sent } = editServer()
   const sheet = await openTargets()

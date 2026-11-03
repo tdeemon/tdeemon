@@ -13,7 +13,7 @@ import {
   type DayType,
   type TargetField,
 } from '@/components/plan/plan-edit'
-import { useViolationText, violationsOf } from '@/components/plan/proposal-text'
+import { useDate, useViolationText, violationsOf } from '@/components/plan/proposal-text'
 import { Button } from '@/components/ui/button'
 import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
@@ -46,6 +46,8 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
   const at = useViolationAt()
   const violation = useViolationText()
   const warning = useWarningText()
+  // A day of another year than today's says its year.
+  const date = useDate()
   const e = t.plan.edit
   // The target edited: today's, else the first one planned, from its day.
   const now =
@@ -143,8 +145,8 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
       aria-describedby={`${id}-from`}
     >
       <p id={`${id}-from`} className="text-small text-muted-foreground">
-        {from === plan.today ? e.fromToday : e.fromDay(f.short(from))}
-        {later !== undefined && ` ${e.laterTarget(f.short(later.effective_from))}`}
+        {from === plan.today ? e.fromToday : e.fromDay(date(from))}
+        {later !== undefined && ` ${e.laterTarget(date(later.effective_from))}`}
       </p>
       {days.map((d) => {
         const carbs = carbsOf(d)

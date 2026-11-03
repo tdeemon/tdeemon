@@ -16,7 +16,8 @@ type DayTarget = components['schemas']['DayTargetBody']
 // and rest: the kcal and the macros of each, and the days of the week
 // each is; the weekly average they come to over the training days,
 // against the TDEE calibration measures; and the targets to come. The
-// user edits them from today on.
+// user edits them from today on, or, before the plan's first target,
+// that one from its day.
 export function TargetsCard({ plan }: { plan: Plan }) {
   const t = useMessages()
   const date = useDate()
