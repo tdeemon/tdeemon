@@ -55,7 +55,7 @@ export function WeightFields({
     )
   } else if (weight !== undefined && share?.off !== undefined && rawText !== undefined) {
     said = (
-      <p className="flex items-start gap-2.5 rounded-md bg-warning/10 px-3 py-2.5 text-small text-warning">
+      <p className="flex items-start gap-2.5 rounded-md bg-warning-soft px-3 py-2.5 text-small text-warning">
         <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
         <span>
           {(share.off === 'low' ? t.recipes.yieldLow : t.recipes.yieldHigh)(

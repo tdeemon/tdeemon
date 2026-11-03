@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { useId, type ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
@@ -6,7 +7,9 @@ import { cn } from '@/lib/utils'
 // control: radios in a fieldset whose legend names it, so a screen reader
 // says them as one group and the arrow keys move between them. A segment
 // is 44 px high on a phone, as a button, and shares the width with the
-// others, its words cut short when they do not fit. children follow the
+// others, its words cut short when they do not fit. The control has a
+// control's edge; the segment chosen is the brand's soft green with a
+// check, as a chosen chip is. children follow the
 // segments in the fieldset (a hint, which describedBy names).
 export function SegmentedControl<T extends string>({
   legend,
@@ -36,11 +39,11 @@ export function SegmentedControl<T extends string>({
     // content, and the segments' words would not be cut short.
     <fieldset className={cn('min-w-0 space-y-2', className)} aria-describedby={describedBy}>
       <legend className={hideLegend ? 'sr-only' : 'font-medium'}>{legend}</legend>
-      <div className="flex gap-1 rounded-md bg-surface-2 p-1">
+      <div className="flex gap-1 rounded-md border border-control-border bg-surface-2 p-1">
         {options.map((option) => (
           <label
             key={option.value}
-            className="flex h-11 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-sm px-2 text-sm text-muted-foreground transition-colors has-checked:bg-card has-checked:font-semibold has-checked:text-foreground has-checked:shadow-card has-focus-visible:ring-2 has-focus-visible:ring-ring motion-reduce:transition-none lg:h-9"
+            className="flex h-11 min-w-0 flex-1 cursor-pointer items-center justify-center gap-1 rounded-sm px-2 text-sm text-muted-foreground transition-colors has-checked:bg-primary-soft has-checked:font-semibold has-checked:text-primary has-focus-visible:ring-2 has-focus-visible:ring-ring motion-reduce:transition-none lg:h-9"
           >
             <input
               type="radio"
@@ -51,6 +54,7 @@ export function SegmentedControl<T extends string>({
                 onChange(option.value)
               }}
             />
+            {value === option.value && <Check aria-hidden className="size-4 shrink-0" />}
             <span className="truncate">{option.label}</span>
           </label>
         ))}

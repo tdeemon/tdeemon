@@ -5,8 +5,8 @@ import { applyTheme, getTheme, readTheme, setTheme } from '@/lib/theme'
 // The page's colours for the browser's bar, as index.html has them.
 beforeEach(() => {
   document.head.innerHTML = `
-    <meta name="theme-color" data-scheme="light" media="(prefers-color-scheme: light)" content="#F5F6F8" />
-    <meta name="theme-color" data-scheme="dark" media="(prefers-color-scheme: dark)" content="#0A0E15" />`
+    <meta name="theme-color" data-scheme="light" media="(prefers-color-scheme: light)" content="#F6F7F9" />
+    <meta name="theme-color" data-scheme="dark" media="(prefers-color-scheme: dark)" content="#0B0F16" />`
 })
 
 afterEach(() => {

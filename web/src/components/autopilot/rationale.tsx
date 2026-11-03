@@ -31,7 +31,7 @@ export function Rationale({ proposal, brief = false }: { proposal: Proposal; bri
         </p>
       ))}
       {c.past_drift && proposal.status === 'pending' && (
-        <div className="mt-2 space-y-0.5 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+        <div className="mt-2 space-y-0.5 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm">
           <p className="font-semibold text-warning">{a.pastDriftTitle}</p>
           <p>
             {c.drift_limit_kcal === undefined

@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 // hunger is expected).
 const tones = {
   good: 'aria-pressed:border-success aria-pressed:bg-primary-soft aria-pressed:text-success',
-  signal: 'aria-pressed:border-warning aria-pressed:bg-warning/10 aria-pressed:text-warning',
+  signal: 'aria-pressed:border-warning aria-pressed:bg-warning-soft aria-pressed:text-warning',
 }
 
 // Stepper picks a value of a check-in's scale, 1 to 5, in one tap, each
@@ -47,7 +47,7 @@ export function Stepper({
                 onPick(value === step ? 0 : step)
               }}
               className={cn(
-                'min-h-11 min-w-0 flex-1 rounded-md border bg-card px-0.5 text-caption text-muted-foreground transition-colors outline-none hover:border-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card aria-pressed:font-semibold',
+                'min-h-11 min-w-0 flex-1 rounded-md border border-control-border bg-card px-0.5 text-caption text-muted-foreground transition-colors outline-none hover:border-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card aria-pressed:font-semibold',
                 tones[tone],
               )}
             >

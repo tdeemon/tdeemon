@@ -103,7 +103,7 @@ export function PendingProposal({
             ].join(' · ')}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-warning/10 px-3 py-1 text-small text-warning">
+        <span className="shrink-0 rounded-full bg-warning-soft px-3 py-1 text-small text-warning">
           {p.expiresIn(daysLeft)}
         </span>
       </header>

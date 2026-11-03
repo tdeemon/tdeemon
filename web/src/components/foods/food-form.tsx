@@ -550,7 +550,7 @@ export function FoodForm({
       )}
       <div aria-live="polite">
         {energy !== undefined && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md bg-warning/10 px-3 py-2.5 text-small text-warning">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md bg-warning-soft px-3 py-2.5 text-small text-warning">
             <TriangleAlert aria-hidden className="size-4 shrink-0" />
             <p id={`${id}-energy`} className="min-w-0 flex-1 basis-48">
               {t.foods.energyOff(f.number(energy.values), f.number(energy.typed))}

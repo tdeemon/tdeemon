@@ -96,7 +96,7 @@ export function ProfileForm({ profile, labelledBy }: { profile: Profile; labelle
           'rounded-md px-3 py-2.5 text-small',
           profile.missing.length === 0
             ? 'bg-primary-soft text-primary'
-            : 'bg-warning/10 text-warning',
+            : 'bg-warning-soft text-warning',
         )}
       >
         {profile.missing.length === 0

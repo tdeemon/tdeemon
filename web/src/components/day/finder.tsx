@@ -34,7 +34,7 @@ import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
 import { useDesktop } from '@/lib/media'
 import { matches, parts } from '@/lib/search'
-import { inputClass } from '@/lib/styles'
+import { activeChip, chipClass, inputClass } from '@/lib/styles'
 import { cn } from '@/lib/utils'
 
 // The lists a meal's foods are found in.
@@ -221,7 +221,7 @@ export function Finder({
         </section>
       )}
       {/* The search, and beside it a barcode's: the camera, or its digits. */}
-      <div className="flex h-12 items-center rounded-lg border-2 border-input bg-card pr-0.5 focus-within:border-ring">
+      <div className="flex h-12 items-center rounded-lg border border-input bg-card pr-0.5 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
         <label className="flex h-full min-w-0 flex-1 items-center gap-2.5 pl-3.5">
           <Search aria-hidden className="size-4.5 shrink-0 text-muted-foreground" />
           <span className="sr-only">{t.log.search}</span>
@@ -270,12 +270,8 @@ export function Finder({
       >
         <Tabs.List aria-label={t.log.lists} className="flex gap-1.5">
           {shownLists.map((l) => (
-            <Tabs.Tab
-              key={l}
-              value={l}
-              // 32 px to the eye, 44 to a finger.
-              className="relative h-8 min-w-11 rounded-full bg-surface-2 px-3 text-small outline-none after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] focus-visible:ring-2 focus-visible:ring-ring data-active:bg-foreground data-active:font-semibold data-active:text-background"
-            >
+            <Tabs.Tab key={l} value={l} className={cn(chipClass, activeChip)}>
+              {l === list && <Check aria-hidden className="size-4 shrink-0" />}
               {t.log.list[l]}
             </Tabs.Tab>
           ))}
