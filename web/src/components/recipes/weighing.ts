@@ -29,7 +29,8 @@ export function weighingOf(
 }
 
 // withPot is a weighing whose pot changed: its weight, the full pot less
-// the empty one, once the full pot is the heavier.
+// the empty one, once the full pot is the heavier; none while it is not,
+// so no weight of before stands beside a pot that gives none.
 export function withPot(
   w: Weighing,
   change: Partial<Pick<Weighing, 'full' | 'empty'>>,
@@ -41,6 +42,9 @@ export function withPot(
   const empty = parse(next.empty)
   if (full !== undefined && empty !== undefined && empty >= 0 && full > empty) {
     return { ...next, weight: field(full - empty) }
+  }
+  if (full !== undefined && empty !== undefined && empty >= 0) {
+    return { ...next, weight: '' }
   }
   return next
 }

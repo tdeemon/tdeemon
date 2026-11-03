@@ -35,6 +35,9 @@ test('days, a difference in percent and a list are written as the language write
     setLocale('hr')
   })
   expect(result.current.days('2026-10-19', '2026-10-25', today)).toBe('19. – 25. lis')
+  // A day of one digit has no leading zero, as a date alone has not.
+  expect(result.current.days('2026-10-05', '2026-10-11', today)).toBe('5. – 11. lis')
+  expect(result.current.days('2026-10-26', '2026-11-01', today)).toBe('26. lis – 1. stu')
   expect(result.current.signedPercent(-6.7)).toBe('−7 %')
   expect(result.current.list(['san', 'HRV'])).toBe('san i HRV')
 })

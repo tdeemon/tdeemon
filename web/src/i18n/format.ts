@@ -196,7 +196,12 @@ export function useFormat() {
           ? {}
           : { year: 'numeric' }),
         timeZone: 'UTC',
-      }).formatRange(calendarDate(from), calendarDate(to)),
+      })
+        .formatRangeToParts(calendarDate(from), calendarDate(to))
+        // ICU writes a range's day in Croatian with a leading zero ("05. –
+        // 11. lis"), which a date alone has not.
+        .map((part) => (part.type === 'day' ? part.value.replace(/^0(?=\d)/, '') : part.value))
+        .join(''),
     // time is an instant's time of day on the user's clock.
     time: (instant: string, timeZone: string) =>
       dateFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone }).format(
