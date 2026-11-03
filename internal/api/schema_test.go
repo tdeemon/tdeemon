@@ -26,6 +26,7 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/coaching"
 	"github.com/zarnautovic/tdeemon/internal/domain/clientid"
 	"github.com/zarnautovic/tdeemon/internal/domain/day"
+	"github.com/zarnautovic/tdeemon/internal/domain/food"
 	"github.com/zarnautovic/tdeemon/internal/domain/meal"
 	"github.com/zarnautovic/tdeemon/internal/domain/user"
 )
@@ -392,6 +393,87 @@ func answerCases() map[string]answerCase {
 			stew := foodOf(t, in.db, in.user.ID, "Shared bread stew")
 			for range 2 {
 				in.do(t, http.MethodDelete, "/api/v1/recipes/"+stew.ID.String()+"/shares/2", "", []*http.Cookie{session}, nil)
+			}
+		},
+		// A household with a member and an invite each way.
+		"get-household": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			ana := []*http.Cookie{session}
+			zoe := in.addUser(t, user.RoleUser)
+			zoes := sessionOfUser(t, in, zoe)
+			mia := newIsolationUser(t, in.db, "mia@example.com", "Mia", in.clock.Now())
+			if _, err := in.db.InviteToHousehold(t.Context(), mia, in.user.ID, in.clock.Now()); err != nil {
+				t.Fatal(err)
+			}
+			id := inviteByAPI(t, in, ana, zoe.Email)
+			in.do(t, http.MethodPost, "/api/v1/household/invites/"+id+"/accept", acceptBody(previewByAPI(t, in, zoes, id)), zoes, nil)
+			newIsolationUser(t, in.db, "eva@example.com", "Eva", in.clock.Now())
+			inviteByAPI(t, in, ana, "eva@example.com")
+			in.do(t, http.MethodGet, "/api/v1/household", "", ana, nil)
+		},
+		// An invite, then a 409 and a 422.
+		"invite-to-household": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			zoe := in.addUser(t, user.RoleUser)
+			for _, to := range []string{zoe.Email, zoe.Email, "nobody@example.com"} {
+				in.do(t, http.MethodPost, "/api/v1/household/invites", `{"email": "`+to+`"}`, []*http.Cookie{session}, nil)
+			}
+		},
+		// A revoke, then a 404.
+		"delete-household-invite": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			id := inviteByAPI(t, in, []*http.Cookie{session}, in.addUser(t, user.RoleUser).Email)
+			for range 2 {
+				in.do(t, http.MethodDelete, "/api/v1/household/invites/"+id, "", []*http.Cookie{session}, nil)
+			}
+		},
+		// A preview with a food on each side and a rename, a 404 and a 409.
+		"preview-household-invite": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			now := in.clock.Now()
+			zoe := in.addUser(t, user.RoleUser)
+			saveIsolationRecipe(t, in.db, zoe, saveIsolationFoods(t, in.db, zoe, now), now)
+			saveIsolationFoods(t, in.db, in.user, now)
+			// A plain food of the name of Zoe's recipe, which the merge renames.
+			pudding := food.Food{
+				ID: uuid.NewV7(), Name: "Zoe's bread pudding", Basis: food.Per100g, Source: food.User,
+				Nutrients: food.Nutrients{Kcal: 200, Protein: 6, Carbs: 30, Fat: 6},
+			}
+			if _, err := in.db.SaveFood(t.Context(), in.user.ID, isolationActor, pudding, now); err != nil {
+				t.Fatal(err)
+			}
+			inv, err := in.db.InviteToHousehold(t.Context(), zoe.ID, in.user.ID, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := "/api/v1/household/invites/" + inv.ID.String() + "/preview"
+			in.do(t, http.MethodGet, path, "", []*http.Cookie{session}, nil)
+			in.do(t, http.MethodGet, "/api/v1/household/invites/"+uuid.NewV7().String()+"/preview", "", []*http.Cookie{session}, nil)
+			eva := newIsolationUser(t, in.db, "eva@example.com", "Eva", now)
+			inHousehold(t, in.db, in.user.ID, eva)
+			in.do(t, http.MethodGet, path, "", []*http.Cookie{session}, nil)
+		},
+		// A 409 of an old preview, then the accept, then a 404.
+		"accept-household-invite": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			zoe := in.addUser(t, user.RoleUser)
+			inv, err := in.db.InviteToHousehold(t.Context(), zoe.ID, in.user.ID, in.clock.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			id := inv.ID.String()
+			old := previewByAPI(t, in, []*http.Cookie{session}, id)
+			saveIsolationFoods(t, in.db, zoe, in.clock.Now())
+			for _, fingerprint := range []string{old, previewByAPI(t, in, []*http.Cookie{session}, id), old} {
+				in.do(t, http.MethodPost, "/api/v1/household/invites/"+id+"/accept", acceptBody(fingerprint), []*http.Cookie{session}, nil)
+			}
+		},
+		// A leave, then a 404.
+		"leave-household": func(t *testing.T, in *instance, session *http.Cookie) {
+			t.Helper()
+			inHousehold(t, in.db, in.user.ID, in.addUser(t, user.RoleUser).ID)
+			for range 2 {
+				in.do(t, http.MethodPost, "/api/v1/household/leave", "", []*http.Cookie{session}, nil)
 			}
 		},
 		// A copy, then one of a name the user has, and one of their own.

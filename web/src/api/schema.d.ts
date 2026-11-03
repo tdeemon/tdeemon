@@ -33,7 +33,7 @@ export interface paths {
         };
         /**
          * Export your data
-         * @description Needs a web session. All your data, as a ZIP: `tdeemon.json`, every table of your data with your rows (format `tdeemon-export/1`: the tables and columns as the database has them), and `csv/<table>.csv` of each. Left out are secrets: hashes of the password, the API tokens and the sessions, and the devices' push subscriptions.
+         * @description Needs a web session. All your data, as a ZIP: `tdeemon.json`, every table of your data with your rows (format `tdeemon-export/1`: the tables and columns as the database has them), your household's row and the invites into a household made to you among them, and `csv/<table>.csv` of each. Left out are secrets: hashes of the password, the API tokens and the sessions, and the devices' push subscriptions.
          */
         get: operations["export-account"];
         put?: never;
@@ -394,6 +394,126 @@ export interface paths {
         get: operations["get-history"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/household": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get your household
+         * @description Needs a web session. Its members, by name and address, and the invites waiting: those the household made, and those for your answer.
+         */
+        get: operations["get-household"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/household/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invite a user into your household
+         * @description Needs a web session. Invites the user of the address into your household, or into one of the two of you when you are in none, for 7 days; they are told by a notification on their devices. A refusal's error at body.email has a code as its value: no_user, self or deactivated (422: no user of the instance has the address, it is yours, or the admin deactivated its user); member, other_household or waiting (409: they are in your household already, they are in another, which they leave first, or an invite of them from your household waits).
+         */
+        post: operations["invite-to-household"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/household/invites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke or decline an invite
+         * @description Needs a web session. An invite your household made is revoked, by any of its members; one for your answer is declined.
+         */
+        delete: operations["delete-household-invite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/household/invites/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join a household
+         * @description Needs a web session; of an invite for your answer. Does the merge its preview showed, of the fingerprint given, and makes you a member: from then on every food and recipe of a member is every member's, and your meals, measurements and plan stay yours. The members are told by a notification on their devices. Joining is never undone. A merge that is no longer the one the preview showed (the household's foods or yours changed since) does nothing: a 409 whose error at body.fingerprint has the code merge_changed, and a new preview shows the merge now. A refusal's error at path.id has a code as its value: member or other_household (you are in that household already, or in another, which you leave first), or recipe_cycle (the merge would make a recipe its own ingredient). Answers your household.
+         */
+        post: operations["accept-household-invite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/household/invites/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * See what joining a household does
+         * @description Needs a web session; of an invite for your answer. What accepting it would do now, the merge itself done and rolled back: how many of your foods and recipes become one with the household's, how many come to you and how many go to it, and each food of yours renamed or losing a barcode. A refusal's error at path.id has a code as its value: member or other_household (you are in that household already, or in another, which you leave first), or recipe_cycle (the merge would make a recipe its own ingredient).
+         */
+        get: operations["preview-household-invite"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/household/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Leave your household
+         * @description Needs a web session. Every member keeps every food and recipe they have, yours as ordinary foods of your own; a household of one member left is no more. The members who stay are told by a notification on their devices. Leaving is never undone: an invite brings you back. You in no household is a 404.
+         */
+        post: operations["leave-household"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1200,6 +1320,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptHouseholdInputBody: {
+            /** @description The preview's fingerprint: the accept does the merge it showed, or none. */
+            fingerprint: string;
+        };
         AcceptInviteInputBody: {
             /**
              * @description The language of the app.
@@ -1333,7 +1457,7 @@ export interface components {
             source: "label" | "estimate" | "reference" | "user" | "dish" | "off" | "recipe";
         };
         ChangeBody: {
-            /** @description What the change did: food.save, food.archive, recipe.save, recipe.share, recipe.unshare, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge, notes.set, or a change of the plan: profile.set, limits.set, phase.set, phase.delete, target.set, target.delete, plan.weekdays, proposal.create, proposal.status, autopilot.set (the autopilot's settings). */
+            /** @description What the change did: food.save, food.archive, recipe.save, recipe.share, recipe.unshare, meal.create, meal.replace, meal.delete, day.exclude, day.include, day.training, day.checkin, metric.set, metric.delete, metrics.merge, notes.set, or a change of the plan: profile.set, limits.set, phase.set, phase.delete, target.set, target.delete, plan.weekdays, proposal.create, proposal.status, autopilot.set (the autopilot's settings); or household.join, household.leave (joining a household, leaving one: never undone, never next). */
             action: string;
             /** @description Of food.archive: true when it archived the food, false when it brought it back in use. */
             archived?: boolean;
@@ -1348,7 +1472,7 @@ export interface components {
             client: string;
             /** @description The days (YYYY-MM-DD) it was of, as undo's answer says them: a meal's before and after it, a check-in's, a measurement's or a day's; none for a food, the notes or the plan. */
             days: string[];
-            /** @description What it changed, as undo's last names it: a food's, a meal's or a proposal's id, a day (YYYY-MM-DD), a day and a metric (2026-10-21/weight), profile, limits, plan or notes. */
+            /** @description What it changed, as undo's last names it: a food's, a meal's or a proposal's id, a day (YYYY-MM-DD), a day and a metric (2026-10-21/weight), profile, limits, plan, notes, or household (of a join or a leave). */
             entity: string;
             /**
              * Format: uuid
@@ -1902,6 +2026,43 @@ export interface components {
             /** Format: double */
             weight_kg?: number;
         };
+        HouseholdBody: {
+            /** @description The household's members, you among them, in the order they joined; none when you are in no household. */
+            members: components["schemas"]["HouseholdMemberBody"][];
+            /** @description The invites into a household waiting for your answer, the newest first. */
+            received: components["schemas"]["HouseholdInviteBody"][];
+            /** @description The invites waiting that the household made, any of its members (yours alone when you are in none), the newest first. */
+            sent: components["schemas"]["HouseholdInviteBody"][];
+        };
+        HouseholdInviteBody: {
+            /** @description Who invited: a member of the household, or a user in none, whom the accept makes a household with. */
+            by: components["schemas"]["HouseholdPersonBody"];
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description When it stops waiting, unanswered: 7 days after it was made.
+             */
+            expires_at: string;
+            /**
+             * Format: uuid
+             * @description What a revoke, a decline, a preview and an accept name.
+             */
+            id: string;
+            invited: components["schemas"]["HouseholdPersonBody"];
+        };
+        HouseholdMemberBody: {
+            /** Format: email */
+            email: string;
+            name: string;
+            /** @description The member is you. */
+            you?: boolean;
+        };
+        HouseholdPersonBody: {
+            /** Format: email */
+            email: string;
+            name: string;
+        };
         InfoBody: {
             /**
              * @description The instance's public URL, without a path: MCP is at its /mcp, the API under its /api/v1.
@@ -2038,6 +2199,13 @@ export interface components {
         InviteSSOOutputBody: {
             /** @description The provider's page to send the browser to; back from it, the account is made and signed in. */
             url: string;
+        };
+        InviteToHouseholdInputBody: {
+            /**
+             * Format: email
+             * @description The address of the user of the instance to invite.
+             */
+            email: string;
         };
         ItemBody: {
             /**
@@ -2319,6 +2487,41 @@ export interface components {
              * @enum {string}
              */
             op: "add" | "replace" | "remove" | "note";
+        };
+        MergeBarcodeBody: {
+            code: string;
+            /** @description The food of yours, by its name after the merge. */
+            food: string;
+        };
+        MergeCountsBody: {
+            /**
+             * Format: int64
+             * @description Foods that are no recipes.
+             */
+            foods: number;
+            /** Format: int64 */
+            recipes: number;
+        };
+        MergePreviewOutputBody: {
+            /** @description What the accept is given, to do this merge and no other. */
+            fingerprint: string;
+            report: components["schemas"]["MergeReportBody"];
+        };
+        MergeRenameBody: {
+            from: string;
+            to: string;
+        };
+        MergeReportBody: {
+            /** @description Barcodes dropped from a food of yours, as another food has them. */
+            dropped: components["schemas"]["MergeBarcodeBody"][];
+            /** @description Yours that go to the household's members. */
+            given: components["schemas"]["MergeCountsBody"];
+            /** @description Your foods and recipes that become one with the household's: the household's values, your note, aliases and archived. */
+            merged: components["schemas"]["MergeCountsBody"];
+            /** @description The household's that come to you. */
+            received: components["schemas"]["MergeCountsBody"];
+            /** @description Foods of yours renamed, as the household has a food of their name. */
+            renamed: components["schemas"]["MergeRenameBody"][];
         };
         MethodsBody: {
             /** @description The OpenID Connect provider, when the instance has one. */
@@ -5569,6 +5772,547 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-household": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdBody"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "invite-to-household": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteToHouseholdInputBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdInviteBody"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Request Timeout */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "delete-household-invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The invite's id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "accept-household-invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The invite's id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptHouseholdInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdBody"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Request Timeout */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "preview-household-invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The invite's id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergePreviewOutputBody"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "leave-household": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9191,6 +9935,15 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

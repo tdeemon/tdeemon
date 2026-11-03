@@ -11,6 +11,7 @@ import (
 	"uuid"
 
 	"github.com/zarnautovic/tdeemon/internal/domain/event"
+	"github.com/zarnautovic/tdeemon/internal/domain/user"
 )
 
 // A member leaves their household (story 408), and no one else takes
@@ -67,12 +68,18 @@ type leaveState struct {
 // comment above says, in one transaction, which takes the invites they
 // made away. It is recorded as userID's event (household.leave), which
 // undo never takes back, nor goes past. A user in no household is
-// ErrNotFound.
-func (db *DB) LeaveHousehold(ctx context.Context, userID uuid.UUID, a event.Actor, now time.Time) error {
+// ErrNotFound. It returns the members who stay, as the transaction found
+// them.
+func (db *DB) LeaveHousehold(ctx context.Context, userID uuid.UUID, a event.Actor, now time.Time) ([]user.User, error) {
 	if err := a.Validate(); err != nil {
-		return fmt.Errorf("invalid actor: %w", err)
+		return nil, fmt.Errorf("invalid actor: %w", err)
 	}
+	var stay []user.User
 	err := db.WriteTx(ctx, func(tx *sql.Tx) error {
+		var err error
+		if stay, err = householdMatesInTx(ctx, tx, userID); err != nil {
+			return err
+		}
 		dissolved, err := leaveHousehold(ctx, tx, userID)
 		if err != nil {
 			return err
@@ -81,12 +88,12 @@ func (db *DB) LeaveHousehold(ctx context.Context, userID uuid.UUID, a event.Acto
 		return err
 	})
 	if errors.Is(err, ErrNotFound) {
-		return err
+		return nil, err
 	}
 	if err != nil {
-		return fmt.Errorf("leave household: %w", err)
+		return nil, fmt.Errorf("leave household: %w", err)
 	}
-	return nil
+	return stay, nil
 }
 
 // leaveHousehold takes userID out of their household in tx, as

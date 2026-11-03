@@ -22,9 +22,18 @@ func (db *DB) ActiveUsers(ctx context.Context) ([]user.User, error) {
 	return db.users(ctx, "SELECT "+userColumns+" FROM users WHERE disabled_at IS NULL ORDER BY created_at, id")
 }
 
-// users runs query, which selects userColumns.
-func (db *DB) users(ctx context.Context, query string) ([]user.User, error) {
-	rows, err := db.read.QueryContext(ctx, query)
+// users runs query of args, which selects userColumns.
+func (db *DB) users(ctx context.Context, query string, args ...any) ([]user.User, error) {
+	return queryUsers(ctx, db.read, query, args...)
+}
+
+// queryUsers runs query of args in q, a database or a transaction; query
+// selects userColumns.
+func queryUsers(ctx context.Context, q interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}, query string, args ...any,
+) ([]user.User, error) {
+	rows, err := q.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("users: %w", err)
 	}

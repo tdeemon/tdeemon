@@ -56,6 +56,8 @@ type party struct {
 	pushEndpoint string
 	// invite is an invite they made, as an admin would.
 	invite uuid.UUID
+	// householdInvite is their household's invite of a guest, waiting.
+	householdInvite uuid.UUID
 }
 
 // tokenName is the name of the party's token, which only they may see.
@@ -72,6 +74,9 @@ type isolationEnv struct {
 	// ownerValues are the owner's values in the database that the other
 	// has none of: no answer to the other may show them.
 	ownerValues []string
+	// sameRow, when set, is what of an owner's row must stay the same:
+	// the case may change the rest (ownerRowsMayChange).
+	sameRow func(row string) string
 }
 
 func newIsolationEnv(t *testing.T, adminActs bool) isolationEnv {
@@ -128,7 +133,7 @@ func newIsolationEnv(t *testing.T, adminActs bool) isolationEnv {
 		p.applied, p.pending = saveIsolationPlan(t, in.db, p.user, now)
 		p.push, p.pushEndpoint = saveIsolationPush(t, in.db, p.user, now)
 		p.invite = saveIsolationInvite(t, in.db, p.user, now)
-		saveIsolationHousehold(t, in.db, p.user, guest, now)
+		p.householdInvite = saveIsolationHousehold(t, in.db, p.user, guest, now)
 		identity := store.Identity{Issuer: "https://idp.example", Subject: "subject-of-" + p.user.Name, Email: p.user.Email, EmailVerified: true}
 		if _, err := in.db.SignInWithIdentity(t.Context(), identity, now); err != nil {
 			t.Fatalf("link %s's identity: %v", p.user.Name, err)
@@ -259,9 +264,11 @@ func saveIsolationInvite(t *testing.T, db *store.DB, u user.User, now time.Time)
 // saveIsolationHousehold puts u in a household of their own with a
 // third user, and gives u an invite into it waiting for guest, whom
 // both parties invite, so the guest is neither's alone: no household
-// between the two parties, whose foods would be shared.
-func saveIsolationHousehold(t *testing.T, db *store.DB, u user.User, guest uuid.UUID, now time.Time) {
+// between the two parties, whose foods would be shared. It returns the
+// invite's id.
+func saveIsolationHousehold(t *testing.T, db *store.DB, u user.User, guest uuid.UUID, now time.Time) uuid.UUID {
 	t.Helper()
+	invite := uuid.NewV7()
 	mate := newIsolationUser(t, db, strings.ToLower(u.Name)+".housemate@example.com", u.Name+"'s housemate", now)
 	at := now.UTC().Format(time.RFC3339)
 	household := uuid.NewV7().String()
@@ -276,12 +283,13 @@ func saveIsolationHousehold(t *testing.T, db *store.DB, u user.User, guest uuid.
 			}
 		}
 		_, err := tx.ExecContext(t.Context(), "INSERT INTO household_invites (id, user_id, invited_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-			uuid.NewV7().String(), u.ID.String(), guest.String(), at, now.Add(7*24*time.Hour).UTC().Format(time.RFC3339))
+			invite.String(), u.ID.String(), guest.String(), at, now.Add(7*24*time.Hour).UTC().Format(time.RFC3339))
 		return err
 	})
 	if err != nil {
 		t.Fatalf("household of %s: %v", u.Name, err)
 	}
+	return invite
 }
 
 // newIsolationUser makes a third user, of neither party, and returns
@@ -1268,6 +1276,96 @@ func isolateTestPush(t *testing.T, e isolationEnv) {
 	}
 }
 
+// asNone fails unless the other's request of method and path, which names
+// the owner's ownerPath, answers as the same of nonePath, which names
+// nothing, does: the same 404.
+func asNone(t *testing.T, e isolationEnv, method, ownerPath, nonePath, body string) {
+	t.Helper()
+	session := []*http.Cookie{e.other.session}
+	theirs := e.in.do(t, method, ownerPath, body, session, nil)
+	none := e.in.do(t, method, nonePath, body, session, nil)
+	if theirs.Code != http.StatusNotFound || theirs.Body.String() != none.Body.String() {
+		t.Errorf("the owner's %s: %d %s; none: %d %s; want the same 404", ownerPath, theirs.Code, theirs.Body.String(),
+			none.Code, none.Body.String())
+	}
+}
+
+// isolateInviteToHousehold is invite-to-household's case: the owner, in
+// a household of theirs, is refused; a third user, in none, is invited.
+func isolateInviteToHousehold(t *testing.T, e isolationEnv) {
+	t.Helper()
+	session := []*http.Cookie{e.other.session}
+	rec := e.in.do(t, http.MethodPost, "/api/v1/household/invites", `{"email": "`+e.owner.user.Email+`"}`, session, nil)
+	if rec.Code != http.StatusConflict || codeOf(t, rec.Body, "body.email") != "other_household" {
+		t.Errorf("an invite of the owner: %d %s, want 409 other_household", rec.Code, rec.Body.String())
+	}
+	zoe := e.in.addUser(t, user.RoleUser)
+	if rec := e.in.do(t, http.MethodPost, "/api/v1/household/invites", `{"email": "`+zoe.Email+`"}`, session, nil); rec.Code != http.StatusCreated {
+		t.Errorf("an invite of a third user: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// isolateDeleteHouseholdInvite is delete-household-invite's case: the
+// owner's household's invite answers the other as one that does not
+// exist; their own household's is revoked.
+func isolateDeleteHouseholdInvite(t *testing.T, e isolationEnv) {
+	t.Helper()
+	asNone(t, e, http.MethodDelete, "/api/v1/household/invites/"+e.owner.householdInvite.String(),
+		"/api/v1/household/invites/"+uuid.NewV7().String(), "")
+	rec := e.in.do(t, http.MethodDelete, "/api/v1/household/invites/"+e.other.householdInvite.String(), "", []*http.Cookie{e.other.session}, nil)
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("their own household's invite: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// invitedByAThird has the other leave their household, and a third user,
+// in none, invite them into one; it returns the invite's path.
+func invitedByAThird(t *testing.T, e isolationEnv) string {
+	t.Helper()
+	if _, err := e.in.db.LeaveHousehold(t.Context(), e.other.user.ID, isolationActor, e.in.clock.Now()); err != nil {
+		t.Fatal(err)
+	}
+	zoe := e.in.addUser(t, user.RoleUser)
+	inv, err := e.in.db.InviteToHousehold(t.Context(), zoe.ID, e.other.user.ID, e.in.clock.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return "/api/v1/household/invites/" + inv.ID.String()
+}
+
+// isolateHouseholdJoin is the case of preview-household-invite and,
+// accept, of accept-household-invite: the owner's household's invite
+// answers the other as one that does not exist, as does one of nothing;
+// one a third user made them they see and, accept, join.
+//
+//nolint:thelper // A case is a test, not a helper: a failure should point into it.
+func isolateHouseholdJoin(accept bool) isolationCase {
+	return func(t *testing.T, e isolationEnv) {
+		session := []*http.Cookie{e.other.session}
+		owners := "/api/v1/household/invites/" + e.owner.householdInvite.String()
+		none := "/api/v1/household/invites/" + uuid.NewV7().String()
+		asNone(t, e, http.MethodGet, owners+"/preview", none+"/preview", "")
+		asNone(t, e, http.MethodPost, owners+"/accept", none+"/accept", acceptBody("x"))
+		path := invitedByAThird(t, e)
+		fingerprint := previewByAPI(t, e.in, session, path[len("/api/v1/household/invites/"):])
+		if !accept {
+			return
+		}
+		if rec := e.in.do(t, http.MethodPost, path+"/accept", acceptBody(fingerprint), session, nil); rec.Code != http.StatusOK {
+			t.Errorf("their own invite: %d %s", rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// isolateLeaveHousehold is leave-household's case: the other leaves their
+// own household, whose other member alone is told.
+func isolateLeaveHousehold(t *testing.T, e isolationEnv) {
+	t.Helper()
+	if rec := e.in.do(t, http.MethodPost, "/api/v1/household/leave", "", []*http.Cookie{e.other.session}, nil); rec.Code != http.StatusNoContent {
+		t.Errorf("their leave: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 // isolationCases has one case for every operation in the OpenAPI
 // document. TestIsolation checks after each that no answer showed the
 // owner's values, that the case got a 2xx from its operation, that the
@@ -1333,6 +1431,14 @@ func isolationCases() map[string]isolationCase {
 		"save-push-subscription":   isolateSavePush,
 		"delete-push-subscription": isolateDeletePush,
 		"share-recipe":             isolateShareRecipe,
+		"get-household": read("/api/v1/household", false, func(e isolationEnv) []string {
+			return []string{e.other.user.Email, strings.ToLower(e.other.user.Name) + ".housemate@example.com", e.other.householdInvite.String()}
+		}),
+		"invite-to-household":      isolateInviteToHousehold,
+		"delete-household-invite":  isolateDeleteHouseholdInvite,
+		"preview-household-invite": isolateHouseholdJoin(false),
+		"accept-household-invite":  isolateHouseholdJoin(true),
+		"leave-household":          isolateLeaveHousehold,
 		"unshare-recipe":           isolateUnshareRecipe,
 		"copy-ingredient-food":     isolateCopyIngredient,
 		"delete-account":           isolateDeleteAccount,
@@ -1455,6 +1561,18 @@ var adminOnly = map[string]bool{
 	"create-invite": true, "list-invites": true, "delete-invite": true,
 }
 
+// shareVersion is the version of a row of food_shares.
+var shareVersion = regexp.MustCompile(`^(food_shares .*) version=\d+`)
+
+// ownerRowsMayChange are the operations that may change an owner's row,
+// and what of it must stay the same. A join of a household adds its
+// members to the recipe the owner shared with the other, as the merge
+// does (docs/superpowers/specs/2026-11-02-household-design.md, rule 5),
+// which counts a version of the owner's share of it.
+var ownerRowsMayChange = map[string]func(row string) string{
+	"accept-household-invite": func(row string) string { return shareVersion.ReplaceAllString(row, "$1") },
+}
+
 func TestIsolation(t *testing.T) {
 	t.Parallel()
 
@@ -1469,6 +1587,7 @@ func TestIsolation(t *testing.T) {
 				t.Run(op, func(t *testing.T) {
 					t.Parallel()
 					e := newIsolationEnv(t, adminActs)
+					e.sameRow = ownerRowsMayChange[op]
 					if adminActs && adminOnly[op] {
 						e.ownerValues = e.withoutAccount(t)
 					}
@@ -1496,7 +1615,7 @@ func TestIsolation(t *testing.T) {
 func (e isolationEnv) isolated(t *testing.T, run isolationCase, reached func()) {
 	t.Helper()
 	sees := e.ownerSees(t)
-	rows, _ := e.rowsOf(t, e.owner.user.ID)
+	rows := e.ownerRows(t)
 	// Two hours on, a request records the use of its session or token
 	// again: the case's requests write, and a write to one of the owner's
 	// rows shows.
@@ -1508,13 +1627,26 @@ func (e isolationEnv) isolated(t *testing.T, run isolationCase, reached func()) 
 		e.noneOfTheOwners(t, "the answer to "+a.request, a.text)
 	}
 	reached()
-	if after, _ := e.rowsOf(t, e.owner.user.ID); !slices.Equal(after, rows) {
+	if after := e.ownerRows(t); !slices.Equal(after, rows) {
 		t.Errorf("the owner's rows changed:\nbefore %s\nafter  %s", strings.Join(rows, "\n       "), strings.Join(after, "\n       "))
 	}
 	if after := e.ownerSees(t); after != sees {
 		t.Errorf("what the owner sees changed:\nbefore %s\nafter  %s", sees, after)
 	}
 	e.ownersTokenWorks(t)
+}
+
+// ownerRows are the owner's rows, as isolated compares them: of each,
+// what sameRow keeps, when set.
+func (e isolationEnv) ownerRows(t *testing.T) []string {
+	t.Helper()
+	rows, _ := e.rowsOf(t, e.owner.user.ID)
+	if e.sameRow != nil {
+		for i, r := range rows {
+			rows[i] = e.sameRow(r)
+		}
+	}
+	return rows
 }
 
 // Every operation in the OpenAPI document has an isolation case, and

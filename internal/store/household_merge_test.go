@@ -616,7 +616,7 @@ func TestAcceptAfterAChangeIsRefused(t *testing.T) {
 	corrected := copyNamed(t, db, ana, bar().Name)
 	corrected.Nutrients.Kcal = 400
 	saveFood(t, db, ana, corrected)
-	if _, err := db.AcceptHouseholdInvite(t.Context(), ivo, testActor, inv.ID, preview.Fingerprint, t0); !errors.Is(err, store.ErrMergeChanged) {
+	if _, _, err := db.AcceptHouseholdInvite(t.Context(), ivo, testActor, inv.ID, preview.Fingerprint, t0); !errors.Is(err, store.ErrMergeChanged) {
 		t.Fatalf("the accept after Ana's save = %v, want ErrMergeChanged", err)
 	}
 	if countRows(t, db, "household_members") != 0 || countRows(t, db, "households") != 0 {
@@ -628,7 +628,7 @@ func TestAcceptAfterAChangeIsRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.AcceptHouseholdInvite(t.Context(), ivo, testActor, inv.ID, preview.Fingerprint, t0); err != nil {
+	if _, _, err := db.AcceptHouseholdInvite(t.Context(), ivo, testActor, inv.ID, preview.Fingerprint, t0); err != nil {
 		t.Fatal(err)
 	}
 	householdHolds(t, db, ana, ivo)

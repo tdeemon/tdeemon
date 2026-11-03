@@ -330,9 +330,9 @@ func recipeError(err error, sent *RecipeFields) error {
 		return huma.Error422UnprocessableEntity("the recipe: " + oneLine(err))
 	case errors.Is(err, store.ErrRecipeFood):
 		return errRecipeFood
-	case errors.Is(err, store.ErrShareNameTaken):
+	case shareRefusal(err) != nil:
 		// Which food is the member's own to know.
-		return huma.Error409Conflict("another member of the shared recipe has a food of that name: they rename theirs, or you keep the recipe's")
+		return shareRefusal(err)
 	}
 	return internalError("saving the recipe failed", err)
 }

@@ -34,7 +34,7 @@ func addMia(t *testing.T, db *store.DB) uuid.UUID {
 // error.
 func leave(t *testing.T, db *store.DB, userID uuid.UUID) {
 	t.Helper()
-	if err := db.LeaveHousehold(t.Context(), userID, testActor, t0); err != nil {
+	if _, err := db.LeaveHousehold(t.Context(), userID, testActor, t0); err != nil {
 		t.Fatalf("LeaveHousehold: %v", err)
 	}
 }
@@ -122,7 +122,7 @@ func TestLeaveAHouseholdOfTwo(t *testing.T) {
 	}
 
 	apart(t, db, ana, ivo)
-	if err := db.LeaveHousehold(t.Context(), ivo, testActor, t0); !errors.Is(err, store.ErrNotFound) {
+	if _, err := db.LeaveHousehold(t.Context(), ivo, testActor, t0); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("a leave of no household = %v, want ErrNotFound", err)
 	}
 }

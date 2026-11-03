@@ -462,6 +462,8 @@ func (s *sessions) upsertFood(ctx context.Context, in *upsertFoodInput) (*foodOu
 		return nil, huma.Error409Conflict(conflictDetail(conflict), conflictError(conflict, &b.FoodFields))
 	case errors.Is(err, store.ErrRecipeFood):
 		return nil, errRecipeFood
+	case shareRefusal(err) != nil:
+		return nil, shareRefusal(err)
 	case err != nil:
 		return nil, internalError("saving the food failed", err)
 	}
@@ -524,10 +526,27 @@ func (s *sessions) createFood(ctx context.Context, in *createFoodInput) (*create
 		return nil, huma.Error409Conflict(conflictDetail(conflict), conflictError(conflict, &in.Body))
 	case errors.Is(err, store.ErrRecipeFood):
 		return nil, errRecipeFood
+	case shareRefusal(err) != nil:
+		return nil, shareRefusal(err)
 	case err != nil:
 		return nil, internalError("saving the food failed", err)
 	}
 	return &createdFoodOutput{Body: newFoodBody(&saved)}, nil
+}
+
+// shareRefusal is the 409 of a save that another member's food is in
+// the way of, of their household's or of a shared recipe's, which food
+// theirs alone to know; nil for any other err.
+func shareRefusal(err error) error {
+	switch {
+	case errors.Is(err, store.ErrShareNameTaken):
+		return huma.Error409Conflict("another member of your household, or of the shared recipe, has another food of that name and brand: " +
+			"they rename theirs, or you save this one under another name")
+	case errors.Is(err, store.ErrShareBarcodeTaken):
+		return huma.Error409Conflict("another member of your household has another food of a barcode of this one: " +
+			"they take it from theirs, or you save this one without it")
+	}
+	return nil
 }
 
 // errRecipeFood is the 422 of a save of a food that is, or would make, a
