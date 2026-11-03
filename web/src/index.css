@@ -210,7 +210,8 @@
 
 /* What Base UI would put in a <style> of its own, which the CSP refuses
  * (app.tsx): a select's list and a scroll area without the native
- * scrollbar. */
+ * scrollbar. No component of the app has that class today (a select
+ * aligned with its trigger, scroll arrows or a scroll area would). */
 .base-ui-disable-scrollbar {
   scrollbar-width: none;
 }
