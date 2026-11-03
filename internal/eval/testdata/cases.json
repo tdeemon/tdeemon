@@ -907,7 +907,8 @@
       "tools": [
         "upsert_food"
       ],
-      "household_kcal": 64
+      "household_kcal": 64,
+      "max_rounds": 3
     }
   },
   {
@@ -922,7 +923,8 @@
       "tools": [
         "upsert_food"
       ],
-      "household_kcal": 64
+      "household_kcal": 64,
+      "max_rounds": 3
     }
   }
 ]
