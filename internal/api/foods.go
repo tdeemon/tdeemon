@@ -262,7 +262,7 @@ func newLastUseBody(u store.LastUse) *lastUseBody {
 type listFoodsInput struct {
 	Archived bool   `query:"archived" doc:"The archived foods instead of the others."`
 	Source   string `query:"source" enum:"label,estimate,reference,user,dish,off,recipe" doc:"The foods whose values come from it alone, such as the estimates to check or the recipes."`
-	Order    string `query:"order" enum:"name,use,frequent" default:"name" doc:"name: by name, then brand; use: the food a meal had last first, and those no meal had after the others, by name; frequent: the food the most of your latest 100 meals had first, then as use."`
+	Order    string `query:"order" enum:"name,use,frequent" default:"name" doc:"name: by name, then brand, in the alphabet of your language; use: the food a meal had last first, and those no meal had after the others, by name; frequent: the food the most of your latest 100 meals had first, then as use."`
 	Limit    int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The most foods of the page."`
 	Offset   int    `query:"offset" default:"0" minimum:"0" maximum:"1000000" doc:"How many foods of the list come before the page."`
 }

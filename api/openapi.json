@@ -7739,13 +7739,13 @@
             }
           },
           {
-            "description": "name: by name, then brand; use: the food a meal had last first, and those no meal had after the others, by name; frequent: the food the most of your latest 100 meals had first, then as use.",
+            "description": "name: by name, then brand, in the alphabet of your language; use: the food a meal had last first, and those no meal had after the others, by name; frequent: the food the most of your latest 100 meals had first, then as use.",
             "explode": false,
             "in": "query",
             "name": "order",
             "schema": {
               "default": "name",
-              "description": "name: by name, then brand; use: the food a meal had last first, and those no meal had after the others, by name; frequent: the food the most of your latest 100 meals had first, then as use.",
+              "description": "name: by name, then brand, in the alphabet of your language; use: the food a meal had last first, and those no meal had after the others, by name; frequent: the food the most of your latest 100 meals had first, then as use.",
               "enum": [
                 "name",
                 "use",

@@ -5404,7 +5404,7 @@ export interface operations {
                 archived?: boolean;
                 /** @description The foods whose values come from it alone, such as the estimates to check or the recipes. */
                 source?: "label" | "estimate" | "reference" | "user" | "dish" | "off" | "recipe";
-                /** @description name: by name, then brand; use: the food a meal had last first, and those no meal had after the others, by name; frequent: the food the most of your latest 100 meals had first, then as use. */
+                /** @description name: by name, then brand, in the alphabet of your language; use: the food a meal had last first, and those no meal had after the others, by name; frequent: the food the most of your latest 100 meals had first, then as use. */
                 order?: "name" | "use" | "frequent";
                 /** @description The most foods of the page. */
                 limit?: number;

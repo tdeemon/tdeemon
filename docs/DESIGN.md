@@ -662,7 +662,8 @@ session's only: a page (`limit`, `offset`) of the archived foods or the
 others (`archived`), of a source alone when asked (`source=estimate`,
 the estimates to check, or `source=recipe`, the recipes), by name, by
 their last use or by how many of
-the user's latest 100 meals had them (`order=name|use|frequent`), each
+the user's latest 100 meals had them (`order=name|use|frequent`; a name
+in the alphabet of the user's language, Č after C in Croatian), each
 with its last use, and how many there are (`total`); says on a food's
 page how many of the user's meals had it and the last of them, the
 amount it offers to log, with `GET /api/v1/foods/{id}/use`, a web
