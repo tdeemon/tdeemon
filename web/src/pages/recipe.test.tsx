@@ -202,6 +202,30 @@ test("a recipe's actions are a portion logged, cooked again and an edit, in Croa
   expect(within(page).getByRole('region', { name: 'Energija recepta' })).toBeDefined()
 })
 
+test("a recipe's archive that failed says so beside its button, at the page's end", async () => {
+  recipeServer(curry, { 'POST /api/v1/foods': () => problem(500) })
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  const archive = within(page).getByRole('button', { name: 'Archive the recipe' })
+  fireEvent.click(archive)
+  const said = await within(page).findByRole('alert')
+  expect(archive.parentElement?.contains(said)).toBe(true)
+})
+
+test("a recipe's Log is a row of its own, Cook again and the edit under it", async () => {
+  recipeServer()
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  const log = await within(page).findByRole('button', { name: 'Log 1 portion' })
+  // Its amount may be long (Log ⅒ of the recipe): the row's whole width.
+  expect(log.className).toContain('col-span-2')
+  const cook = within(page).getByRole('button', { name: 'Cook again' })
+  expect(cook.parentElement).toBe(log.parentElement)
+  expect(cook.className).not.toContain('col-span-2')
+})
+
 test('a recipe not weighed says so plainly, ≈ on its grams, and is weighed in a sheet', async () => {
   const server = recipeServer(notWeighed)
   renderAt(`/foods/${curryId}`)

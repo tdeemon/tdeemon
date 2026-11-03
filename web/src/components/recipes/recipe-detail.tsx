@@ -208,10 +208,11 @@ export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody 
               )}
             </div>
           </section>
-          {/* Log it, cook it again and, as an icon, edit it; one archived is
-          brought back instead. */}
-          <div className="flex gap-2">
-            {!food.archived && <LogFood food={eaten} className="min-w-0 flex-1" />}
+          {/* Log it, on a row of its own (its amount as long as "Log ⅒ of
+          the recipe"); under it cook it again and, as an icon, edit it. One
+          archived is brought back instead. */}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            {!food.archived && <LogFood food={eaten} className="col-span-2" />}
             {!food.archived && (
               <Button
                 ref={cookedButton}
@@ -224,7 +225,7 @@ export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody 
                 {t.recipes.cookedAgain}
               </Button>
             )}
-            {food.archived && <ArchiveButton food={food} archive={archive} className="flex-1" />}
+            {food.archived && <ArchiveButton food={food} archive={archive} />}
             <Link
               to="/foods/$id"
               params={{ id: food.id }}
@@ -240,7 +241,7 @@ export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody 
               <Pencil aria-hidden />
             </Link>
           </div>
-          <SaveStatus change={archive} />
+          {food.archived && <SaveStatus change={archive} />}
           {changed.length > 0 && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md bg-surface-2 px-3 py-2.5 text-small">
               <Info aria-hidden className="size-4 shrink-0 text-muted-foreground" />
@@ -356,8 +357,10 @@ export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody 
             )}
           </dl>
           {!food.archived && (
-            <div>
+            // Its status beside it, at the page's end.
+            <div className="space-y-2">
               <ArchiveButton food={food} archive={archive} small />
+              <SaveStatus change={archive} />
             </div>
           )}
         </div>

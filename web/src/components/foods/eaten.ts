@@ -3,7 +3,7 @@ import { daysBetween } from '@/i18n/format'
 
 // daysSinceEaten is how many days before today a food was eaten last:
 // undefined when it never was, or while today is not known.
-export function daysSinceEaten(food: Food, today: string | undefined): number | undefined {
+function daysSinceEaten(food: Food, today: string | undefined): number | undefined {
   return today === undefined || food.last_use === undefined
     ? undefined
     : daysBetween(food.last_use.day, today)
