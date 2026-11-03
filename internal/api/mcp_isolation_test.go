@@ -187,3 +187,52 @@ func TestMCPIsolationCoversEveryTool(t *testing.T) {
 		t.Error("MCP serves no tool to a token of the tools scope")
 	}
 }
+
+// Through MCP, a member of a household sees none of another member's but
+// the kitchen and the members, and a correction of a food of the
+// household's reaches the other member.
+func TestMCPHouseholdSharesTheKitchenAlone(t *testing.T) {
+	t.Parallel()
+
+	e := newIsolationEnv(t, false)
+	inOneHousehold(t, e)
+	forbidden := notToCross(t, e)
+	cs := mcpSession(t, e.in, e.other.token.Token)
+	bread := e.owner.user.Name + "'s rye bread"
+	for _, c := range []struct {
+		tool string
+		args map[string]any
+	}{
+		{"get_profile", nil},
+		{"get_day", nil},
+		{"get_summary", nil},
+		{"get_history", nil},
+		{"get_plan", nil},
+		{"find_foods", map[string]any{"query": "rye"}},
+	} {
+		text, isErr := callTool(t, cs, c.tool, c.args)
+		if isErr {
+			t.Errorf("%s: %s", c.tool, text)
+		}
+		for _, v := range forbidden {
+			if strings.Contains(text, v) {
+				t.Errorf("%s shows the owner's %q: %s", c.tool, v, text)
+			}
+		}
+		if c.tool == "find_foods" && !strings.Contains(text, bread) {
+			t.Errorf("find_foods finds no copy of the owner's bread: %s", text)
+		}
+	}
+
+	copyOf := foodOf(t, e.in.db, e.other.user.ID, bread)
+	corrected := map[string]any{
+		"id": copyOf.ID.String(), "name": bread, "basis": "100g", "source": "user", "barcodes": []string{"3850000000015"},
+		"nutrients": map[string]any{"kcal": 265, "protein": 9, "carbs": 48, "fat": 3.3},
+	}
+	if text, isErr := callTool(t, cs, "upsert_food", corrected); isErr {
+		t.Fatalf("the other's correction: %s", text)
+	}
+	if got := foodOf(t, e.in.db, e.owner.user.ID, bread); got.Nutrients.Kcal != 265 || got.ID != e.owner.bread.ID {
+		t.Errorf("the owner's bread after the other's correction = %+v, want 265 kcal under its id", got)
+	}
+}
