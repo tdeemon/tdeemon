@@ -415,7 +415,7 @@ test("a phone's day is one column as before, today's Croatian date on one line",
     await expect(
       page
         .getByRole('navigation', { name: 'Tjedan' })
-        .getByRole('link', { name: 'sri 19: 640 kcal' }),
+        .getByRole('link', { name: 'sri 19.: 640 kcal' }),
     ).toBeVisible()
     await line.click()
     const sheet = page.getByRole('dialog', { name: 'Taj tjedan' })
