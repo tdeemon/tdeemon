@@ -383,27 +383,28 @@ func (w writer) calibrationLine(v verdictBody, tdee tdeeBody) string {
 	case slices.Contains(v.Reasons, "no_tdee") || math.Round(*tdee.Kcal) <= 0:
 		return label + w.noTDEE
 	}
-	measured := "TDEE " + w.num(*tdee.Kcal, 0) + " kcal"
+	return label + w.withTDEE(v, tdee, noPlan)
+}
+
+// withTDEE says the TDEE measured and why there is no verdict on it: no
+// plan, a phase just begun (until about when its first comes), or a TDEE
+// not trusted yet.
+func (w writer) withTDEE(v verdictBody, tdee tdeeBody, noPlan bool) string {
+	line := "TDEE " + w.num(*tdee.Kcal, 0) + " kcal"
+	if !tdee.Trusted {
+		line += ", " + w.notTrusted
+	}
 	switch {
-	case noPlan && !tdee.Trusted:
-		return label + measured + ", " + w.notTrusted + "; " + w.noPlan
 	case noPlan:
-		return label + measured + "; " + w.noPlan
+		return line + "; " + w.noPlan
 	case tdee.BeforePhase || slices.Contains(v.Reasons, "before_phase"):
-		line := label + measured
-		if !tdee.Trusted {
-			line += ", " + w.notTrusted
-		}
 		line += "; " + w.phaseBegun
 		if d, err := day.ParseDate(tdee.BeforePhaseUntil); err == nil {
 			// The first summary of the phase's own days is the day after.
 			line += ", " + w.firstVerdict + " " + w.shortDate(d.AddDays(1))
 		}
-		return line
-	case !tdee.Trusted:
-		return label + measured + ", " + w.notTrusted
 	}
-	return label + measured
+	return line
 }
 
 // withoutTDEE says why calibration has nothing to say yet, without a
