@@ -1,24 +1,36 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { Bell, Globe, History, LogOut, Palette, Smartphone, Users } from 'lucide-react'
+import { Bell, Globe, History, House, LogOut, Palette, Smartphone, Users } from 'lucide-react'
 import { useState } from 'react'
 
 import { $api, fetchClient } from '@/api/client'
 import { HttpError } from '@/api/errors'
+import { householdQuery, type Household } from '@/api/household'
 import { pushDeviceQuery } from '@/api/push'
 import { sessionQuery } from '@/api/session'
 import { ListGroup } from '@/components/list-group'
 import { ListRow } from '@/components/list-row'
 import { RecentChanges } from '@/components/recent-changes'
+import type { Messages } from '@/i18n/en'
 import { locales } from '@/i18n/locale'
 import { useMessages } from '@/i18n/messages'
 import { leave } from '@/lib/push'
 import { useTheme } from '@/lib/theme'
 
+// householdSummary says the household in short: its other members, an
+// invite waiting for the user's answer, or what one is for.
+function householdSummary(s: Messages['settings'], household: Household): string {
+  const others = household.members.filter((m) => m.you !== true).map((m) => m.name)
+  if (others.length > 0) {
+    return s.householdWith(others.join(', '))
+  }
+  return household.received.length > 0 ? s.householdInvited : s.householdNone
+}
+
 // SettingsList is the user's settings, each a row to its page with its
 // value in short: this browser's theme, the account's language, time zone
-// and day's start, and the devices and AI clients with a token; for the
-// admin, the users; the recent changes, in a sheet; then signing out, as whom, and what the
+// and day's start, the devices and AI clients with a token, the
+// household; for the admin, the users; the recent changes, in a sheet; then signing out, as whom, and what the
 // server is. On the plan's page it has its heading; the settings' page is
 // its title.
 export function SettingsList({
@@ -35,6 +47,7 @@ export function SettingsList({
   const tokens = $api.useQuery('get', '/api/v1/tokens')
   const notified = $api.useQuery('get', '/api/v1/push/subscriptions')
   const info = $api.useQuery('get', '/api/v1/info')
+  const household = useQuery(householdQuery)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [changes, setChanges] = useState(false)
@@ -109,6 +122,12 @@ export function SettingsList({
         title={s.notifications.title}
         to="/settings/notifications"
         summary={notified.data && s.notifications.summary(notified.data.subscriptions.length)}
+      />
+      <ListRow
+        icon={House}
+        title={s.household}
+        to="/settings/household"
+        summary={household.data && householdSummary(s, household.data)}
       />
       {user?.role === 'admin' && (
         <ListRow icon={Users} title={s.users} to="/settings/users" summary={s.usersSummary} />

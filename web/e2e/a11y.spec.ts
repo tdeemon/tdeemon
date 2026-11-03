@@ -4,7 +4,7 @@
 import { AxeBuilder } from '@axe-core/playwright'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
 
-import { invite, openMeal, signIn } from './user.ts'
+import { invite, openMeal, signIn, user } from './user.ts'
 
 // The checks of every screen of the app, on a phone and a desktop, in
 // the light and the dark theme, in English and Croatian: axe finds
@@ -94,7 +94,38 @@ async function make(page: Page, tag: string): Promise<Made> {
   })
   expect(before.ok()).toBe(true)
   const link = await invite(page, `invited-${tag}@example.com`)
+  await householdInvite(page, tag)
   return { foodId, recipeId, meal, invite: new URL(link).hash.slice(1) }
+}
+
+// householdInvite has a new user, in a browser of their own, invite the
+// e2e user into their household: she sees it and what joining does, and
+// never joins, so her kitchen stays hers for the other tests.
+async function householdInvite(page: Page, tag: string) {
+  const browser = page.context().browser()
+  if (browser === null) {
+    throw new Error('the page has no browser')
+  }
+  const link = await invite(page, `cook-${tag}@example.com`)
+  const theirs = await browser.newContext({
+    baseURL: new URL(page.url()).origin,
+    serviceWorkers: 'block',
+  })
+  const made = await theirs.request.post('/api/v1/invites/accept', {
+    data: {
+      token: new URL(link).hash.slice(1),
+      name: 'Cook',
+      password: 'a password of the cook’s own',
+      timezone: 'UTC',
+      locale: 'en',
+    },
+  })
+  expect(made.ok()).toBe(true)
+  const invited = await theirs.request.post('/api/v1/household/invites', {
+    data: { email: user.email },
+  })
+  expect(invited.ok()).toBe(true)
+  await theirs.close()
 }
 
 // The day of the week whose sheet is checked.
@@ -349,6 +380,7 @@ const screens: Screen[] = [
     '/settings/devices',
     '/settings/notifications',
     '/settings/users',
+    '/settings/household',
   ].map((path) => ({
     name: path.slice(1).replace('/', '-'),
     open: async (page: Page) => {
@@ -356,6 +388,29 @@ const screens: Screen[] = [
       await settled(page)
     },
   })),
+  // The household's page with an invite for her answer, what joining
+  // does, and an invite of someone.
+  {
+    name: 'household-preview',
+    open: async (page) => {
+      await page.goto('/settings/household')
+      await page
+        .getByRole('button', { name: /^(See what joining does|Pogledaj što pridruživanje radi)$/ })
+        .first()
+        .click()
+      await expect(page.getByRole('dialog').getByRole('button').last()).toBeEnabled()
+      await settled(page)
+    },
+  },
+  {
+    name: 'household-invite',
+    open: async (page) => {
+      await page.goto('/settings/household')
+      await page.getByRole('button', { name: /^(Invite someone|Pozovi nekoga)$/ }).click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+      await settled(page)
+    },
+  },
   // The page an invite's link opens, which makes an account.
   {
     name: 'invite',

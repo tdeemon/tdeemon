@@ -114,6 +114,7 @@ export const hr: Messages = {
     autopilot: 'Autopilot se nije učitao.',
     users: 'Korisnici se nisu učitali.',
     invites: 'Pozivnice se nisu učitale.',
+    household: 'Kućanstvo se nije učitalo.',
   },
   stale: {
     offline: (when: string) => `Nema veze · podaci od ${when}`,
@@ -707,6 +708,74 @@ export const hr: Messages = {
     thatFood: 'ta namirnica',
     refused: (detail: string) => `Server nije prihvatio ovu namirnicu: ${detail}`,
   },
+  household: {
+    hint: 'Dijeli sve namirnice i recepte s onima s kojima kuhaš. Tvoji obroci, kilaža i plan ostaju samo tvoji.',
+    members: 'Članovi',
+    you: 'Ti',
+    none: 'Nisi ni u jednom kućanstvu. Pozovi nekoga s kim kuhaš ili prihvati pozivnicu.',
+    invite: 'Pozovi nekoga',
+    email: 'E-mail adresa osobe',
+    inviteHint: 'Osoba mora imati račun ovdje. Dobit će obavijest, a pozivnica čeka 7 dana.',
+    send: 'Pozovi',
+    sending: 'Pozivam…',
+    invited: (email: string) => `Poslana pozivnica: ${email}`,
+    refusals: {
+      no_user: 'Nijedan korisnik ovog servera nema tu adresu.',
+      self: 'To je tvoja adresa: pozovi nekog drugog.',
+      deactivated: 'Admin je deaktivirao tog korisnika.',
+      member: 'Već je u tvom kućanstvu.',
+      other_household: 'U drugom je kućanstvu: prvo mora izaći iz njega.',
+      waiting: 'Pozivnica za tu osobu već čeka.',
+    },
+    failed: (why: string) => `Nije napravljeno. ${why}`,
+    sent: 'Poslane pozivnice',
+    received: 'Pozivnice za tebe',
+    waitsUntil: (when: string) => `Čeka do ${when}`,
+    revoke: (name: string) => `Opozovi pozivnicu za: ${name}`,
+    confirmRevoke: (name: string) => `Opozvati pozivnicu za: ${name}?`,
+    yesRevoke: 'Opozovi',
+    invitesYou: (name: string) => `${name} te poziva u svoje kućanstvo`,
+    see: 'Pogledaj što pridruživanje radi',
+    decline: 'Odbij',
+    confirmDecline: (name: string) => `Odbiti pozivnicu od: ${name}?`,
+    declined: (name: string) => `Odbijena pozivnica od: ${name}`,
+    join: 'Pridruži se kućanstvu',
+    joining: 'Pridružujem…',
+    preview: 'Što pridruživanje radi',
+    previewHint:
+      'Tvoje i njihove namirnice i recepti postaju jedna kuhinja. Tvoji obroci, kilaža i plan ostaju tvoji.',
+    merged: 'Spajaju se s njihovima, uz njihove vrijednosti',
+    incoming: 'Dolaze tebi',
+    given: 'Idu kućanstvu',
+    counts: (foods: number, recipes: number) =>
+      [
+        foods > 0 || recipes === 0
+          ? `${String(foods)} ${plural('hr', foods, { one: 'namirnica', few: 'namirnice', other: 'namirnica' })}`
+          : '',
+        recipes > 0
+          ? `${String(recipes)} ${plural('hr', recipes, { one: 'recept', few: 'recepta', other: 'recepata' })}`
+          : '',
+      ]
+        .filter((s) => s !== '')
+        .join(', '),
+    renamed: 'Preimenovane, jer njihova ima to ime',
+    dropped: 'Skinuti barkodovi, jer ih ima druga namirnica',
+    barcodeOf: (code: string, food: string) => `${code} s namirnice ${food}`,
+    changed: 'Namirnice su se u međuvremenu promijenile. Ovo pridruživanje radi sada.',
+    joinRefusals: {
+      member: 'Već si u tom kućanstvu.',
+      other_household: 'U drugom si kućanstvu: prvo izađi iz njega.',
+      recipe_cycle:
+        'Pridruživanje bi recept učinilo vlastitim sastojkom. Prvo promijeni svoje recepte istog imena kao njihovi.',
+    },
+    joined: (name: string) => `Sad si u kućanstvu s: ${name}`,
+    gone: 'Pozivnice više nema: istekla je ili je opozvana.',
+    leave: 'Izađi iz kućanstva',
+    confirmLeave:
+      'Izaći iz kućanstva? Zadržavaš sve namirnice i recepte koje imaš, a i oni svoje. Natrag te vraća samo nova pozivnica.',
+    yesLeave: 'Izađi',
+    left: 'Više nisi u kućanstvu',
+  },
   sharing: {
     title: 'Podijeljeno s',
     none: 'Imaš ga samo ti. Podijeljen, to je jedan recept: promjena bilo koga od vas je svačija.',
@@ -1130,6 +1199,10 @@ export const hr: Messages = {
     },
     users: 'Korisnici',
     usersSummary: 'Pozovi ljude i upravljaj njihovim računima',
+    household: 'Kućanstvo',
+    householdWith: (names: string) => `S: ${names}`,
+    householdInvited: 'Pozivnica čeka tvoj odgovor',
+    householdNone: 'Dijeli sve namirnice s onima s kojima kuhaš',
   },
   users: {
     hint: 'Tko smije koristiti ovaj server.',

@@ -130,6 +130,7 @@ export const en = {
     autopilot: "Couldn't load the autopilot.",
     users: "Couldn't load the users.",
     invites: "Couldn't load your invites.",
+    household: "Couldn't load your household.",
   },
   // A thin bar over what a page shows when asking for it again failed:
   // the server out of reach (offline) or failing, and how old it is.
@@ -835,6 +836,74 @@ export const en = {
     added: (name: string) => `Added to your foods: ${name}`,
     youHaveIt: 'You have a food of its name already.',
   },
+  // A household: users who keep one kitchen, every food and recipe of a
+  // member each member's.
+  household: {
+    hint: 'Share every food and recipe with the people you cook with. Your meals, weight and plan stay yours alone.',
+    members: 'Members',
+    you: 'You',
+    none: 'You are in no household. Invite someone you cook with, or accept an invite.',
+    invite: 'Invite someone',
+    email: 'Their email address',
+    inviteHint:
+      'They must have an account here. A notification tells them, and the invite waits 7 days.',
+    send: 'Invite',
+    sending: 'Inviting…',
+    invited: (email: string) => `Invited ${email}`,
+    refusals: {
+      no_user: 'No user of this server has that address.',
+      self: 'That is your own address: invite someone else.',
+      deactivated: 'The admin deactivated that user.',
+      member: 'They are in your household already.',
+      other_household: 'They are in another household: they leave it first.',
+      waiting: 'An invite of theirs waits already.',
+    },
+    failed: (why: string) => `Not done. ${why}`,
+    sent: 'Invites sent',
+    received: 'Invites for you',
+    waitsUntil: (when: string) => `Waits until ${when}`,
+    revoke: (name: string) => `Revoke the invite of ${name}`,
+    confirmRevoke: (name: string) => `Revoke the invite of ${name}?`,
+    yesRevoke: 'Revoke',
+    invitesYou: (name: string) => `${name} invites you into their household`,
+    see: 'See what joining does',
+    decline: 'Decline',
+    confirmDecline: (name: string) => `Decline ${name}’s invite?`,
+    declined: (name: string) => `Declined ${name}’s invite`,
+    // The sheet of what joining does, from the merge's dry run.
+    join: 'Join the household',
+    joining: 'Joining…',
+    preview: 'What joining does',
+    previewHint:
+      'Your foods and recipes and theirs become one kitchen. Your meals, weight and plan stay yours.',
+    merged: 'Become one with theirs, their values kept',
+    incoming: 'Come to you',
+    given: 'Go to the household',
+    counts: (foods: number, recipes: number) =>
+      [
+        foods > 0 || recipes === 0 ? `${String(foods)} ${foods === 1 ? 'food' : 'foods'}` : '',
+        recipes > 0 ? `${String(recipes)} ${recipes === 1 ? 'recipe' : 'recipes'}` : '',
+      ]
+        .filter((s) => s !== '')
+        .join(', '),
+    renamed: 'Renamed, as theirs has the name',
+    dropped: 'Barcodes taken off, as another food has them',
+    barcodeOf: (code: string, food: string) => `${code} from ${food}`,
+    changed: 'The foods changed since. This is what joining does now.',
+    joinRefusals: {
+      member: 'You are in that household already.',
+      other_household: 'You are in another household: leave it first.',
+      recipe_cycle:
+        'Joining would make a recipe its own ingredient. Change your recipes of their recipes’ names first.',
+    },
+    joined: (name: string) => `You joined ${name}’s household`,
+    gone: 'The invite is gone: it expired, or was revoked.',
+    leave: 'Leave the household',
+    confirmLeave:
+      'Leave the household? You keep every food and recipe you have, and so do they. Only an invite brings you back.',
+    yesLeave: 'Leave',
+    left: 'You left the household',
+  },
   recipes: {
     // A recipe's mark beside its name.
     mark: 'recipe',
@@ -1280,6 +1349,11 @@ export const en = {
     },
     users: 'Users',
     usersSummary: 'Invite people, and manage their accounts',
+    household: 'Household',
+    // The household's row: its other members, an invite waiting, or none.
+    householdWith: (names: string) => `With ${names}`,
+    householdInvited: 'An invite waits for your answer',
+    householdNone: 'Share every food with the people you cook with',
   },
   // The admin's users: who may sign in to the server, and the invites
   // of new ones.
