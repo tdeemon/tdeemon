@@ -31,7 +31,8 @@ const fields: readonly TargetField[] = ['kcal', 'protein', 'fat']
 
 type Typed = Record<DayType, Record<TargetField, string>>
 
-// TargetsForm changes the plan's targets by type of day from today on:
+// TargetsForm changes the plan's targets by type of day from today on, or,
+// before the plan's first target, that target from its day:
 // the kcal, the protein and the fat of each, the carbs following what the
 // kcal leave. What it can check it checks before it sends; what the
 // limits refuse the server says, each at its field, and one of the
@@ -46,7 +47,13 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
   const violation = useViolationText()
   const warning = useWarningText()
   const e = t.plan.edit
-  const now = targetNow(plan.targets, plan.today)
+  // The target edited: today's, else the first one planned, from its day.
+  const now =
+    targetNow(plan.targets, plan.today) ?? plan.targets.find((tg) => tg.effective_from > plan.today)
+  const from =
+    now !== undefined && now.effective_from > plan.today ? now.effective_from : plan.today
+  // A target planned after the one edited still takes over on its day.
+  const later = plan.targets.find((tg) => tg.effective_from > from)
   const [typed, setTyped] = useState<Typed>(() => ({
     training: typedOf(now?.training, f.field),
     rest: typedOf(now?.rest, f.field),
@@ -123,7 +130,7 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
       return
     }
     change.mutate({
-      body: { targets: [{ from: plan.today, training: sent('training'), rest: sent('rest') }] },
+      body: { targets: [{ from, training: sent('training'), rest: sent('rest') }] },
     })
   }
 
@@ -136,7 +143,8 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
       aria-describedby={`${id}-from`}
     >
       <p id={`${id}-from`} className="text-small text-muted-foreground">
-        {e.fromToday}
+        {from === plan.today ? e.fromToday : e.fromDay(f.short(from))}
+        {later !== undefined && ` ${e.laterTarget(f.short(later.effective_from))}`}
       </p>
       {days.map((d) => {
         const carbs = carbsOf(d)

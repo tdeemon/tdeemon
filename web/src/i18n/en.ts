@@ -1734,6 +1734,8 @@ export const en = {
       fat: 'Fat, g',
       carbs: (g: string) => `Carbs follow: ${g} g`,
       fromToday: 'From today on, until a change.',
+      fromDay: (day: string) => `From ${day}, when the plan's target starts, until a change.`,
+      laterTarget: (day: string) => `The target planned from ${day} takes over then.`,
       save: 'Save',
       saving: 'Saving…',
       problem: {

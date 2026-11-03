@@ -127,6 +127,46 @@ test('the targets are edited from today on, the carbs following the kcal', async
   })
 })
 
+test("before the plan's first target, that target is edited from its day; a later one is said", async () => {
+  const sent: unknown[] = []
+  const tomorrow = {
+    effective_from: '2026-10-24',
+    training: { kcal: 2100, protein: 170, carbs: 216.25, fat: 65 },
+    rest: { kcal: 1900, protein: 170, carbs: 170, fat: 60 },
+  }
+  const later = { ...tomorrow, effective_from: '2026-11-07' }
+  fakeServer({
+    ...signedIn(),
+    'GET /api/v1/limits': () => Response.json(limitsBody()),
+    'GET /api/v1/plan': () => Response.json(planBody({ ...plan, targets: [tomorrow, later] })),
+    'POST /api/v1/plan/changes': async (r) => {
+      sent.push(await r.json())
+      return Response.json({ proposal: applied, preview: { checks: [] } })
+    },
+  })
+  const sheet = await openTargets()
+  sheet.getByText(
+    "From Oct 24, when the plan's target starts, until a change. The target planned from Nov 7 takes over then.",
+  )
+  expect(field('Training', 'kcal')).toHaveProperty('value', '2100')
+  expect(field('Rest', 'Fat, g')).toHaveProperty('value', '60')
+  fireEvent.change(field('Rest', 'kcal'), { target: { value: '1800' } })
+  fireEvent.click(sheet.getByRole('button', { name: 'Save' }))
+  await waitFor(() => {
+    expect(sent).toEqual([
+      {
+        targets: [
+          {
+            from: '2026-10-24',
+            training: { kcal: 2100, protein: 170, fat: 65 },
+            rest: { kcal: 1800, protein: 170, fat: 60 },
+          },
+        ],
+      },
+    ])
+  })
+})
+
 test('a target that is no number, or more fat and protein than its kcal, is not sent', async () => {
   const { sent } = editServer()
   const sheet = await openTargets()

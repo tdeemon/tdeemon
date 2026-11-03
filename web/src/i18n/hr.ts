@@ -1560,6 +1560,8 @@ export const hr: Messages = {
       fat: 'Masti, g',
       carbs: (g: string) => `Ugljikohidrati slijede: ${g} g`,
       fromToday: 'Od danas nadalje, do promjene.',
+      fromDay: (day: string) => `Od ${day}, kad cilj plana počinje, do promjene.`,
+      laterTarget: (day: string) => `Cilj planiran od ${day} tada ga zamjenjuje.`,
       save: 'Spremi',
       saving: 'Spremam…',
       problem: {
