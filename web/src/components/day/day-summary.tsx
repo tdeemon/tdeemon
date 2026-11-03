@@ -101,7 +101,7 @@ export function DaySummary({ day }: { day: Day }) {
         <div className="lg:row-span-2">
           <EnergyRing eaten={total.kcal} target={target.kcal} past={past} />
         </div>
-        <div className="flex min-w-0 flex-col items-start gap-2 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between lg:gap-x-6">
+        <div className="flex min-w-0 flex-col items-start gap-4 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between lg:gap-x-6">
           <div className="space-y-1.5">
             <dl className="flex gap-5 lg:gap-7">
               <div>

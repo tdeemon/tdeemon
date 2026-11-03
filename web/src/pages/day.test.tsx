@@ -235,7 +235,7 @@ test("a day before's body is the day's: the weight's trend of that day, which a 
   await waitFor(() => {
     expect(tile('Weight')).toBe('Weight85.9 kgtrend 86.4 kg')
   })
-  // Asked once, with the week strip: of its week, Monday to Sunday.
+  // Asked once, with the week: of its week, Monday to Sunday.
   expect(new Set(asked)).toEqual(new Set(['2026-08-24 to 2026-08-30']))
 
   trend = 86.2

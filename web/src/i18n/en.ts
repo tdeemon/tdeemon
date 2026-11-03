@@ -1953,7 +1953,6 @@ export const en = {
     // The day's line on the review's day, and its link's word.
     line: (what: string) => `Autopilot: ${what}`,
     why: 'Why',
-    // The day's line of a proposal of its own that waits.
     // What a review says, from its numbers: what it decided, a line of it
     // for the day, and why.
     say: {

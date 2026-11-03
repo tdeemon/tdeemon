@@ -18,7 +18,7 @@ export function weekDates(date: string): string[] {
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
 }
 
-// weekOf is the history a day's week asks for (WeekStrip): its calendar
+// weekOf is the history a day's week asks for (WeekBars): its calendar
 // week up to today, and from the first day a history is of (limits.json),
 // as no history goes further back. A week to come asks for none: its to
 // is before its from. The day's history is asked of it, once for every

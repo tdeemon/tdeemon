@@ -92,6 +92,15 @@ test('at 390 px the hero and the week are on the first screen', async ({ page })
   await expect(
     page.getByRole('region', { name: 'Energy and macros' }).getByRole('link', { name: /^TDEE / }),
   ).toBeVisible()
+  // The ⓘ is a finger's whole target: the day's type's chip under it
+  // reaches none of it.
+  const tip = page.getByRole('button', { name: 'What TDEE is' })
+  const box = await boxOf(tip)
+  const hit = await page.evaluate(
+    ([x, y]) => document.elementFromPoint(x, y)?.closest('button')?.getAttribute('aria-label'),
+    [box.x + box.width / 2, box.y + box.height + 10] as const,
+  )
+  expect(hit).toBe('What TDEE is')
 })
 
 test("a meal's row gives its name the room, and its values stay with their labels", async ({
