@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"uuid"
@@ -49,6 +50,14 @@ func TestProduct(t *testing.T) {
 	if asked.URL.Path != "/api/v2/product/3850000000015" || !strings.Contains(asked.URL.Query().Get("fields"), "product_name_hr") ||
 		asked.Header.Get("User-Agent") != "tdeemon/test (https://example.com)" {
 		t.Errorf("asked %s %s, user agent %q", asked.URL.Path, asked.URL.RawQuery, asked.Header.Get("User-Agent"))
+	}
+	// Open Food Facts answers product_quantity_unit, of the quantity, only
+	// when the quantity is asked for too.
+	fields := strings.Split(asked.URL.Query().Get("fields"), ",")
+	for _, f := range []string{"quantity", "product_quantity_unit", "serving_quantity", "serving_quantity_unit", "categories_tags", "nutriments"} {
+		if !slices.Contains(fields, f) {
+			t.Errorf("the fields asked %v, want %s among them", fields, f)
+		}
 	}
 	want := off.Product{
 		Code: "3850000000015", Name: "Grčki jogurt", Brand: "Dukat", Serving: 150, URL: c.BaseURL + "/product/3850000000015",
@@ -105,6 +114,46 @@ func TestProductOfADrinkInKJ(t *testing.T) {
 	if f.Name != "Orange juice" || f.Basis != food.Per100ml || f.Nutrients.Kcal != 44.9 ||
 		!reflect.DeepEqual(f.Servings, []food.Serving{{Name: "serving", Amount: 250}}) {
 		t.Errorf("the juice: %+v", f)
+	}
+}
+
+// A product without product_quantity_unit (a quantity Open Food Facts
+// did not read) is told by the unit its quantity is written in ("330 ml",
+// "1,5 L"), or else its serving's, and a drink's serving in ml is kept.
+func TestProductOfADrinkWithoutItsQuantityUnit(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name, fields string
+		perMl        bool
+	}{
+		{"330 ml", `"quantity": "330 ml"`, true},
+		{"1,5 L", `"quantity": "1,5 L"`, true},
+		{"6 x 33 cl", `"quantity": "6 x 33 cl"`, true},
+		{"no quantity, a serving in ml", `"quantity": ""`, true},
+		{"330ml ℮", `"quantity": "330ml ℮"`, true},
+		{"1 litre", `"quantity": "1 litre"`, true},
+		{"12 fl oz (355 ml)", `"quantity": "12 fl oz (355 ml)"`, true},
+		{"6x33cl", `"quantity": "6x33cl"`, true},
+		{"12 oz, by weight", `"quantity": "12 oz"`, false},
+		{"500 g", `"quantity": "500 g"`, false},
+		// A quantity of no unit known: its serving's says.
+		{"a word, a serving in ml", `"quantity": "one bottle"`, true},
+	} {
+		c := server(t, http.StatusOK, `{"status": 1, "product": {"code": "5449000000996", "product_name": "Cola",
+			`+tc.fields+`, "serving_quantity": 330, "serving_quantity_unit": "ml",
+			"categories_tags": ["en:beverages", "en:carbonated-drinks"],
+			"nutriments": {"energy-kcal_100g": 42, "carbohydrates_100g": 10.6, "proteins_100g": 0, "fat_100g": 0}}}`, nil)
+		p, err := c.Product(t.Context(), "5449000000996", "en")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.PerMilliliter != tc.perMl {
+			t.Errorf("%s: per ml = %v, want %v", tc.name, p.PerMilliliter, tc.perMl)
+		}
+		if want := map[bool]float64{true: 330, false: 0}[tc.perMl]; p.Serving != want {
+			t.Errorf("%s: serving = %v, want %v", tc.name, p.Serving, want)
+		}
 	}
 }
 
