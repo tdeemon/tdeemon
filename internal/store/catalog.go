@@ -37,6 +37,11 @@ func catalogued(f food.Food) bool {
 	return false
 }
 
+// declared reports whether a food of source s is of declared values.
+func declared(s food.Source) bool {
+	return s == food.Label || s == food.Reference || s == food.OpenFoodFacts
+}
+
 // catalogState is a catalog row as a save found it, for the save's
 // undo: its food, its version, and the save before the catalog it was
 // made of, if any (legacy_save).
@@ -44,23 +49,29 @@ type catalogState struct {
 	Food       food.Food `json:"food"`
 	Version    int64     `json:"version"`
 	LegacySave string    `json:"legacy_save,omitempty"`
+	// Hidden tells a row an admin's estimate hid (hideRow).
+	Hidden bool `json:"hidden,omitempty"`
 }
 
-// syncCatalog puts userID's food f, as its save of event saved it, into
-// the catalog, unless it is not catalogued (a user's, no admin's, then
-// leaves its row) or userID is no admin (whose copy of a row is linked
+// syncCatalog puts userID's food f, which was was (nil for a new one),
+// as its save of event saved it, into
+// the catalog, unless it is not catalogued (an admin's of declared
+// values before may then hide its row, hideRow) or userID is no admin (whose copy of a row is linked
 // to it alone), links f to its row, and
 // records what it did for the save's undo (catalog_saves). The row is
 // the product of f's name and brand; else the row f names already,
 // renamed to f's; else the row of one of f's barcodes; else a new one.
 // Its values and servings become f's, and f's barcodes its, but those
 // another row has: a barcode stays the product's that had it first.
-func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, saved uuid.UUID, now time.Time) error {
+func syncCatalog(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, was *food.Food, saved uuid.UUID, now time.Time) error {
 	if saved == uuid.Nil() {
 		return nil
 	}
 	if !catalogued(f) {
-		return leaveRow(ctx, tx, userID, f, saved)
+		if was == nil || !declared(was.Source) {
+			return nil
+		}
+		return hideRow(ctx, tx, userID, f, saved)
 	}
 	nameKey, brandKey := food.Key(f.Name), food.Key(f.Brand)
 	link, err := foodCatalogID(ctx, tx, userID, f.ID)
@@ -115,26 +126,43 @@ func linkedAlone(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food,
 	return !admin, err
 }
 
-// leaveRow unlinks userID's food f, of no declared values as their save
-// of event saved left it, from its row, unless userID is an admin: a
-// user's estimate (or archived food) hides no row from the others, as
-// they write none. Its undo links it back alone, as a copy's
-// (copyVersion).
-func leaveRow(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, saved uuid.UUID) error {
-	admin, err := isAdmin(ctx, tx, userID)
-	if err != nil || admin {
-		return err
-	}
+// rowUndeclared holds a row of the catalog c none of whose foods is of
+// declared values, archived too, though some name it: a plate first
+// saved as a label's and then as an estimate.
+const rowUndeclared = `EXISTS (SELECT 1 FROM foods AS l WHERE l.catalog_id = c.id)
+	AND NOT EXISTS (SELECT 1 FROM foods AS l WHERE l.catalog_id = c.id AND l.source IN ('label', 'off', 'reference'))`
+
+// hideRow hides the row admin userID's food f names, saved by event
+// saved of no declared values, when none of the row's foods is declared
+// now (rowUndeclared): no one says its values are a label's. It records
+// the row before for the save's undo, which shows it again. A user's
+// save who is no admin hides nothing: they write no row.
+func hideRow(ctx context.Context, tx *sql.Tx, userID uuid.UUID, f food.Food, saved uuid.UUID) error {
 	link, err := foodCatalogID(ctx, tx, userID, f.ID)
 	if err != nil || !link.Valid {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, "UPDATE foods SET catalog_id = NULL WHERE user_id = ? AND id = ?",
-		userID.String(), f.ID.String()); err != nil {
+	if admin, err := isAdmin(ctx, tx, userID); err != nil || !admin {
+		return err
+	}
+	var hide bool
+	if err := tx.QueryRowContext(ctx, "SELECT hidden = 0 AND "+rowUndeclared+" FROM catalog_foods AS c WHERE c.id = ?",
+		link.String).Scan(&hide); err != nil || !hide {
+		return err
+	}
+	before, err := catalogStateInTx(ctx, tx, link.String)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE catalog_foods SET hidden = 1, version = version + 1 WHERE id = ?", link.String); err != nil {
+		return err
+	}
+	state, err := stateJSON(&before)
+	if err != nil {
 		return err
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO catalog_saves (user_id, event_id, catalog_id, version, before_state, link_before)
-		VALUES (?, ?, ?, ?, NULL, ?)`, userID.String(), saved.String(), link.String, copyVersion, link)
+		VALUES (?, ?, ?, ?, ?, ?)`, userID.String(), saved.String(), link.String, before.Version+1, state, link)
 	return err
 }
 
@@ -335,7 +363,7 @@ func putBackCatalogRow(ctx context.Context, tx *sql.Tx, id string, before catalo
 	if before.LegacySave != "" {
 		legacy = before.LegacySave
 	}
-	_, err := tx.ExecContext(ctx, "UPDATE catalog_foods SET legacy_save = ? WHERE id = ?", legacy, id)
+	_, err := tx.ExecContext(ctx, "UPDATE catalog_foods SET legacy_save = ?, hidden = ? WHERE id = ?", legacy, before.Hidden, id)
 	return err
 }
 
@@ -395,7 +423,7 @@ func writeCatalogFood(ctx context.Context, tx *sql.Tx, row catalogRow, f food.Fo
 	if row.exists {
 		_, err = tx.ExecContext(ctx, `UPDATE catalog_foods SET name = ?, brand = ?, name_key = ?, brand_key = ?, basis = ?,
 			kcal = ?, protein = ?, carbs = ?, fat = ?, fiber = ?, saturated_fat = ?, sugars = ?, salt = ?, polyols = ?,
-			alcohol = ?, portion_g = ?, source = ?, updated_at = ?, version = ?, legacy_save = NULL WHERE id = ?`,
+			alcohol = ?, portion_g = ?, source = ?, updated_at = ?, version = ?, legacy_save = NULL, hidden = 0 WHERE id = ?`,
 			append(values, row.id)...)
 	} else {
 		_, err = tx.ExecContext(ctx, `INSERT INTO catalog_foods (name, brand, name_key, brand_key, basis, kcal, protein,
@@ -461,7 +489,7 @@ func catalogStateInTx(ctx context.Context, tx *sql.Tx, id string) (catalogState,
 		return catalogState{}, err
 	}
 	var legacy sql.NullString
-	err = tx.QueryRowContext(ctx, "SELECT version, legacy_save FROM catalog_foods WHERE id = ?", id).Scan(&st.Version, &legacy)
+	err = tx.QueryRowContext(ctx, "SELECT version, legacy_save, hidden FROM catalog_foods WHERE id = ?", id).Scan(&st.Version, &legacy, &st.Hidden)
 	st.LegacySave = legacy.String
 	return st, err
 }
@@ -481,16 +509,9 @@ func foodCatalogID(ctx context.Context, tx *sql.Tx, userID, id uuid.UUID) (sql.N
 const catalogColumns = `c.id, c.name, c.brand, c.basis, c.kcal, c.protein, c.carbs, c.fat,
 	c.fiber, c.saturated_fat, c.sugars, c.salt, c.polyols, c.alcohol, c.portion_g, c.source, '', 0`
 
-// catalogShown holds a row of the catalog c to be shown: one a food of
-// declared values names, archived too, or none at all (its users gone).
-// A row all of whose foods are of no declared values now, such as a
-// plate first saved as a label's and then as an estimate, is not: no one
-// says its values are a label's. The foods keep their link, so a save of
-// one as declared again, or an undo, shows it again. A user's food of no
-// declared values who is no admin names no row (leaveRow), so it hides
-// none.
-const catalogShown = `(NOT EXISTS (SELECT 1 FROM foods AS l WHERE l.catalog_id = c.id)
-	OR EXISTS (SELECT 1 FROM foods AS l WHERE l.catalog_id = c.id AND l.source IN ('label', 'off', 'reference')))`
+// catalogShown holds a row of the catalog c to be shown: one no admin's
+// estimate hid (hideRow), or a declared save showed again.
+const catalogShown = `c.hidden = 0`
 
 // FindCatalog returns up to limit of the catalog's foods that match
 // query as FindFoods matches, but the ones userID has already: a food of

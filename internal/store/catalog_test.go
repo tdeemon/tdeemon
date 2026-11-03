@@ -706,6 +706,15 @@ func TestNoAdminHidesARow(t *testing.T) {
 		t.Errorf("Eva's catalog of tuna after Ivo's estimate = %v, want Ana's row", found)
 	}
 
+	// Ana renames her tuna, the household's estimate: still one row,
+	// which her declared save shows anew.
+	anas := copyNamed(t, db, ana, tuna(116).Name)
+	anas.Name, anas.Source, anas.Nutrients.Kcal, anas.Barcodes = "Tuna", food.Label, 120, nil
+	saveFood(t, db, ana, anas)
+	if found := findCatalog(t, db, eva, "tuna"); len(found) != 1 || found[0].Name != "Tuna" || catalogRows(t, db) != 1 {
+		t.Errorf("Eva's catalog of tuna after Ana's rename = %v (%d rows), want her row renamed", found, catalogRows(t, db))
+	}
+
 	plate := tuna(116)
 	plate.Name, plate.Barcodes, plate.Aliases = "Plate", nil, nil
 	plate = saveFood(t, db, eva, plate)

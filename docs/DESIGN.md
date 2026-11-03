@@ -98,7 +98,7 @@ store layer and covered by tests that run every query as the wrong user.
 | `food_servings` | food_id, user_id, name, amount | named amounts of a food by weight or volume: "piece" = 60 g of egg, "slice" = 40 g of bread |
 | `food_aliases` | food_id, user_id, alias | "the dessert from last Sunday", "my bread" |
 | `food_barcodes` | food_id, user_id, code | the product's barcodes, one for each size of its package, a scan of one finding the food; a barcode leads to one food of the user's; an EAN-13, EAN-8 or GTIN-14 by its digits, checked by its check digit, a UPC-A kept as its EAN-13 (a 0 before it) and a GTIN-14 of a 0 first as that EAN-13, so any form a scan reads finds it |
-| `catalog_foods` / `catalog_servings` / `catalog_barcodes` | id, name, brand, basis, the nutrients, portion_g?, source (label/reference/off), created_at, updated_at; its servings; its barcodes, each one product's | the instance's catalog, no user's, an admin's saves' ("The catalog" below); a user's food names the row it went into, or came from, in `foods.catalog_id`; `catalog_saves` (user_id, event_id, the row as the save found it, the version it left) is what a user's save did to it, for its undo |
+| `catalog_foods` / `catalog_servings` / `catalog_barcodes` | id, name, brand, basis, the nutrients, portion_g?, source (label/reference/off), hidden (by an admin's estimate), created_at, updated_at; its servings; its barcodes, each one product's | the instance's catalog, no user's, an admin's saves' ("The catalog" below); a user's food names the row it went into, or came from, in `foods.catalog_id`; `catalog_saves` (user_id, event_id, the row as the save found it, the version it left) is what a user's save did to it, for its undo |
 | `recipes` / `recipe_items` | food_id (the recipe's food), yield_g?, portions?, pot_g?; its ingredients as a meal's items (food_user_id + food_id, the food's owner and id, quantity as given, amount + unit, the nutrients) | batch cooking: a recipe is a food of `source: recipe` whose values per 100 g of the cooked dish are worked out of its ingredients and the dish's weight ("Recipes" below) |
 | `food_shares` | share_id, seat, user_id + food_id (the member's food or recipe), version, left_at?, household (the seat the household's, or an explicit share's) | a recipe shared between users, or a food of a household: each member's of it, tied together ("Shared recipes" below) |
 | `households` / `household_members` / `household_invites` | id, created_at; user_id (one household a user), household_id, joined_at; id, user_id (the inviter), email (the address invited), created_at, expires_at | users who keep one kitchen and share every food and recipe ("A household" below); an invite waits for the answer of whoever has the address, one per inviter and address |
@@ -169,15 +169,15 @@ user's word, a dish, a recipe or an archived food never does. Another
 user's food stays theirs, declared too: no one but an admin changes
 what every user finds (decided 3 November 2026, after QA round 2,
 where a user's "reference" banana rewrote everyone's); a user's copy of
-a row is linked to it, and changes it in nothing, and their food of no
-declared values (an estimate, or archived) names no row, so it hides
-none. A row all of whose foods are of those sources now (an admin's
-plate first saved as a label's, then as an estimate) is shown no more,
-till one says it is declared again. A household's food is each
-member's, so a member's change of one an admin keeps is the admin's
-food's too, and goes into the row with the admin's next save. Rows
-users wrote before the rule stay, and a former admin's undo still puts
-back what their own save did. One
+a row is linked to it, and changes it in nothing. A row is hidden by
+an admin's save alone (`hidden`): an admin's food of the row saved of
+no declared values (a plate first saved as a label's, then as an
+estimate) hides it when no food that names it is declared, archived
+too, and a declared save shows it again; an undo puts it back. A
+household's food is each member's, so a member's change of one an
+admin keeps is the admin's food's too, and goes into the row with the
+admin's next save. Rows users wrote before the rule stay, and a former
+admin's undo still puts back what their own save did. One
 product is one row, by its name and brand, else the row the food went
 into before (renamed with it), else one of its barcodes; the latest
 save of an admin's food wins, but a barcode stays the product's that
