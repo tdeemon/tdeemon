@@ -262,11 +262,12 @@ func TestMCPSchemasCarryWhatAModelUses(t *testing.T) {
 // history and notes, then for an item's quantities and a search again,
 // then for the coach's plan, then for its proposals, then for the limits
 // they change, then for a food's barcodes and their lookup, then for
-// recipes, then for the coaching sessions' guide, then for the catalog.
+// recipes, then for the coaching sessions' guide, then for the catalog,
+// then for a household, whose saves reach its members.
 func TestMCPFitsItsBudget(t *testing.T) {
 	t.Parallel()
 
-	const budget = 25400
+	const budget = 25500
 	in, session := signedIn(t)
 	cs := mcpSession(t, in, mcpToken(t, in, session, `"tools"`))
 	res, err := cs.ListTools(t.Context(), nil)
@@ -507,13 +508,14 @@ func TestMCPInstructions(t *testing.T) {
 	}
 	// The prefix a client reads before its first call, which every call
 	// of a log sends again (cached, as a client caches a prompt): about
-	// four bytes a token.
+	// four bytes a token. 30,100 until November 2026, raised for a
+	// household, whose saves reach its members.
 	list, err := json.Marshal(res.Tools)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := len(got) + len(list); n > 30100 {
-		t.Errorf("the instructions and the tools are %d bytes, want at most 30100", n)
+	if n := len(got) + len(list); n > 30200 {
+		t.Errorf("the instructions and the tools are %d bytes, want at most 30200", n)
 	}
 	known := map[string]bool{}
 	for _, tl := range res.Tools {

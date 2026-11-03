@@ -350,7 +350,8 @@ func (s *sessions) recipeTool() tool {
 			"Not weighed, the raw ingredients' weight stands for the dish's. A save replaces the whole recipe, its ingredients taking their foods' values now: " +
 			"correct it from what get_food gave. A food of the name that is no recipe, or an alias another food has, is refused (409), naming it; " +
 			"so is an ingredient that is the recipe, at any depth (422). The answer holds its food with the recipe, and warnings: a weight far off the raw ingredients', or values of a new food that do not add up. " +
-			"A shared recipe (shared_with) is one recipe: a save is every member's; its ingredients of another member's food (theirs) keep their food_id.",
+			"A shared recipe (shared_with) is one recipe: a save is every member's; its ingredients of another member's food (theirs) keep their food_id. " +
+			"In a household, every recipe is shared with its members.",
 		Errors: []int{http.StatusUnauthorized, http.StatusNotFound, http.StatusConflict},
 	}, s.upsertRecipe).
 		briefly("Saves a recipe, or corrects one: by its id, or else its name; else a new one. Its ingredients are log_meal's items, no estimates; " +

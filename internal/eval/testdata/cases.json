@@ -894,5 +894,35 @@
       "shared_yield": 1200,
       "max_rounds": 3
     }
+  },
+  {
+    "name": "a household's food corrected",
+    "lang": "en",
+    "seed_household": true,
+    "say": [
+      "The kefir's label says 64 kcal per 100 ml, protein 3.4, carbs 4.1, fat 3.5. Fix the food, don't log anything."
+    ],
+    "expect": {
+      "meals": 0,
+      "tools": [
+        "upsert_food"
+      ],
+      "household_kcal": 64
+    }
+  },
+  {
+    "name": "ispravak namirnice kućanstva",
+    "lang": "hr",
+    "seed_household": true,
+    "say": [
+      "Na deklaraciji kefira piše 64 kcal na 100 ml, proteini 3,4, ugljikohidrati 4,1, masti 3,5. Ispravi namirnicu, ništa ne upisuj."
+    ],
+    "expect": {
+      "meals": 0,
+      "tools": [
+        "upsert_food"
+      ],
+      "household_kcal": 64
+    }
   }
 ]

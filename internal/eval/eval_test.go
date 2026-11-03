@@ -75,8 +75,11 @@ type evalCase struct {
 	SeedCatalog bool `json:"seed_catalog,omitempty"`
 	// SeedShared gives the user a goulash another user shares with them,
 	// of the other's beef: 600 g, 1000 g cooked.
-	SeedShared bool   `json:"seed_shared,omitempty"`
-	Expect     expect `json:"expect"`
+	SeedShared bool `json:"seed_shared,omitempty"`
+	// SeedHousehold puts the user in a household with another user, whose
+	// kefir is theirs too then: 60 kcal per 100 ml.
+	SeedHousehold bool   `json:"seed_household,omitempty"`
+	Expect        expect `json:"expect"`
 }
 
 type expect struct {
@@ -128,6 +131,9 @@ type expect struct {
 	// SharedYield is the weight the shared goulash has after the case, its
 	// other member's beef still its ingredient.
 	SharedYield float64 `json:"shared_yield,omitempty"`
+	// HouseholdKcal is the kcal per 100 ml the other member's kefir has
+	// after the case: a correction of the user's reaches it.
+	HouseholdKcal float64 `json:"household_kcal,omitempty"`
 }
 
 // systemPrompt is all the client says of itself: the policy comes from
@@ -273,6 +279,9 @@ func newInstance(t *testing.T, c evalCase) instance {
 	}
 	if c.SeedShared {
 		seedShared(t, db, u.ID, lang, now)
+	}
+	if c.SeedHousehold {
+		seedHousehold(t, db, u.ID, lang, now)
 	}
 	if c.SeedHistory {
 		for i := 1; i <= 63; i++ {
@@ -735,6 +744,7 @@ func check(t *testing.T, in instance, e expect, foodsBefore []string, turns []tu
 	checkFoods(t, in, e, foodsBefore)
 	checkFromCatalog(t, in, e.FromCatalog)
 	checkShared(t, in, e.SharedYield)
+	checkHousehold(t, in, e.HouseholdKcal)
 	checkSources(t, in, e, foodsBefore, today)
 	checkDay(t, in, e, today)
 }
@@ -887,6 +897,71 @@ func checkShared(t *testing.T, in instance, yield float64) {
 	r, err := in.db.RecipeByID(t.Context(), in.user.ID, f.ID)
 	if err != nil || r.Yield != yield || len(r.Items) != 1 || r.Items[0].FoodUser == uuid.Nil() {
 		t.Errorf("the shared goulash = %+v, %v; want %v g, of the other member's beef", r, err, yield)
+	}
+}
+
+// kefirNames are the household's kefir's name in each language.
+var kefirNames = map[string]string{"en": "Kefir", "hr": "Kefir"}
+
+// partnerEmail is the address of the user's partner in the household.
+const partnerEmail = "partner@example.com"
+
+// seedHousehold gives another user a kefir, 60 kcal per 100 ml, and puts
+// userID in a household with them, by their invite: the kefir is
+// userID's too.
+func seedHousehold(t *testing.T, db *store.DB, userID uuid.UUID, lang string, now time.Time) {
+	t.Helper()
+	partner := user.User{
+		ID: uuid.NewV7(), Email: partnerEmail, Name: "Partner", Role: user.RoleUser, Locale: lang,
+		TimeZone: "Europe/Zagreb", DayStartHour: 4, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.CreateUser(t.Context(), partner, ""); err != nil {
+		t.Fatal(err)
+	}
+	kefir := food.Food{
+		ID: uuid.NewV7(), Name: kefirNames[lang], Basis: food.Per100ml, Source: food.Label,
+		Nutrients: food.Nutrients{Kcal: 60, Protein: 3.2, Carbs: 4, Fat: 3},
+	}
+	if _, err := db.SaveFood(t.Context(), partner.ID, actor, kefir, now); err != nil {
+		t.Fatal(err)
+	}
+	inv, err := db.InviteToHousehold(t.Context(), partner.ID, userID, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview, err := db.PreviewHouseholdInvite(t.Context(), userID, inv.ID, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := db.AcceptHouseholdInvite(t.Context(), userID, actor, inv.ID, preview.Fingerprint, now); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// correctedKefir is the kefir's label as the household's cases correct
+// it to, per 100 ml.
+var correctedKefir = food.Nutrients{Kcal: 64, Protein: 3.4, Carbs: 4.1, Fat: 3.5}
+
+// checkHousehold holds both members' kefir to be the label's, per 100
+// ml, with kcal: the user's correction reaches the other member's; no
+// kcal checks nothing.
+func checkHousehold(t *testing.T, in instance, kcal float64) {
+	t.Helper()
+	if kcal == 0 {
+		return
+	}
+	partner, err := in.db.UserByEmail(t.Context(), partnerEmail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := correctedKefir
+	want.Kcal = kcal
+	for who, id := range map[string]uuid.UUID{"the user's": in.user.ID, "the partner's": partner.ID} {
+		f, err := in.db.FoodByKey(t.Context(), id, kefirNames[in.user.Locale], "")
+		n := f.Nutrients
+		if err != nil || f.Basis != food.Per100ml || n.Kcal != want.Kcal || n.Protein != want.Protein || n.Carbs != want.Carbs || n.Fat != want.Fat {
+			t.Errorf("%s kefir = %s %+v, %v; want %+v per 100 ml, the user's correction", who, f.Basis, n, err, want)
+		}
 	}
 }
 
