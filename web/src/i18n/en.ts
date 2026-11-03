@@ -877,7 +877,7 @@ export const en = {
     joining: 'Joining…',
     preview: 'What joining does',
     previewHint:
-      'Your foods and recipes and theirs become one kitchen. Your meals, weight and plan stay yours.',
+      'Your foods and recipes and theirs become one kitchen; an archived one comes archived. Your meals, weight and plan stay yours.',
     merged: 'Become one with theirs, their values kept',
     incoming: 'Come to you',
     given: 'Go to the household',

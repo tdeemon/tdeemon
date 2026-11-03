@@ -270,6 +270,42 @@ func TestMergeTheInviterWins(t *testing.T) {
 	}
 }
 
+// A food one side has withdrawn, archived by every member who has it,
+// comes to the other side archived: a member's withdrawn food is no one's
+// food in use. One any member has in use comes in use.
+func TestMergeAnArchivedFoodComesArchived(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	saveFood(t, db, ana, bar())
+	anasKefir := saveFood(t, db, ana, kefir())
+	if err := db.SetFoodArchived(t.Context(), ana, testActor, anasKefir.ID, true, t0); err != nil {
+		t.Fatal(err)
+	}
+	chicken := saveFood(t, db, ivo, chickenBreast())
+	if err := db.SetFoodArchived(t.Context(), ivo, testActor, chicken.ID, true, t0); err != nil {
+		t.Fatal(err)
+	}
+	saveFood(t, db, ivo, renamed(chickenBreast(), "Turkey breast"))
+
+	join(t, db, ana, ivo)
+	for _, c := range []struct {
+		who      uuid.UUID
+		name     string
+		archived bool
+	}{
+		{ana, "Chicken breast", true},
+		{ana, "Turkey breast", false},
+		{ivo, "Kefir", true},
+		{ivo, bar().Name, false},
+	} {
+		if f := copyNamed(t, db, c.who, c.name); f.Archived != c.archived {
+			t.Errorf("the copy of %s: archived %v, want %v", c.name, f.Archived, c.archived)
+		}
+	}
+	householdHolds(t, db, ana, ivo)
+}
+
 // Two foods of no name in common match by a barcode, else by the
 // catalog's row, the most recently saved first; the invited user's takes
 // the inviter's name.

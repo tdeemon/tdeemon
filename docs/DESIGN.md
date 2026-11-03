@@ -319,7 +319,9 @@ household's foods) and the invited user's (U):
    are the union of both, H's first, up to a food's most
    (`food.MaxBarcodes`), the rest of U's dropped.
 3. **The other side gets what it lacks**: a copy for U of each food of
-   H's with no match, and for each member of each of U's.
+   H's with no match, and for each member of each of U's; archived when
+   every member who has the food has it archived, as a food withdrawn
+   comes to no one in use.
 4. **Kinds**: a recipe and a plain food of one name and brand never
    merge; U's is renamed (" (2)", the lowest free). Two recipes merge
    as foods do.
