@@ -686,8 +686,13 @@ func TestMorningSummaryOfAPhaseJustBegun(t *testing.T) {
 	if !strings.Contains(got.Text, "Kalibracija: TDEE ") || !strings.Contains(got.Text, want) {
 		t.Errorf("the morning summary:\n%s\nwant the TDEE and %q", got.Text, want)
 	}
-	// On that day, the summary is of the phase's own days.
-	in.clock.Set(in.clock.Now().Add(28 * 24 * time.Hour))
+	// The day before, the summary is still of the days before the phase;
+	// on that day, of the phase's own.
+	in.clock.Set(in.clock.Now().Add(27 * 24 * time.Hour))
+	if b := calibrationOf(t, in).TDEE; !b.BeforePhase {
+		t.Errorf("on %s the TDEE is of the phase's days already", first.AddDays(-1))
+	}
+	in.clock.Set(in.clock.Now().Add(24 * time.Hour))
 	if b := calibrationOf(t, in).TDEE; b.BeforePhase {
 		t.Errorf("on %s the TDEE is still of the days before the phase", first)
 	}

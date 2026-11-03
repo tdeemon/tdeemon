@@ -385,6 +385,8 @@ func (w writer) calibrationLine(v verdictBody, tdee tdeeBody) string {
 	}
 	measured := "TDEE " + w.num(*tdee.Kcal, 0) + " kcal"
 	switch {
+	case noPlan && !tdee.Trusted:
+		return label + measured + ", " + w.notTrusted + "; " + w.noPlan
 	case noPlan:
 		return label + measured + "; " + w.noPlan
 	case tdee.BeforePhase || slices.Contains(v.Reasons, "before_phase"):

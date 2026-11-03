@@ -159,6 +159,13 @@ func TestCalibrationLineWithoutAVerdict(t *testing.T) {
 			"Calibration: the TDEE came out at 0 or less: are the meals all logged?",
 		},
 		{
+			"no plan, a TDEE not trusted",
+			verdictBody{Rate: "none", Reasons: []string{"no_phase"}},
+			untrusted,
+			"Kalibracija: TDEE 1.956 kcal, još nije pouzdan; nema plana (faze i cilja), pa nema tempa za ocijeniti",
+			"Calibration: TDEE 1,956 kcal, not trusted yet; no plan (a phase and a target), so no rate to judge",
+		},
+		{
 			"no plan",
 			verdictBody{Rate: "none", Reasons: []string{"no_phase", "no_target"}},
 			trusted,
