@@ -150,7 +150,9 @@ func (s *sessions) recipeFoodBody(ctx context.Context, p auth.Principal, r *reci
 		return foodBody{}, err
 	}
 	for _, m := range members {
-		b.Recipe.SharedWith = append(b.Recipe.SharedWith, recipeMemberBody{Seat: m.Seat, Name: m.Name, You: m.ID == p.User.ID})
+		b.Recipe.SharedWith = append(b.Recipe.SharedWith, recipeMemberBody{
+			Seat: m.Seat, Name: m.Name, You: m.ID == p.User.ID, Household: m.Household,
+		})
 	}
 	return b, nil
 }

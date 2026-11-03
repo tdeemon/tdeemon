@@ -775,6 +775,9 @@ export const hr: Messages = {
       'Izaći iz kućanstva? Zadržavaš sve namirnice i recepte koje imaš, a i oni svoje. Natrag te vraća samo nova pozivnica.',
     yesLeave: 'Izađi',
     left: 'Više nisi u kućanstvu',
+    mark: 'Ovu namirnicu dijeli tvoje kućanstvo: izmjena ovdje vrijedi za sve članove.',
+    nudge: (name: string) => `${name} te poziva u svoje kućanstvo`,
+    nudgeSee: 'Pogledaj',
   },
   sharing: {
     title: 'Podijeljeno s',
@@ -789,6 +792,8 @@ export const hr: Messages = {
     remove: (name: string) => `Prestani dijeliti s: ${name}`,
     leave: 'Izađi iz recepta',
     leaveHint: 'Tvoji obroci s njim ostaju; više ga ne biraš.',
+    household: 'kućanstvo',
+    leaveWithHousehold: 'Tvoje kućanstvo izlazi s tobom. Tvoji obroci s njim ostaju.',
     noUser: 'Nijedan korisnik ove instance nema tu adresu.',
     self: 'To je tvoja adresa: podijeli ga s nekim drugim.',
     taken: 'Već ga imaju, ili namirnicu tog naziva.',

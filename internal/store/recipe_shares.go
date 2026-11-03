@@ -29,12 +29,16 @@ const notWithdrawn = `NOT EXISTS (SELECT 1 FROM food_shares AS rs
 	WHERE rs.user_id = f.user_id AND rs.food_id = f.id AND rs.left_at IS NOT NULL)`
 
 // RecipeMember is a member of a shared recipe: their seat in its share,
-// by which its members name one another, and who they are.
+// by which its members name one another, and who they are. Household
+// is whether they are in the household of the user who asks (RecipeMembers'
+// userID): no member takes them out, and they leave the recipe only with
+// that user's household.
 type RecipeMember struct {
-	Seat  int
-	ID    uuid.UUID
-	Name  string
-	Email string
+	Seat      int
+	ID        uuid.UUID
+	Name      string
+	Email     string
+	Household bool
 }
 
 // withdrawn reports whether userID's food id is a recipe they left the
@@ -80,8 +84,13 @@ func (db *DB) RecipeMembers(ctx context.Context, userID, foodID uuid.UUID) ([]Re
 		if err != nil || share == "" {
 			return err
 		}
-		if out, err = shareMembers(ctx, tx, share, userID); len(out) < 2 {
+		if out, err = shareMembers(ctx, tx, share, userID); err != nil || len(out) < 2 {
 			out = nil
+			return err
+		}
+		mates, err := householdMates(ctx, tx, userID)
+		for i := range out {
+			out[i].Household = mates[out[i].ID]
 		}
 		return err
 	})

@@ -56,7 +56,12 @@ test('a household: invited, what joining does seen, joined, the kitchen shared, 
     mia.getByRole('region', { name: 'Invites sent' }).getByRole('heading', { name: 'Leo' }),
   ).toBeVisible()
 
-  // Leo sees it from the settings, what joining does, and joins.
+  // Leo's day says it waits; he sees it from the settings, what joining
+  // does, and joins.
+  await leo.goto('/')
+  await expect(
+    leo.getByRole('link', { name: /Mia invites you into their household/ }),
+  ).toBeVisible()
   await leo.goto('/settings')
   const row = leo.getByRole('link', { name: 'Household' })
   await expect(row).toHaveAccessibleDescription('An invite waits for your answer')
@@ -72,9 +77,12 @@ test('a household: invited, what joining does seen, joined, the kitchen shared, 
   await expect(members.getByText(miaEmail)).toBeVisible()
   await expect(members.getByText(leoEmail)).toBeVisible()
 
-  // Mia's drink is his too.
+  // Mia's drink is his too, and its page says a change is the household's.
   await leo.goto('/foods')
-  await expect(leo.getByRole('link', { name: new RegExp(`Oat drink ${tag}`) })).toBeVisible()
+  await leo.getByRole('link', { name: new RegExp(`Oat drink ${tag}`) }).click()
+  await expect(
+    leo.getByText('Your household shares this food: a change here is every member’s.'),
+  ).toBeVisible()
 
   // He leaves, keeping it; Mia is in no household then.
   await leo.goto('/settings/household')

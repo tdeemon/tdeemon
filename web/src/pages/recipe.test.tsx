@@ -745,3 +745,66 @@ test('leaving a recipe goes back to the foods, which a toast says, though the re
   expect(await screen.findByText('You left Chicken curry')).toBeDefined()
   expect(await screen.findByRole('heading', { name: 'Foods', level: 1 })).toBeDefined()
 })
+
+test("a household's recipe marks its members, whom no one removes, and is left only while someone else stays", async () => {
+  const recipe = shared.recipe
+  if (recipe === undefined) {
+    throw new Error('the shared curry has no recipe')
+  }
+  const of = (members: NonNullable<typeof recipe.shared_with>): Food => ({
+    ...shared,
+    recipe: { ...recipe, shared_with: members },
+  })
+  const withEva = of([
+    { seat: 1, name: 'Ana', you: true },
+    { seat: 2, name: 'Zoe', household: true },
+    { seat: 3, name: 'Eva' },
+  ])
+  const household = {
+    members: [
+      { name: 'Ana', email: 'ana@example.com', you: true },
+      { name: 'Zoe', email: 'zoe@example.com' },
+    ],
+    sent: [],
+    received: [],
+  }
+  sharedServer({
+    [`GET /api/v1/foods/${curryId}`]: () => Response.json(withEva),
+    'GET /api/v1/household': () => Response.json(household),
+  })
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  const members = within(page).getByRole('list', { name: 'Shared with' })
+  expect(
+    within(members)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent),
+  ).toEqual(['Ana · youLeave the recipe', 'Zoe · household', 'Eva'])
+  expect(within(page).queryByRole('button', { name: 'Stop sharing with Zoe' })).toBeNull()
+  expect(within(page).getByRole('button', { name: 'Stop sharing with Eva' })).toBeDefined()
+  expect(
+    within(page).getByText('Your household leaves it with you. Your meals of it stay.'),
+  ).toBeDefined()
+  expect(
+    await screen.findByText('Your household shares this food: a change here is every member’s.'),
+  ).toBeDefined()
+  cleanup()
+
+  // The household's alone: no one else would stay, so no one leaves.
+  sharedServer({
+    [`GET /api/v1/foods/${curryId}`]: () =>
+      Response.json(
+        of([
+          { seat: 1, name: 'Ana', you: true },
+          { seat: 2, name: 'Zoe', household: true },
+        ]),
+      ),
+    'GET /api/v1/household': () => Response.json(household),
+  })
+  renderAt(`/foods/${curryId}`)
+  const ours = await screen.findByRole('article', { name: 'Chicken curry' })
+  expect(within(ours).getByText('Zoe')).toBeDefined()
+  expect(within(ours).queryByRole('button', { name: 'Leave the recipe' })).toBeNull()
+  expect(within(ours).queryByText(/leaves it with you/)).toBeNull()
+})

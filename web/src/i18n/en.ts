@@ -824,6 +824,9 @@ export const en = {
     remove: (name: string) => `Stop sharing with ${name}`,
     leave: 'Leave the recipe',
     leaveHint: 'Your meals of it stay; you pick it no more.',
+    // A member of the user's household, whom no one takes out of it.
+    household: 'household',
+    leaveWithHousehold: 'Your household leaves it with you. Your meals of it stay.',
     noUser: 'No user of this instance has that address.',
     self: 'That is your own address: share it with someone else.',
     taken: 'They have it already, or a food of its name.',
@@ -903,6 +906,11 @@ export const en = {
       'Leave the household? You keep every food and recipe you have, and so do they. Only an invite brings you back.',
     yesLeave: 'Leave',
     left: 'You left the household',
+    // A food's page in a household: who a change reaches.
+    mark: 'Your household shares this food: a change here is every member’s.',
+    // The day's line while an invite waits for the user's answer.
+    nudge: (name: string) => `${name} invites you into their household`,
+    nudgeSee: 'See',
   },
   recipes: {
     // A recipe's mark beside its name.

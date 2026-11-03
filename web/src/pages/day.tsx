@@ -25,6 +25,7 @@ import { QuickChips } from '@/components/day/quick-chips'
 import { WeekCard } from '@/components/day/week-card'
 import { WeekLine } from '@/components/day/week-line'
 import { WeekStrip } from '@/components/day/week-strip'
+import { HouseholdNudge } from '@/components/household/household-nudge'
 import { LoadError } from '@/components/load-error'
 import { ProposalNudge } from '@/components/plan/proposal-nudge'
 import { Skeleton } from '@/components/progress/skeleton'
@@ -367,6 +368,8 @@ export function DayPage() {
           </FirstSteps>
           {/* A proposal that waits, under the day's hero. */}
           {isToday && <ProposalNudge />}
+          {/* An invite into a household that waits for an answer. */}
+          {isToday && <HouseholdNudge />}
           {/* This morning's weekly review, on its day. */}
           {isToday && <AutopilotLine today={day.data.date} />}
           {/* This morning's summary: of the calendar's date, as its

@@ -3064,6 +3064,8 @@ export interface components {
             yield_g?: number;
         };
         RecipeMemberBody: {
+            /** @description A member of your household: no stop takes them out, and your leave takes them with you, refused when no one else would stay. */
+            household?: boolean;
             name: string;
             /**
              * Format: int64
