@@ -4,6 +4,10 @@ Thanks for your interest. tdeemon is in early development: the design and
 the plans still move, so open an issue to talk about anything bigger than
 a small fix before you start on it.
 
+Questions, and ideas still to talk over, go to
+[Discussions](https://github.com/tdeemon/tdeemon/discussions); an issue
+is a bug to fix or a feature to build.
+
 Report a security vulnerability privately, as [SECURITY.md](SECURITY.md)
 describes, never in a public issue.
 

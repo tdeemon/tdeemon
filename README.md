@@ -85,6 +85,8 @@ proxy in front of it, or let Caddy do it: uncomment `COMPOSE_FILE` in
 - [Methodology](docs/methodology.md): how the numbers come about.
 - [Limits](docs/limits.md): the limits of a plan and their sources.
 - [Design](docs/DESIGN.md): the whole design.
+- [Discussions](https://github.com/tdeemon/tdeemon/discussions):
+  questions, ideas, and setups to show.
 - [Contributing](CONTRIBUTING.md), and [security](SECURITY.md): report a
   vulnerability privately.
 
