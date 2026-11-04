@@ -1,6 +1,9 @@
 package store
 
 import (
+	"context"
+	"database/sql"
+	"errors"
 	"sync"
 
 	"golang.org/x/text/collate"
@@ -25,6 +28,17 @@ func namesCollation(locale string) string {
 		}
 	}
 	return "names_en"
+}
+
+// usersCollation is namesCollation of the language of the user with id,
+// English's for no such user.
+func usersCollation(ctx context.Context, tx *sql.Tx, id string) (string, error) {
+	var locale string
+	if err := tx.QueryRowContext(ctx, "SELECT locale FROM users WHERE id = ?", id).Scan(&locale); err != nil &&
+		!errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	return namesCollation(locale), nil
 }
 
 func init() {

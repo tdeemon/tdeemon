@@ -15,6 +15,7 @@ import (
 	"github.com/zarnautovic/tdeemon/internal/domain/day"
 	"github.com/zarnautovic/tdeemon/internal/domain/food"
 	"github.com/zarnautovic/tdeemon/internal/domain/meal"
+	"github.com/zarnautovic/tdeemon/internal/domain/user"
 	"github.com/zarnautovic/tdeemon/internal/store"
 )
 
@@ -418,6 +419,66 @@ func TestFindFoodsRanksNamesFirst(t *testing.T) {
 	}
 	if len(got) != 5 || got[0].ID != short || got[1].ID != white || got[2].ID != byName || got[3].ID != byAlias || got[4].ID != byBrand {
 		t.Errorf("FindFoods(kruh) = %v, want the names (shorter first), the alias, then the brand", names(got))
+	}
+}
+
+// Names of one length are in the alphabet of the user's language, in
+// any case, then by brand: in Croatian Č after C, in English beside it;
+// the catalog's as the user's own.
+func TestFindFoodsTiesInTheUsersAlphabet(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	eva := newUser("eva@example.com")
+	eva.Locale, eva.Role = "en", user.RoleUser
+	if err := db.CreateUser(t.Context(), eva, ""); err != nil {
+		t.Fatal(err)
+	}
+	foods := [][2]string{{"Sok zob", ""}, {"sok čaj", ""}, {"Sok dud", "B"}, {"Sok caj", ""}, {"Sok dud", "A"}, {"Sok cza", ""}}
+	for _, u := range []uuid.UUID{ivo, eva.ID, ana} {
+		for _, nb := range foods {
+			// Ana's, an admin's declared foods, are the catalog's too.
+			saveFood(t, db, u, food.Food{
+				ID: uuid.NewV7(), Name: nb[0], Brand: nb[1], Basis: food.Per100g, Source: food.Label,
+				Nutrients: food.Nutrients{Kcal: 40, Protein: 0, Carbs: 10, Fat: 0},
+			})
+		}
+	}
+	croatian := []string{"Sok caj", "Sok cza", "sok čaj", "Sok dud A", "Sok dud B", "Sok zob"}
+	english := []string{"Sok caj", "sok čaj", "Sok cza", "Sok dud A", "Sok dud B", "Sok zob"}
+	named := func(fs []food.Food) []string {
+		out := make([]string, len(fs))
+		for i, f := range fs {
+			out[i] = strings.TrimSpace(f.Name + " " + f.Brand)
+		}
+		return out
+	}
+	for _, tc := range []struct {
+		who  string
+		id   uuid.UUID
+		want []string
+	}{{"Croatian", ivo, croatian}, {"English", eva.ID, english}} {
+		got, err := db.FindFoods(t.Context(), tc.id, "sok", 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(named(got), tc.want) {
+			t.Errorf("%s FindFoods(sok) = %v, want %v", tc.who, named(got), tc.want)
+		}
+	}
+	// A user with none of them finds the catalog's, in their alphabet.
+	for _, tc := range []struct {
+		who, email, locale string
+		want               []string
+	}{{"Croatian", "maja@example.com", "hr", croatian}, {"English", "tom@example.com", "en", english}} {
+		u := newUser(tc.email)
+		u.Locale, u.Role = tc.locale, user.RoleUser
+		if err := db.CreateUser(t.Context(), u, ""); err != nil {
+			t.Fatal(err)
+		}
+		if got := named(findCatalog(t, db, u.ID, "sok")); !slices.Equal(got, tc.want) {
+			t.Errorf("%s FindCatalog(sok) = %v, want %v", tc.who, got, tc.want)
+		}
 	}
 }
 

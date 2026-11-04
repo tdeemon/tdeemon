@@ -513,7 +513,8 @@ const catalogShown = `c.hidden = 0`
 // theirs, archived too, that names the row, or has its name and brand,
 // or one of its barcodes. Their IDs are the catalog's, no user's food's.
 // The order is FindFoods': the name's matches first, then the shorter
-// name.
+// name, then by name and brand in the alphabet of the user's language,
+// then by ID.
 func (db *DB) FindCatalog(ctx context.Context, userID uuid.UUID, query string, limit int) ([]food.Food, error) {
 	match := ftsQuery(query)
 	if match == "" || limit <= 0 {
@@ -522,7 +523,10 @@ func (db *DB) FindCatalog(ctx context.Context, userID uuid.UUID, query string, l
 	limit = min(limit, MaxFoodResults)
 	var out []food.Food
 	err := db.readTx(ctx, func(tx *sql.Tx) error {
-		var err error
+		names, err := usersCollation(ctx, tx, userID.String())
+		if err != nil {
+			return err
+		}
 		out, err = queryFoods(ctx, tx, `
 			SELECT `+catalogColumns+` FROM catalog_foods AS c
 			WHERE c.id IN (SELECT catalog_id FROM catalog_fts WHERE catalog_fts MATCH ?2) AND `+catalogShown+`
@@ -532,7 +536,7 @@ func (db *DB) FindCatalog(ctx context.Context, userID uuid.UUID, query string, l
 					JOIN food_barcodes AS fb ON fb.code = b.code AND fb.user_id = ?1
 					WHERE b.catalog_id = c.id)
 			ORDER BY CASE WHEN c.id IN (SELECT catalog_id FROM catalog_fts WHERE catalog_fts MATCH ?3) THEN 0 ELSE 1 END,
-				length(c.name), c.name, c.brand
+				length(c.name), c.name_key COLLATE `+names+`, c.brand_key COLLATE `+names+`, c.id
 			LIMIT ?4`, userID.String(), match, "{name} : ("+match+")", limit)
 		if err != nil {
 			return err
