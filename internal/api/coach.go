@@ -39,6 +39,7 @@ type planBody struct {
 	Pending          *proposalBody      `json:"pending,omitempty" doc:"The proposal that waits for the user's consent; absent when none does."`
 	PendingPreview   *previewBody       `json:"pending_preview,omitempty" doc:"What the pending proposal would come to, by the data and the limits now, as propose_changes previews it; with what the limits would refuse, if they changed since."`
 	Revisions        []proposalBody     `json:"revisions" nullable:"false" doc:"The plan's latest revisions, the proposals applied (reverted ones too), newest first, up to 10."`
+	RevisionsMore    bool               `json:"revisions_more" doc:"Whether the plan has revisions older than those given."`
 	Autopilot        planAutopilotBody  `json:"autopilot" doc:"The autopilot, which only the user changes, in the app: its mode, its drift and the next review."`
 }
 
@@ -173,13 +174,17 @@ func (s *sessions) getPlan(ctx context.Context, _ *struct{}) (*planOutput, error
 	if err != nil {
 		return nil, internalError("reading the plan failed", err)
 	}
-	revisions, err := s.db.Proposals(ctx, p.User.ID, planRevisions, now, proposal.Applied, proposal.Reverted)
+	// One more than given tells whether there are older ones.
+	revisions, err := s.db.Proposals(ctx, p.User.ID, planRevisions+1, now, proposal.Applied, proposal.Reverted)
 	if err != nil {
 		return nil, internalError("reading the plan failed", err)
 	}
+	more := len(revisions) > planRevisions
+	revisions = revisions[:min(len(revisions), planRevisions)]
 	b := planBody{
 		Today: today.String(), Phases: planPhases(data.phases, since), TrainingWeekdays: weekdayNames(data.training),
 		Targets: data.targetPeriods(since, yesterday), Limits: limitsMap(data.lim, true), Revisions: []proposalBody{},
+		RevisionsMore: more,
 	}
 	loc := cal.Location
 	if len(pending) > 0 && pending[0].Status == proposal.Pending {

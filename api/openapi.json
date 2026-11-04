@@ -3439,6 +3439,10 @@
             },
             "type": "array"
           },
+          "revisions_more": {
+            "description": "Whether the plan has revisions older than those given.",
+            "type": "boolean"
+          },
           "targets": {
             "description": "The targets, in order: those in force within the last 365 days, and those to come, each with what its days came to.",
             "items": {
@@ -3475,6 +3479,7 @@
           "targets",
           "limits",
           "revisions",
+          "revisions_more",
           "autopilot"
         ],
         "type": "object"

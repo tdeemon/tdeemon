@@ -97,8 +97,17 @@ export function RevisionList({
 // what it changed, before → after. One applied may be taken back in a
 // step: the user, here, consents to the inverse the server makes, which
 // applies at once, and a toast says it. Taking back a limit it tightened
-// loosens it: the question says so, and the answer confirms it.
-export function RevisionDetail({ rev, plan }: { rev: Proposal; plan: Plan }) {
+// loosens it: the question says so, and the answer confirms it. The
+// revision that takes it back is given to onTakenBack once applied.
+export function RevisionDetail({
+  rev,
+  plan,
+  onTakenBack,
+}: {
+  rev: Proposal
+  plan: Plan
+  onTakenBack?: ((revert: string) => void) | undefined
+}) {
   const t = useMessages()
   const id = useId()
   const queryClient = useQueryClient()
@@ -137,6 +146,7 @@ export function RevisionDetail({ rev, plan }: { rev: Proposal; plan: Plan }) {
         ...(confirm ? { body: { confirm: true } } : {}),
       })
       sayChange({ title: r.done, lines: what })
+      onTakenBack?.(made.proposal.id)
     } catch (error) {
       setFailed({ error })
     } finally {
@@ -242,10 +252,7 @@ export function HistoryCard({ plan }: { plan: Plan }) {
             "relative text-small font-semibold text-primary after:absolute after:-inset-3 after:content-['']",
           )}
         >
-          {/* The plan holds its latest ten (planRevisions, internal/api/coach.go). */}
-          {plan.revisions.length >= 10
-            ? r.all(plan.revisions.length)
-            : r.count(plan.revisions.length)}
+          {plan.revisions_more ? r.all(plan.revisions.length) : r.count(plan.revisions.length)}
         </Link>
       </div>
       <RevisionList revisions={latest} targets={plan.targets} />

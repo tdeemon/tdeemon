@@ -45,6 +45,29 @@ export function priorOf(
   return ch.before ?? (targets && targetNow(targets, addDays(ch.from, -1)))
 }
 
+// priorsOf is each change of a target, in the order of their days, with
+// what it moves the plan from: the target before it as the plan's
+// targets are once the changes before it are made, so a later change is
+// told against what the proposal sets (or deletes) before it, as the
+// proposal's table and its toast both say it.
+export function priorsOf(
+  changes: readonly TargetChange[],
+  targets: readonly Target[],
+): { change: TargetChange; prior: TargetValues | undefined }[] {
+  let timeline: readonly Target[] = targets
+  return changes
+    .toSorted((a, b) => a.from.localeCompare(b.from))
+    .map((ch) => {
+      const prior = priorOf(ch, timeline)
+      const after = ch.after
+      timeline = [
+        ...timeline.filter((tg) => tg.effective_from !== ch.from),
+        ...(after === undefined ? [] : [{ effective_from: ch.from, ...after }]),
+      ].toSorted((a, b) => a.effective_from.localeCompare(b.effective_from))
+      return { change: ch, prior }
+    })
+}
+
 // kcalShift is how far a proposal moves the weekly average of the kcal,
 // over trainingDays training days, by its first change of a target that
 // has one before it; 0 for none.
@@ -53,8 +76,7 @@ export function kcalShift(
   targets: readonly Target[],
   trainingDays: number,
 ): number {
-  for (const ch of proposal.changes.targets) {
-    const prior = priorOf(ch, targets)
+  for (const { change: ch, prior } of priorsOf(proposal.changes.targets, targets)) {
     if (ch.after !== undefined && prior !== undefined) {
       const avg = (v: TargetValues) => weeklyAverage(v.training.kcal, v.rest.kcal, trainingDays)
       return Math.round(avg(ch.after) - avg(prior))
@@ -200,8 +222,7 @@ export function useGists(): (proposal: Proposal, targets: readonly Target[]) => 
         }
         return `${c.phase(date(ch.start))}: ${words.phase(ch.before, ch.after).join(', ')}`
       }),
-      ...changes.map((ch) => {
-        const prior = priorOf(ch, targets)
+      ...priorsOf(changes, targets).map(({ change: ch, prior }) => {
         if (ch.after === undefined) {
           return c.deletedTarget(date(ch.from))
         }

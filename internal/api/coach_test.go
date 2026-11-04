@@ -59,7 +59,8 @@ type planAnswer struct {
 			Violations []json.RawMessage `json:"violations"`
 		} `json:"checks"`
 	} `json:"pending_preview"`
-	Revisions []planProposal `json:"revisions"`
+	Revisions     []planProposal `json:"revisions"`
+	RevisionsMore bool           `json:"revisions_more"`
 }
 
 // planTarget is a target of get_plan's, as the tests read it.
@@ -290,6 +291,43 @@ func TestGetPlanShowsTheRevisions(t *testing.T) {
 	}
 	if c := r.Changes.Targets[0]; c.From != today.AddDays(3).String() || c.Before != nil || c.After == nil || c.After.Training.Kcal != 1900 {
 		t.Errorf("the revision's target = %+v", c)
+	}
+}
+
+// The plan gives its latest ten revisions, and says whether there are
+// older ones.
+func TestGetPlanSaysOlderRevisions(t *testing.T) {
+	t.Parallel()
+
+	in, session := signedIn(t)
+	today := savePlan(t, in)
+	ctx, db, id, now := t.Context(), in.db, in.user.ID, in.clock.Now()
+	apply := func(from, n int) {
+		t.Helper()
+		for i := from; i < from+n; i++ {
+			d := plan.DayTarget{Kcal: float64(1800 + 10*i), Protein: 150, Fat: 60}
+			p, err := db.CreateProposal(ctx, id, isolationActor, proposal.Draft{
+				Rationale: "A step.",
+				Changes: proposal.Changes{Targets: []proposal.TargetChange{{
+					From: today.AddDays(5 + i), After: &plan.Target{EffectiveFrom: today.AddDays(5 + i), Training: d, Rest: d},
+				}}},
+			}, today, now, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.ApplyProposal(ctx, id, isolationActor, p.ID, today, now, nil); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	// savePlan's one and nine: ten, all of them.
+	apply(0, 9)
+	if b := getPlan(t, in, []*http.Cookie{session}, nil); len(b.Revisions) != 10 || b.RevisionsMore {
+		t.Errorf("ten revisions: %d given, more %v; want 10 and none older", len(b.Revisions), b.RevisionsMore)
+	}
+	apply(9, 1)
+	if b := getPlan(t, in, []*http.Cookie{session}, nil); len(b.Revisions) != 10 || !b.RevisionsMore {
+		t.Errorf("eleven revisions: %d given, more %v; want 10 and older ones", len(b.Revisions), b.RevisionsMore)
 	}
 }
 
