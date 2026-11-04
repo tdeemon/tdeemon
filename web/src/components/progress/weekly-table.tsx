@@ -63,7 +63,8 @@ export function WeeklyTable({
           week.trend_kg === undefined || before.trend_kg === undefined
             ? undefined
             : week.trend_kg - before.trend_kg
-        const empty = week.logged_days === 0 && week.kcal === undefined && change === undefined
+        const empty =
+          week.logged_days === 0 && week.kcal === undefined && week.trend_kg === undefined
         return empty ? [] : [{ ...week, change }]
       })
       .toReversed()

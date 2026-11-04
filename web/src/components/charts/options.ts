@@ -26,6 +26,7 @@ export interface Words {
     interval: string
     tdeeBand: string
     proposal: string
+    dayTarget: string
     intake: string
     target: string
     gap: string

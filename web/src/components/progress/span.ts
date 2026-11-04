@@ -12,8 +12,7 @@ const mostDays = 366
 const mostWeeks = 52
 
 // A phase younger than this many days is shown from the start by
-// default: its own days would be a few points (the 14 its first verdict
-// needs at least).
+// default: its own days would be a few points.
 const youngDays = 14
 
 // defaultSpan is the span shown when none is asked for: the phase's,

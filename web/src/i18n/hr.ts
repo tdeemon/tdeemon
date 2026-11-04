@@ -1025,6 +1025,7 @@ export const hr: Messages = {
       interval: 'Interval 80 %',
       tdeeBand: 'TDEE ± 80 %',
       proposal: 'Prijedlog',
+      dayTarget: 'Cilj',
       intake: 'Pojedeno',
       target: 'Cilj, prosjek 7 dana',
       gap: 'Pojedeno do TDEE-a, prosjek 7 dana',

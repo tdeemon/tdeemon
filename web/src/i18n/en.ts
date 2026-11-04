@@ -1173,6 +1173,8 @@ export const en = {
       tdeeBand: 'TDEE ± 80%',
       // A coach's proposal, marked on the chart it cites.
       proposal: 'Proposal',
+      // A day's own target, a column of the TDEE's table.
+      dayTarget: 'Target',
       intake: 'Eaten',
       target: 'Target, 7-day average',
       // The space between the TDEE and the 7 days' intake.

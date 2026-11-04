@@ -209,7 +209,11 @@ async function hero() {
 }
 
 test('the progress says the TDEE and how the phase goes, then the charts and the weeks, over the phase', async () => {
-  const fetch = progressServer()
+  // Of the window's 41 logged days, the 40 from the first weigh-in to the
+  // last are the intake's.
+  const fetch = progressServer({
+    'GET /api/v1/summary': () => Response.json(summaryOf(onTrack, { ...trusted, logged_days: 41 })),
+  })
   renderAt('/progress')
 
   const verdict = await hero()
@@ -316,6 +320,17 @@ test("the TDEE's chart has two layers, more a tap away: the space to the 7 days'
     'Eaten to TDEE, 7-day average',
     'Target, 7-day average',
   ])
+
+  // Its table is of each day's own values: the target the day's, not
+  // the 7 days' average the chart draws.
+  fireEvent.click(within(tdee).getByRole('button', { name: 'Table' }))
+  const rows = within(
+    within(tdee).getByRole('table', { name: 'TDEE and intake, by day' }),
+  ).getAllByRole('row')
+  expect(rows[0]?.textContent).toBe('DateTDEEEatenTarget')
+  // Today is open: what it ate is no value yet.
+  expect(rows[1]?.textContent).toBe('Fri, Oct 232,400 ± 60—2,100')
+  expect(rows[2]?.textContent).toBe('Thu, Oct 222,400 ± 602,7002,100')
 })
 
 test.each([

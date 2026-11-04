@@ -462,7 +462,7 @@ function useCards(
         cited: onWeight ? undefined : cited,
       })}
       label={[tdeeSaid, eatenSaid].filter((s) => s !== undefined).join(' ') || none}
-      table={tableOf(tdeeDays, words, [names.tdee, names.intake, names.target], (d) => [
+      table={tableOf(tdeeDays, words, [names.tdee, names.intake, names.dayTarget], (d) => [
         d.tdee === undefined
           ? undefined
           : tips.tdee(f.number(d.tdee.kcal), f.number(d.tdee.half_width)).replace(/^TDEE /, ''),

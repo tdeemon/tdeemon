@@ -168,7 +168,8 @@ export function VerdictHero({ phase, today }: { phase: Phase | undefined; today:
 
 // Sum is the sum the TDEE comes of, as calibration measures it: the
 // intake of the window's logged days, and the energy the trend weight's
-// change stored or released (its kg a week at 7700 kcal a kg): "Intake
+// change stored or released (its kg a week at 7700 kcal a kg), of the
+// logged days from the first weigh-in to the last: "Intake
 // 2,209 + trend −0.43 kg/wk (≈ 470) = 2,679", then what it is of. That
 // energy is written as the TDEE less the intake, so the sum adds up as it
 // is written, each rounded.
@@ -177,7 +178,9 @@ function Sum({ tdee }: { tdee: Tdee }) {
   const f = useFormat()
   const h = t.charts.hero
   const of = (
-    <span className="text-muted-foreground">· {h.of(tdee.logged_days, tdee.weigh_ins)}</span>
+    <span className="text-muted-foreground">
+      · {h.of(tdee.needs.logged_days.has, tdee.weigh_ins)}
+    </span>
   )
   if (tdee.kcal === undefined || tdee.intake_kcal === undefined || tdee.kg_per_week === undefined) {
     return <p className="rounded-md bg-surface-2 px-3 py-2.5 text-small">{of}</p>
