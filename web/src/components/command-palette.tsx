@@ -101,6 +101,12 @@ export function CommandPalette({
   const t = useMessages()
   // The command chosen, run once the palette has closed.
   const chosen = useRef<(() => void) | undefined>(undefined)
+  // Each opening's own body: opened again while it fades out, the
+  // palette starts anew, not with the words of before.
+  const [opening, setOpening] = useState({ open, count: 0 })
+  if (opening.open !== open) {
+    setOpening({ open, count: open ? opening.count + 1 : opening.count })
+  }
 
   return (
     <Dialog.Root
@@ -125,6 +131,7 @@ export function CommandPalette({
         >
           <Dialog.Title className="sr-only">{t.palette.title}</Dialog.Title>
           <PaletteBody
+            key={opening.count}
             initial={initial}
             actions={actions}
             onChoose={(command) => {

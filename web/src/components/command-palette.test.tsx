@@ -223,6 +223,52 @@ test('typing on the day opens the palette with what was typed; a shortcut, a fie
   expect(p.getByRole('group', { name: 'Foods' })).toBeDefined()
 })
 
+// fading is an animation as a browser plays it, which finishes once end
+// is called.
+function fading(): { finished: Promise<void>; end: () => void } {
+  let end: (() => void) | undefined
+  const finished = new Promise<void>((resolve) => {
+    end = resolve
+  })
+  return {
+    finished,
+    end: () => {
+      end?.()
+    },
+  }
+}
+
+// Opened again by typing while it still fades out, the palette starts
+// anew, with the key typed, not the words of before.
+test('the palette opened again as it fades out starts anew', async () => {
+  server()
+  renderAt('/')
+  await screen.findByRole('heading', { name: 'Today', level: 1 })
+
+  fireEvent.keyDown(document.body, { key: 'o' })
+  const field = (await palette()).getByRole('combobox')
+  fireEvent.change(field, { target: { value: 'oat' } })
+  // Its fade, which a browser plays and jsdom does not: it ends when
+  // fade() is called.
+  const { finished: faded, end: fade } = fading()
+  Object.defineProperty(Element.prototype, 'getAnimations', {
+    configurable: true,
+    value: () => [{ finished: faded }],
+  })
+  try {
+    fireEvent.keyDown(field, { key: 'Escape' })
+    expect(screen.getByRole('combobox')).toHaveProperty('value', 'oat')
+    fireEvent.keyDown(document.body, { key: 'b' })
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toHaveProperty('value', 'b')
+    })
+  } finally {
+    fade()
+    // jsdom has none of its own to put back.
+    Reflect.deleteProperty(Element.prototype, 'getAnimations')
+  }
+})
+
 // choose types in the palette and runs the row named.
 async function choose(typed: string, row: string) {
   fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
