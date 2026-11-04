@@ -1,5 +1,5 @@
 import { scale, type Messages } from './en'
-import { plural } from './plural'
+import { plural, pluralIn, type Case } from './plural'
 
 // wait says how long, rounded up to whole minutes from a minute on.
 function wait(seconds: number): string {
@@ -600,10 +600,15 @@ export const hr: Messages = {
     more: 'Prikaži još',
     shown: (shown: number, total: number) => `${String(shown)} od ${String(total)}`,
     add: 'Dodaj namirnicu',
-    new: 'Nova',
-    newSaid: 'Nova namirnica',
+    new: 'Nova namirnica',
     per: { '100g': 'na 100 g', '100ml': 'na 100 ml', portion: 'po porciji' },
     perShort: { '100g': '/100 g', '100ml': '/100 ml', portion: '/porcija' },
+    density: (kcal: string, protein: string) => `${kcal} kcal · ${protein} g P`,
+    densitySaid: (kcal: string, protein: string, per: string) =>
+      `${kcal} kcal i ${protein} g proteina ${per}`,
+    household: (names: string) => `Kućanstvo · ${names}`,
+    householdYou: 'ti',
+    householdChange: 'Izmjena ovdje vrijedi za sve članove.',
     pick: 'Odaberi namirnicu da vidiš što donosi ili dodaj novu.',
     archivedMark: 'arhivirano',
     kcalPer: (per: string) => `kcal ${per}`,
@@ -776,7 +781,6 @@ export const hr: Messages = {
       'Izaći iz kućanstva? Zadržavaš sve namirnice i recepte koje imaš, a i oni svoje. Natrag te vraća samo nova pozivnica.',
     yesLeave: 'Izađi',
     left: 'Više nisi u kućanstvu',
-    mark: 'Ovu namirnicu dijeli tvoje kućanstvo: izmjena ovdje vrijedi za sve članove.',
     nudge: (name: string) => `${name} te poziva u svoje kućanstvo`,
     nudgeSee: 'Pogledaj',
   },
@@ -811,10 +815,6 @@ export const hr: Messages = {
   recipes: {
     mark: 'recept',
     list: 'Recepti',
-    newChoice: 'Nova namirnica ili recept',
-    newShort: 'Nova',
-    food: 'Namirnica',
-    recipe: 'Recept',
     new: 'Novi recept',
     searchHint: 'Naziv recepta',
     none: 'Još nema recepata',
@@ -827,8 +827,11 @@ export const hr: Messages = {
     perPortionShort: '/porcija',
     ingredients: (n: number) =>
       `${String(n)} ${plural('hr', n, { one: 'sastojak', few: 'sastojka', other: 'sastojaka' })}`,
-    portions: (n: string, count: number) =>
-      `${n} ${plural('hr', count, { one: 'porcija', few: 'porcije', other: 'porcija' })}`,
+    portions: (n: string, count: number, grammaticalCase?: Case) =>
+      `${n} ${pluralIn('hr', count, grammaticalCase ?? 'nominative', {
+        nominative: { one: 'porcija', few: 'porcije', other: 'porcija' },
+        accusative: { one: 'porciju', few: 'porcije', other: 'porcija' },
+      })}`,
     ofRecipe: (share: string) => `${share} recepta`,
     ofTheRecipe: 'recepta',
     quick: 'Brzo: porcija ili dio recepta',
@@ -852,7 +855,8 @@ export const hr: Messages = {
       `Uzima se zbroj sirovih sastojaka, ${raw}. Porcije i dio recepta su točni, grami približni.`,
     noRaw: 'Jedan sastojak nema grame, pa izvaži gotovo jelo.',
     weighIt: 'Upiši izvagano',
-    cookedAgain: 'Skuhano opet',
+    cookedAgain: 'Kuhaj opet',
+    householdLog: 'Svatko upisuje svoju porciju.',
     archive: 'Arhiviraj recept',
     archivedNote: 'Arhiviran je. Pronaći ćeš ga među arhiviranima, a naziv mu ostaje zauzet.',
     ingredientsTitle: 'Sastojci',

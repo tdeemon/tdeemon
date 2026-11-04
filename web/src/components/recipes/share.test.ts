@@ -84,6 +84,15 @@ test("a recipe's quantity is a share of it or portions, in each language", () =>
   expect(recept(2, 'portion')).toBe('2 porcije')
   expect(recept(5, 'portion')).toBe('5 porcija')
   expect(recept(1.5, 'portion')).toBe('1,5 porcija')
+  // As a verb's object, the accusative: Upiši 1 porciju.
+  const object = (servings: number, serving: string) =>
+    recipeQuantity('recipe', { servings, serving }, hr, hrf.number, 'accusative')
+  expect([1, 2, 5].map((n) => object(n, 'portion'))).toEqual([
+    '1 porciju',
+    '2 porcije',
+    '5 porcija',
+  ])
+  expect(object(1, 'recipe')).toBe('1 recept')
   setLocale('en')
 })
 

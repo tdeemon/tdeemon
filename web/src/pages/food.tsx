@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams, useRouter, useSearch } from '@tans
 import { $api } from '@/api/client'
 import { statusOf } from '@/api/errors'
 import { BackToFoods } from '@/components/foods/back-to-foods'
+import { detailHeader } from '@/components/foods/detail-layout'
 import { FoodDetail } from '@/components/foods/food-detail'
 import { FoodForm } from '@/components/foods/food-form'
 import { HouseholdMark } from '@/components/household/household-mark'
@@ -12,10 +13,13 @@ import { RecipeEditor } from '@/components/recipes/recipe-editor'
 import { SettingsAvatar } from '@/components/settings-avatar'
 import { Button } from '@/components/ui/button'
 import { useMessages } from '@/i18n/messages'
+import { useDesktop } from '@/lib/media'
+import { cn } from '@/lib/utils'
 import type { FoodsSearch } from '@/router'
 
 // FoodPage is a food of the user's, read (FoodDetail); with edit=true in
-// the address, its form, to correct it. A recipe's food is its recipe,
+// the address, its form, to correct it, under the card of the household
+// that shares the food (HouseholdMark). A recipe's food is its recipe,
 // read (RecipeDetail) or edited (RecipeEditor). The form goes back to the
 // food once saved, or given up.
 export function FoodPage() {
@@ -25,6 +29,7 @@ export function FoodPage() {
   const fromFood = useLocation({ select: (l) => l.state.fromFood === true })
   const router = useRouter()
   const navigate = useNavigate()
+  const desktop = useDesktop()
   const food = $api.useQuery('get', '/api/v1/foods/{id}', { params: { path: { id } } })
 
   // read goes back to the food from its form: back in the history when
@@ -55,24 +60,26 @@ export function FoodPage() {
   } else if (edit && food.data.recipe !== undefined) {
     body = (
       <>
-        <header className="flex items-center justify-between gap-2">
+        <header className={cn(detailHeader, 'flex items-center justify-between gap-2')}>
           <h1 className="text-h2">{t.recipes.editTitle}</h1>
           <Button variant="ghost" size="sm" onClick={read}>
             {t.foods.cancel}
           </Button>
         </header>
+        <HouseholdMark recipe />
         <RecipeEditor key={food.data.id} food={food.data} onSaved={read} />
       </>
     )
   } else if (edit) {
     body = (
       <>
-        <header className="flex items-center justify-between gap-2">
+        <header className={cn(detailHeader, 'flex items-center justify-between gap-2')}>
           <h1 className="text-h2">{t.foods.editTitle}</h1>
           <Button variant="ghost" size="sm" onClick={read}>
             {t.foods.cancel}
           </Button>
         </header>
+        <HouseholdMark />
         {/* A food corrected elsewhere, or archived, starts the form again
             only when it is another food. */}
         <div className="rounded-lg bg-card p-4 shadow-card lg:p-6">
@@ -88,19 +95,18 @@ export function FoodPage() {
 
   return (
     <div className="space-y-3">
-      {!edit ? (
-        // The way back, on a desktop beside the list and none; on a phone
-        // the user's mark at its other end.
-        <div className="flex items-center justify-between gap-2 lg:hidden">
-          <BackToFoods />
-          <SettingsAvatar />
-        </div>
-      ) : (
-        // A food to correct that did not come, or is none, has the way
-        // back alone: its page, a form's, has no bar of sections.
-        food.data === undefined && food.isError && <BackToFoods />
-      )}
-      {food.data !== undefined && <HouseholdMark />}
+      {!edit
+        ? // The way back, on a desktop beside the list and none; on a phone
+          // the user's mark at its other end.
+          !desktop && (
+            <div className="flex items-center justify-between gap-2">
+              <BackToFoods />
+              <SettingsAvatar />
+            </div>
+          )
+        : // A food to correct that did not come, or is none, has the way
+          // back alone: its page, a form's, has no bar of sections.
+          food.data === undefined && food.isError && <BackToFoods />}
       {body}
     </div>
   )
@@ -115,10 +121,7 @@ function Skeleton() {
   return (
     <div className="space-y-4">
       <output className="sr-only">{t.loading}</output>
-      <div aria-hidden className="flex items-center gap-3">
-        <span className={`size-14 shrink-0 ${block}`} />
-        <span className={`h-8 w-1/2 ${block}`} />
-      </div>
+      <div aria-hidden className={`h-8 w-1/2 ${block}`} />
       <div aria-hidden className={`h-40 ${block}`} />
       <div aria-hidden className={`h-11 ${block}`} />
       <div aria-hidden className={`h-64 ${block}`} />

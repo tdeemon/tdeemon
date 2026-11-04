@@ -9,8 +9,8 @@ test('a food is made, logged, found, corrected, archived and brought back', asyn
     .getByRole('link', { name: 'Foods' })
     .click()
 
-  await page.getByRole('button', { name: 'New food or recipe' }).click()
-  await page.getByRole('menuitem', { name: 'Food' }).click()
+  // The header's, or an empty list's own.
+  await page.getByRole('link', { name: /^(New food|Add a food)$/ }).click()
   await page.getByLabel('Name', { exact: true }).fill('Buckwheat')
   // A slip of the energy, which the macros tell, and their energy taken.
   await page.getByLabel('Energy (kcal)').fill('34')
@@ -98,4 +98,83 @@ test("a food's servings of long names fit a phone's width", async ({ page }) => 
   await page.getByText('half a loaf of rye bread (250 g)', { exact: true }).click()
   await expect(half).toBeChecked()
   await expect(page.getByRole('cell', { name: '625 kcal' })).toBeVisible()
+})
+
+test("a desktop's foods and food scroll on their own, the food's end in reach and its title in view", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await signIn(page)
+  const tag = String(Date.now())
+  // A recipe of many ingredients, taller than the screen.
+  const made = await Promise.all(
+    Array.from({ length: 14 }, (_, i) =>
+      page.request.post('/api/v1/foods', {
+        data: {
+          name: `Ingredient ${String(i)} ${tag}`,
+          basis: '100g',
+          source: 'label',
+          nutrients: { kcal: 100 + i, protein: 5, carbs: 10, fat: 3 },
+        },
+      }),
+    ),
+  )
+  const ids = await Promise.all(
+    made.map(async (answer) => {
+      const body: unknown = await answer.json()
+      return typeof body === 'object' && body !== null && 'id' in body ? String(body.id) : ''
+    }),
+  )
+  const answer = await page.request.post('/api/v1/recipes/new', {
+    data: {
+      name: `Stew ${tag}`,
+      items: ids.map((id) => ({ food_id: id, amount: 100, unit: 'g' })),
+      yield_g: 1200,
+      portions: 4,
+    },
+  })
+  const saved: unknown = await answer.json()
+  const food =
+    typeof saved === 'object' && saved !== null && 'food' in saved ? saved.food : undefined
+  const id = typeof food === 'object' && food !== null && 'id' in food ? String(food.id) : ''
+  await page.goto(`/foods/${id}`)
+  const title = page.getByRole('heading', { name: `Stew ${tag}`, level: 1 })
+  await expect(title).toBeVisible()
+
+  // The page itself does not scroll: each pane does.
+  const height = await page.evaluate<number>('document.documentElement.scrollHeight')
+  expect(height).toBeLessThanOrEqual(900)
+  const end = page.getByText('Values from')
+  await end.scrollIntoViewIfNeeded()
+  await expect(end).toBeInViewport()
+  // The title stays at the top of its pane.
+  await expect(title).toBeInViewport()
+  // The list beside it, its search at the top of its own pane.
+  await expect(page.getByLabel('Search the foods')).toBeInViewport()
+
+  // What it brings is across both columns: its amounts' segments whole.
+  const amounts = page.getByRole('group', { name: 'Values for' }).locator('label span')
+  await expect(amounts).toHaveText(['1 portion', '100 g', 'Whole recipe'])
+  const cut = await amounts.evaluateAll((spans) =>
+    spans.filter((span) => span.scrollWidth > span.clientWidth).map((span) => span.textContent),
+  )
+  expect(cut).toEqual([])
+
+  // A control the focus comes back to, far above, scrolls clear of the
+  // title that stays at the pane's top.
+  // The pane is scrolled so it is just under the title's top, in the
+  // pane's sight but hidden.
+  await page.getByRole('button', { name: 'Share' }).focus()
+  const edit = page.getByRole('link', { name: 'Edit the recipe' })
+  await edit.evaluate((link) => {
+    const pane = link.closest('.overflow-y-auto')
+    if (pane !== null) {
+      pane.scrollTop += link.getBoundingClientRect().top - pane.getBoundingClientRect().top - 8
+    }
+  })
+  await page.keyboard.press('Shift+Tab')
+  await expect(edit).toBeFocused()
+  const below = await edit.boundingBox()
+  const header = await title.locator('xpath=..').boundingBox()
+  expect(below?.y ?? 0).toBeGreaterThanOrEqual((header?.y ?? 0) + (header?.height ?? 0))
 })

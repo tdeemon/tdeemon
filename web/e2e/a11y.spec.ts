@@ -304,7 +304,7 @@ const screens: Screen[] = [
     open: async (page, made) => {
       await page.goto(`/foods/${made.recipeId}`)
       await settled(page)
-      await page.getByRole('button', { name: /^(Cooked again|Skuhano opet)$/ }).click()
+      await page.getByRole('button', { name: /^(Cook again|Kuhaj opet)$/ }).click()
       await expect(page.getByRole('dialog')).toBeVisible()
       await settled(page)
     },

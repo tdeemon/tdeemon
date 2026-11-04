@@ -6,10 +6,11 @@ import { fieldsOf, useFoodUse, useSaveFood } from '@/api/foods'
 import { sessionQuery } from '@/api/session'
 import type { Food } from '@/api/types'
 import { SaveStatus } from '@/components/day/save-status'
+import { detailColumns, detailHeader } from '@/components/foods/detail-layout'
 import { EnergySplit } from '@/components/foods/energy-split'
-import { FoodAvatar } from '@/components/foods/food-avatar'
 import { LogFood } from '@/components/foods/log-food'
 import { NutritionTable } from '@/components/foods/nutrition-table'
+import { HouseholdMark } from '@/components/household/household-mark'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { useFormat } from '@/i18n/format'
@@ -23,9 +24,12 @@ const card = 'rounded-lg bg-card p-4 shadow-card lg:p-5'
 // FoodDetail is a food of the user's, read: its name and brand, whether
 // its values are an estimate, its energy and where the energy comes from,
 // what it brings (NutritionTable), its servings, other names and note,
-// where its values come from and how often it was logged. It logs the
+// where its values come from and how often it was logged, and the
+// household that shares it (HouseholdMark). It logs the
 // food today in the amount eaten last (LogFood), opens it to edit, and
-// archives it or brings it back, which a toast says, with Undo.
+// archives it or brings it back, which a toast says, with Undo. Its
+// title stays in view as a desktop's pane scrolls, and a pane wide
+// enough has two columns: what it is and does, and what it brings.
 export function FoodDetail({ food }: { food: Food }) {
   const t = useMessages()
   const f = useFormat()
@@ -45,127 +49,133 @@ export function FoodDetail({ food }: { food: Food }) {
 
   return (
     <article aria-labelledby={`food-${food.id}`} className="space-y-4">
-      {/* A short name beside the middle of its mark, a long one from its top. */}
-      <header className="flex items-start gap-3">
-        <FoodAvatar name={food.name} large />
-        <div className="flex min-h-14 min-w-0 flex-1 flex-col justify-center">
-          <h1 id={`food-${food.id}`} className="text-title break-words">
-            {food.name}
-          </h1>
-          {(Boolean(food.brand) || food.source === 'estimate' || food.archived) && (
-            <p className="mt-1 flex flex-wrap items-center gap-1.5 text-small text-muted-foreground">
-              {food.brand && <span className="mr-0.5">{food.brand}</span>}
-              {food.source === 'estimate' && <Badge tone="warning">{t.meal.estimate}</Badge>}
-              {food.archived && <Badge>{t.foods.archivedMark}</Badge>}
-            </p>
-          )}
-        </div>
+      <header className={detailHeader}>
+        <h1 id={`food-${food.id}`} className="text-title break-words">
+          {food.name}
+        </h1>
+        {(Boolean(food.brand) || food.source === 'estimate' || food.archived) && (
+          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-small text-muted-foreground">
+            {food.brand && <span className="mr-0.5">{food.brand}</span>}
+            {food.source === 'estimate' && <Badge tone="warning">{t.meal.estimate}</Badge>}
+            {food.archived && <Badge>{t.foods.archivedMark}</Badge>}
+          </p>
+        )}
       </header>
       {food.archived && (
         <p className="rounded-md bg-surface-2 px-3 py-2 text-small">{t.foods.archivedNote}</p>
       )}
-      <section aria-label={t.foods.energyFrom} className={cn(card, 'space-y-4')}>
-        <p className="flex flex-wrap items-baseline gap-x-2">
-          <span className="text-display">{f.number(n.kcal)}</span>
-          <span className="text-muted-foreground">{t.foods.kcalPer(t.foods.per[food.basis])}</span>
-        </p>
-        <EnergySplit nutrients={n} />
-      </section>
-      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        {!food.archived && <LogFood food={eaten} className="col-span-2 sm:flex-1" />}
-        <Link
-          to="/foods/$id"
-          params={{ id: food.id }}
-          search={{ ...search, edit: true }}
-          state={{ fromFood: true }}
-          // Merged, as Button merges its own: the outline's border, not the base's.
-          className={buttonVariants({ variant: 'outline' })}
-        >
-          <Pencil aria-hidden />
-          {t.foods.edit}
-        </Link>
-        <Button
-          variant="outline"
-          disabled={archive.isPending}
-          onClick={() => {
-            archive.mutate(
-              { body: { ...fieldsOf(food), archived: !food.archived } },
-              {
-                onSuccess: (saved) => {
-                  sayChange(
-                    {
-                      title: saved.archived
-                        ? t.toast.archived(saved.name)
-                        : t.toast.inUse(saved.name),
+      <div className={detailColumns}>
+        <div className="space-y-4">
+          <section aria-label={t.foods.energyFrom} className={cn(card, 'space-y-4')}>
+            <p className="flex flex-wrap items-baseline gap-x-2">
+              <span className="text-display">{f.number(n.kcal)}</span>
+              <span className="text-muted-foreground">
+                {t.foods.kcalPer(t.foods.per[food.basis])}
+              </span>
+            </p>
+            <EnergySplit nutrients={n} />
+          </section>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            {!food.archived && <LogFood food={eaten} className="col-span-2 sm:flex-1" />}
+            <Link
+              to="/foods/$id"
+              params={{ id: food.id }}
+              search={{ ...search, edit: true }}
+              state={{ fromFood: true }}
+              // Merged, as Button merges its own: the outline's border, not the base's.
+              className={buttonVariants({ variant: 'outline' })}
+            >
+              <Pencil aria-hidden />
+              {t.foods.edit}
+            </Link>
+            <Button
+              variant="outline"
+              disabled={archive.isPending}
+              onClick={() => {
+                archive.mutate(
+                  { body: { ...fieldsOf(food), archived: !food.archived } },
+                  {
+                    onSuccess: (saved) => {
+                      sayChange(
+                        {
+                          title: saved.archived
+                            ? t.toast.archived(saved.name)
+                            : t.toast.inUse(saved.name),
+                        },
+                        // Of no day: after the changes of today's still on their way.
+                        { last: { action: 'food.save', entity: saved.id }, date: 'today' },
+                      )
                     },
-                    // Of no day: after the changes of today's still on their way.
-                    { last: { action: 'food.save', entity: saved.id }, date: 'today' },
-                  )
-                },
-              },
-            )
-          }}
-        >
-          {food.archived ? <ArchiveRestore aria-hidden /> : <Archive aria-hidden />}
-          {food.archived ? t.foods.unarchive : t.foods.archive}
-        </Button>
+                  },
+                )
+              }}
+            >
+              {food.archived ? <ArchiveRestore aria-hidden /> : <Archive aria-hidden />}
+              {food.archived ? t.foods.unarchive : t.foods.archive}
+            </Button>
+          </div>
+          <SaveStatus change={archive} />
+        </div>
+        <div className="space-y-4">
+          {(servings.length > 0 || aliases.length > 0 || barcodes.length > 0 || food.note) && (
+            <section className={cn(card, 'space-y-4')}>
+              {servings.length > 0 && (
+                <div className="space-y-1.5">
+                  <h2 className="text-h3">{t.foods.servings}</h2>
+                  <ul className="divide-y">
+                    {servings.map((s) => (
+                      <li key={s.name} className="flex items-baseline justify-between gap-3 py-2">
+                        <span className="min-w-0 break-words">{s.name}</span>
+                        <span className="shrink-0 text-muted-foreground">
+                          {t.unit[unit](f.number(s.amount, 1))}
+                          {food.basis !== 'portion' &&
+                            ` · ${t.unit.kcal(f.number((n.kcal * s.amount) / 100))}`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {aliases.length > 0 && (
+                <div className="space-y-1.5">
+                  <h2 className="text-h3">{t.foods.aliases}</h2>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {aliases.map((a) => (
+                      <li key={a} className="rounded-sm bg-surface-2 px-2.5 py-1 text-small">
+                        {a}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {barcodes.length > 0 && (
+                <div className="space-y-1.5">
+                  <h2 className="text-h3">{t.foods.barcodes}</h2>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {barcodes.map((code) => (
+                      <li
+                        key={code}
+                        className="rounded-sm bg-surface-2 px-2.5 py-1 text-small tabular-nums"
+                      >
+                        {code}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {food.note && (
+                <div className="space-y-1.5">
+                  <h2 className="text-h3">{t.foods.note}</h2>
+                  <p className="whitespace-pre-line text-muted-foreground">{food.note}</p>
+                </div>
+              )}
+            </section>
+          )}
+        </div>
       </div>
-      <SaveStatus change={archive} />
+      {/* What it brings, across both columns: its amounts' segments whole. */}
       <NutritionTable food={food} />
-      {(servings.length > 0 || aliases.length > 0 || barcodes.length > 0 || food.note) && (
-        <section className={cn(card, 'space-y-4')}>
-          {servings.length > 0 && (
-            <div className="space-y-1.5">
-              <h2 className="text-h3">{t.foods.servings}</h2>
-              <ul className="divide-y">
-                {servings.map((s) => (
-                  <li key={s.name} className="flex items-baseline justify-between gap-3 py-2">
-                    <span className="min-w-0 break-words">{s.name}</span>
-                    <span className="shrink-0 text-muted-foreground">
-                      {t.unit[unit](f.number(s.amount, 1))}
-                      {food.basis !== 'portion' &&
-                        ` · ${t.unit.kcal(f.number((n.kcal * s.amount) / 100))}`}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {aliases.length > 0 && (
-            <div className="space-y-1.5">
-              <h2 className="text-h3">{t.foods.aliases}</h2>
-              <ul className="flex flex-wrap gap-1.5">
-                {aliases.map((a) => (
-                  <li key={a} className="rounded-sm bg-surface-2 px-2.5 py-1 text-small">
-                    {a}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {barcodes.length > 0 && (
-            <div className="space-y-1.5">
-              <h2 className="text-h3">{t.foods.barcodes}</h2>
-              <ul className="flex flex-wrap gap-1.5">
-                {barcodes.map((code) => (
-                  <li
-                    key={code}
-                    className="rounded-sm bg-surface-2 px-2.5 py-1 text-small tabular-nums"
-                  >
-                    {code}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {food.note && (
-            <div className="space-y-1.5">
-              <h2 className="text-h3">{t.foods.note}</h2>
-              <p className="whitespace-pre-line text-muted-foreground">{food.note}</p>
-            </div>
-          )}
-        </section>
-      )}
+      <HouseholdMark className={card} />
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 px-1 text-small">
         <dt className="text-muted-foreground">{t.foods.from}</dt>
         <dd>{t.foods.sources[food.source]}</dd>

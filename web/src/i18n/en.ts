@@ -1,4 +1,4 @@
-import { plural } from './plural'
+import { plural, pluralIn, type Case } from './plural'
 
 // The app's text in English, the base language. Every other language has
 // the same keys (Messages), which the type checker holds it to; a text
@@ -692,13 +692,21 @@ export const en = {
     more: 'Show more',
     shown: (shown: number, total: number) => `${String(shown)} of ${String(total)}`,
     add: 'Add a food',
-    // The list's button of a new food: short where a language needs it
-    // to fit beside the title, whole for a screen reader.
+    // The list's button of a new food, beside the recipe's.
     new: 'New food',
-    newSaid: 'New food',
     per: { '100g': 'per 100 g', '100ml': 'per 100 ml', portion: 'per portion' },
     // A food's basis beside its kcal in a list: 370 kcal /100 g.
     perShort: { '100g': '/100 g', '100ml': '/100 ml', portion: '/portion' },
+    // A food's energy and protein in a list, and its basis after it:
+    // 120 kcal · 23 g P /100 g; said whole to a screen reader.
+    density: (kcal: string, protein: string) => `${kcal} kcal · ${protein} g P`,
+    densitySaid: (kcal: string, protein: string, per: string) =>
+      `${kcal} kcal and ${protein} g of protein ${per}`,
+    // A food's card of the household it is shared in: Household · Ana and
+    // you. A change is every member's.
+    household: (names: string) => `Household · ${names}`,
+    householdYou: 'you',
+    householdChange: 'A change here is every member’s.',
     pick: 'Pick a food to see what it brings, or add one.',
     archivedMark: 'archived',
     // A food's page, read: 370 kcal per 100 g.
@@ -909,8 +917,6 @@ export const en = {
       'Leave the household? You keep every food and recipe you have, and so do they. Only an invite brings you back.',
     yesLeave: 'Leave',
     left: 'You left the household',
-    // A food's page in a household: who a change reaches.
-    mark: 'Your household shares this food: a change here is every member’s.',
     // The day's line while an invite waits for the user's answer.
     nudge: (name: string) => `${name} invites you into their household`,
     nudgeSee: 'See',
@@ -919,11 +925,6 @@ export const en = {
     // A recipe's mark beside its name.
     mark: 'recipe',
     list: 'Recipes',
-    // The foods' button of something new, a menu of a food or a recipe.
-    newChoice: 'New food or recipe',
-    newShort: 'New',
-    food: 'Food',
-    recipe: 'Recipe',
     new: 'New recipe',
     searchHint: 'The name of a recipe',
     none: 'No recipes yet',
@@ -938,8 +939,10 @@ export const en = {
     perPortionShort: '/portion',
     ingredients: (n: number) =>
       `${String(n)} ${plural('en', n, { one: 'ingredient', other: 'ingredients' })}`,
-    portions: (n: string, count: number) =>
-      `${n} ${plural('en', count, { one: 'portion', other: 'portions' })}`,
+    // A count of portions, as a label says it or a verb's object (Log 1
+    // portion), which in en is one.
+    portions: (n: string, count: number, grammaticalCase: Case = 'nominative') =>
+      `${n} ${pluralIn('en', count, grammaticalCase, { nominative: { one: 'portion', other: 'portions' } })}`,
     // A share of the whole dish: ¼ of the recipe.
     ofRecipe: (share: string) => `${share} of the recipe`,
     // The unit of a share typed, after it: 1/4 of the recipe.
@@ -967,7 +970,9 @@ export const en = {
       `The raw ingredients' sum, ${raw}, stands for the weight. Portions and shares are exact, grams approximate.`,
     noRaw: 'An ingredient has no weight in grams, so weigh the cooked dish.',
     weighIt: 'Enter the weight',
-    cookedAgain: 'Cooked again',
+    cookedAgain: 'Cook again',
+    // Each member logs a portion of a household's recipe of their own.
+    householdLog: 'Each logs their own portion.',
     archive: 'Archive the recipe',
     archivedNote: 'Archived. Find it among the archived foods; its name stays taken.',
     ingredientsTitle: 'Ingredients',

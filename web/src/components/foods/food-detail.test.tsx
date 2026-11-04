@@ -217,6 +217,47 @@ test('a portion is said in Croatian, of 100 g too when its grams are known', asy
   expect(screen.getByRole('button', { name: 'Upiši' })).toBeDefined()
 })
 
+test.each([
+  [1, 'Upiši 1 porciju'],
+  [2, 'Upiši 2 porcije'],
+  [5, 'Upiši 5 porcija'],
+])("a portion to log takes Croatian's case: %i", async (n, words) => {
+  const soup: Food = {
+    id,
+    name: 'Juha',
+    basis: 'portion',
+    source: 'user',
+    archived: false,
+    nutrients: { kcal: 200, protein: 8, carbs: 20, fat: 9 },
+  }
+  const last = eaten().last_use
+  foodServer({
+    food: soup,
+    use: {
+      meals: 1,
+      ...(last && {
+        last_use: { ...last, quantity: { portions: n }, amount: n, unit: 'portion' as const },
+      }),
+    },
+    locale: 'hr',
+  })
+  renderAt(`/foods/${id}`)
+
+  expect(await screen.findByRole('button', { name: words })).toBeDefined()
+})
+
+test("a food's page has no initials, and the bar of its energy is its own", async () => {
+  foodServer()
+  renderAt(`/foods/${id}`)
+
+  const title = await screen.findByRole('heading', { name: 'Rolled oats', level: 1 })
+  // Its header is its name and brand, nothing beside them for the eye.
+  expect(title.closest('header')?.querySelector('[aria-hidden]')).toBeNull()
+  expect(title.closest('header')?.textContent).toBe('Rolled oatsMill')
+  const energy = screen.getByRole('region', { name: 'Where the energy comes from' })
+  expect(energy.querySelectorAll('[style*="width"]')).toHaveLength(3)
+})
+
 test('a food of many servings picks the amount in a list', async () => {
   const servings = ['slice', 'cup', 'spoon'].map((name, i) => ({ name, amount: 10 * (i + 1) }))
   foodServer({ food: { ...oats, servings } })

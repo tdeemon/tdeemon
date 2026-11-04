@@ -184,6 +184,48 @@ test("a recipe's page says a portion's energy, the dish's weight and its ingredi
   expect(within(page).getByRole('row', { name: 'Energy 2,140 kcal' })).toBeDefined()
 })
 
+test("a recipe's actions are a portion logged, cooked again and an edit, in Croatian's cases", async () => {
+  recipeServer(curry, signedIn('hr'))
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  // A portion as the verb's object: Upiši 1 porciju, not 1 porcija.
+  expect(await within(page).findByRole('button', { name: 'Upiši 1 porciju' })).toBeDefined()
+  expect(within(page).getByRole('button', { name: 'Kuhaj opet' })).toBeDefined()
+  // The edit an icon, its name for a screen reader.
+  const edit = within(page).getByRole('link', { name: 'Uredi recept' })
+  expect(edit.textContent).toBe('')
+  expect(edit.getAttribute('href')).toBe(`/foods/${curryId}?edit=true`)
+  // Its count in the header, in the nominative: 5 porcija.
+  expect(within(page).getByText('2 sastojka · 5 porcija')).toBeDefined()
+  // The bar of where the energy comes from is the page's.
+  expect(within(page).getByRole('region', { name: 'Energija recepta' })).toBeDefined()
+})
+
+test("a recipe's archive that failed says so beside its button, at the page's end", async () => {
+  recipeServer(curry, { 'POST /api/v1/foods': () => problem(500) })
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  const archive = within(page).getByRole('button', { name: 'Archive the recipe' })
+  fireEvent.click(archive)
+  const said = await within(page).findByRole('alert')
+  expect(archive.parentElement?.contains(said)).toBe(true)
+})
+
+test("a recipe's Log is a row of its own, Cook again and the edit under it", async () => {
+  recipeServer()
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  const log = await within(page).findByRole('button', { name: 'Log 1 portion' })
+  // Its amount may be long (Log ⅒ of the recipe): the row's whole width.
+  expect(log.className).toContain('col-span-2')
+  const cook = within(page).getByRole('button', { name: 'Cook again' })
+  expect(cook.parentElement).toBe(log.parentElement)
+  expect(cook.className).not.toContain('col-span-2')
+})
+
 test('a recipe not weighed says so plainly, ≈ on its grams, and is weighed in a sheet', async () => {
   const server = recipeServer(notWeighed)
   renderAt(`/foods/${curryId}`)
@@ -273,8 +315,8 @@ test('cooked again changes the amounts, the weight from the pot and the portions
   const server = recipeServer()
   renderAt(`/foods/${curryId}`)
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Cooked again' }))
-  const sheet = await screen.findByRole('dialog', { name: 'Cooked again' })
+  fireEvent.click(await screen.findByRole('button', { name: 'Cook again' }))
+  const sheet = await screen.findByRole('dialog', { name: 'Cook again' })
   const amount = await within(sheet).findByLabelText('Amount: Chicken breast')
   expect(amount).toHaveProperty('value', '800')
   expect(within(sheet).getByLabelText('Unit: Basmati rice')).toHaveProperty('value', 'serving:cup')
@@ -294,7 +336,7 @@ test('cooked again changes the amounts, the weight from the pot and the portions
 
   expect(await screen.findByText('Saved: Chicken curry · 428 kcal per portion')).toBeDefined()
   await waitFor(() => {
-    expect(screen.queryByRole('dialog', { name: 'Cooked again' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Cook again' })).toBeNull()
   })
   expect(server.sent).toEqual([
     {
@@ -482,7 +524,7 @@ test('the recipes are a list of their own, their kcal for a portion, and a new o
   // In use, a recipe is marked, its kcal those of a portion.
   const row = await screen.findByRole('link', { name: /^Chicken curry/ })
   expect(row.textContent).toContain('recipe')
-  expect(row.textContent).toContain('428 kcal/portion')
+  expect(row.textContent).toContain('428 kcal · 42 g P /portion')
   fireEvent.click(screen.getByRole('radio', { name: 'Recipes' }))
   expect(await screen.findByRole('radio', { name: 'Recipes · 1' })).toHaveProperty('checked', true)
   expect(router.state.location.search).toEqual({ filter: 'recipes' })
@@ -503,15 +545,15 @@ test('the recipes are a list of their own, their kcal for a portion, and a new o
   expect(screen.getAllByRole('link', { name: 'New recipe' })).toHaveLength(1)
 })
 
-test('the new button is a choice of a food or a recipe', async () => {
+test('a new recipe is a button of its own, beside the new food', async () => {
   fakeServer({
     ...signedIn('hr'),
     'GET /api/v1/foods/list': () => Response.json({ foods: [chicken], total: 1 }),
   })
   const router = renderAt('/foods')
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Nova namirnica ili recept' }))
-  fireEvent.click(await screen.findByRole('menuitem', { name: 'Recept' }))
+  expect(await screen.findByRole('link', { name: 'Nova namirnica' })).toBeDefined()
+  fireEvent.click(screen.getByRole('link', { name: 'Novi recept' }))
   expect(await screen.findByRole('heading', { name: 'Novi recept' })).toBeDefined()
   expect(router.state.location.pathname).toBe('/foods/new-recipe')
   expect(
@@ -682,8 +724,8 @@ test("cooked again keeps another member's ingredient, of the values the recipe h
   const server = recipeServer(shared, { [`GET /api/v1/foods/${rice.id}`]: () => problem(404) })
   renderAt(`/foods/${curryId}`)
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Cooked again' }))
-  const sheet = await screen.findByRole('dialog', { name: 'Cooked again' })
+  fireEvent.click(await screen.findByRole('button', { name: 'Cook again' }))
+  const sheet = await screen.findByRole('dialog', { name: 'Cook again' })
   expect(await within(sheet).findByLabelText('Unit: Basmati rice')).toHaveProperty(
     'value',
     'serving:cup',
@@ -705,8 +747,8 @@ test("an own ingredient no longer the user's (a recipe they left) stands for its
   recipeServer(curry, { [`GET /api/v1/foods/${chicken.id}`]: () => problem(404) })
   renderAt(`/foods/${curryId}`)
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Cooked again' }))
-  const sheet = await screen.findByRole('dialog', { name: 'Cooked again' })
+  fireEvent.click(await screen.findByRole('button', { name: 'Cook again' }))
+  const sheet = await screen.findByRole('dialog', { name: 'Cook again' })
   expect(await within(sheet).findByLabelText('Amount: Chicken breast')).toHaveProperty(
     'value',
     '800',
@@ -804,9 +846,13 @@ test("a household's recipe marks its members, whom no one removes, and is left o
   expect(
     within(page).getByText('Your household leaves it with you. Your meals of it stay.'),
   ).toBeDefined()
-  expect(
-    await screen.findByText('Your household shares this food: a change here is every member’s.'),
-  ).toBeDefined()
+  // The household's card: its members, the user last, and that a change
+  // is every member's.
+  const card = (await screen.findByRole('heading', { name: 'Household · Zoe and you' }))
+    .parentElement
+  expect(card?.textContent).toContain(
+    'A change here is every member’s. Each logs their own portion.',
+  )
   cleanup()
 
   // The household's alone: no one else would stay, so no one leaves.

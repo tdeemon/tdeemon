@@ -26,7 +26,8 @@ export function LogFood({ food, className }: { food: Food; className?: string })
   // Today, as the day answered, else as the user's profile says: a tap
   // before either came opens the meal once one has.
   const date = day.data?.date ?? me.data?.today
-  const amount = lastAmountOf(food, t, f)
+  // The amount as the verb's object: Upiši 1 porciju.
+  const amount = lastAmountOf(food, t, f, 'accusative')
 
   return (
     <>

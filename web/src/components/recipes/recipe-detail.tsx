@@ -20,10 +20,11 @@ import { recipeInput, useSaveRecipe, type RecipeBody } from '@/api/recipes'
 import { sessionQuery } from '@/api/session'
 import type { Food } from '@/api/types'
 import { SaveStatus } from '@/components/day/save-status'
+import { detailColumns, detailHeader } from '@/components/foods/detail-layout'
 import { EnergySplit } from '@/components/foods/energy-split'
-import { FoodAvatar } from '@/components/foods/food-avatar'
 import { LogFood } from '@/components/foods/log-food'
 import { NutritionTable } from '@/components/foods/nutrition-table'
+import { HouseholdMark } from '@/components/household/household-mark'
 import { CookedAgain } from '@/components/recipes/cooked-again'
 import { RecipeSharing } from '@/components/recipes/recipe-sharing'
 import { ingredientAmount, warningOf } from '@/components/recipes/recipe-values'
@@ -46,10 +47,13 @@ const card = 'rounded-lg bg-card p-4 shadow-card lg:p-5'
 // brought, one whose food changed since marked, with a way to take the
 // new values (the recipe saved again); what it brings (NutritionTable);
 // its note, and how often it was logged. It logs the recipe today, saves
-// it cooked again or weighed (CookedAgain), opens its editor, and
-// archives it or brings it back, which a toast says, with Undo. Shared
-// with other users, it says with whom (RecipeSharing), and another
-// member's ingredient is added to the user's foods in a tap.
+// it cooked again or weighed (CookedAgain), opens its editor (an icon
+// beside them), and archives it or brings it back, which a toast says,
+// with Undo. Shared with other users, it says with whom (RecipeSharing),
+// and another member's ingredient is added to the user's foods in a tap;
+// of a household, that a change is every member's (HouseholdMark). Its
+// title stays in view as a desktop's pane scrolls, and a pane wide
+// enough has two columns, as a food's page.
 export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody }) {
   const t = useMessages()
   const f = useFormat()
@@ -100,208 +104,230 @@ export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody 
 
   return (
     <article aria-labelledby={`food-${food.id}`} className="space-y-4">
-      <header className="flex items-start gap-3">
-        <FoodAvatar name={food.name} large />
-        <div className="flex min-h-14 min-w-0 flex-1 flex-col justify-center">
-          <h1 id={`food-${food.id}`} className="text-title break-words">
-            {food.name}
-          </h1>
-          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-small text-muted-foreground">
-            <Badge tone="primary">{t.recipes.mark}</Badge>
-            {food.archived && <Badge>{t.foods.archivedMark}</Badge>}
-            <span>
-              {t.recipes.ingredients(items.length)}
-              {recipe.portions !== undefined &&
-                ` · ${t.recipes.portions(f.number(recipe.portions), recipe.portions)}`}
-            </span>
-          </p>
-        </div>
+      <header className={detailHeader}>
+        <h1 id={`food-${food.id}`} className="text-title break-words">
+          {food.name}
+        </h1>
+        <p className="mt-1 flex flex-wrap items-center gap-1.5 text-small text-muted-foreground">
+          <Badge tone="primary">{t.recipes.mark}</Badge>
+          {food.archived && <Badge>{t.foods.archivedMark}</Badge>}
+          <span>
+            {t.recipes.ingredients(items.length)}
+            {recipe.portions !== undefined &&
+              ` · ${t.recipes.portions(f.number(recipe.portions), recipe.portions)}`}
+          </span>
+        </p>
       </header>
       {food.archived && (
         <p className="rounded-md bg-surface-2 px-3 py-2 text-small">{t.recipes.archivedNote}</p>
       )}
-      <section aria-label={t.recipes.energy} className={cn(card, 'space-y-4')}>
-        <p className="flex flex-wrap items-baseline gap-x-2">
-          <span className="text-display">
-            {portion ? f.number(portion.kcal) : `${approx}${f.number(per100.kcal)}`}
-          </span>
-          <span className="text-muted-foreground">
-            {portion ? t.recipes.kcalPerPortion : t.recipes.kcalPer100}
-          </span>
-        </p>
-        <EnergySplit nutrients={portion ?? per100} />
-        <dl className="grid grid-cols-3 gap-2 border-t pt-3">
-          {portionGrams !== undefined && (
-            <div className="min-w-0">
-              <dt className="text-caption text-muted-foreground">{t.recipes.portion}</dt>
-              <dd className="text-small font-semibold">
-                {approx}
-                {grams(portionGrams)}
-              </dd>
-            </div>
-          )}
-          <div className="min-w-0">
-            <dt className="text-caption text-muted-foreground">{t.recipes.per100}</dt>
-            <dd className="text-small font-semibold">
-              {approx}
-              {t.unit.kcal(f.number(per100.kcal))}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-caption text-muted-foreground">{t.recipes.whole}</dt>
-            <dd className="text-small font-semibold">{t.unit.kcal(f.number(recipe.total.kcal))}</dd>
-          </div>
-          {portionGrams === undefined && (
-            <div className="min-w-0">
-              <dt className="text-caption text-muted-foreground">{t.recipes.weight}</dt>
-              <dd className="text-small font-semibold">
-                {approx}
-                {grams(recipe.weight)}
-              </dd>
-            </div>
-          )}
-        </dl>
-        <div className="flex flex-wrap items-start gap-x-3 gap-y-2 border-t pt-3">
-          <Scale aria-hidden className="mt-0.5 size-4.5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0 flex-1 basis-48 space-y-0.5">
-            <p className="font-medium">
-              {weighed ? t.recipes.weighed(grams(recipe.weight)) : t.recipes.notWeighed}
+      <div className={detailColumns}>
+        <div className="space-y-4">
+          <section aria-label={t.recipes.energy} className={cn(card, 'space-y-4')}>
+            <p className="flex flex-wrap items-baseline gap-x-2">
+              <span className="text-display">
+                {portion ? f.number(portion.kcal) : `${approx}${f.number(per100.kcal)}`}
+              </span>
+              <span className="text-muted-foreground">
+                {portion ? t.recipes.kcalPerPortion : t.recipes.kcalPer100}
+              </span>
             </p>
-            <p className="text-small text-muted-foreground">
-              {weighed
-                ? [
-                    ...(recipe.portions === undefined || portionGrams === undefined
-                      ? []
-                      : [
-                          t.recipes.portionsOf(
-                            t.recipes.portions(f.number(recipe.portions), recipe.portions),
-                            grams(portionGrams),
-                          ),
-                        ]),
-                    ...(recipe.raw_weight === undefined
-                      ? []
-                      : [t.recipes.ofRaw(f.percent((recipe.weight / recipe.raw_weight) * 100, 0))]),
-                  ].join(' · ')
-                : t.recipes.notWeighedWhy(grams(recipe.weight))}
-            </p>
-          </div>
-          {!weighed && !food.archived && (
-            <Button
-              ref={weighButton}
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSheet('weigh')
-              }}
+            <EnergySplit nutrients={portion ?? per100} />
+            <dl className="grid grid-cols-3 gap-2 border-t pt-3">
+              {portionGrams !== undefined && (
+                <div className="min-w-0">
+                  <dt className="text-caption text-muted-foreground">{t.recipes.portion}</dt>
+                  <dd className="text-small font-semibold">
+                    {approx}
+                    {grams(portionGrams)}
+                  </dd>
+                </div>
+              )}
+              <div className="min-w-0">
+                <dt className="text-caption text-muted-foreground">{t.recipes.per100}</dt>
+                <dd className="text-small font-semibold">
+                  {approx}
+                  {t.unit.kcal(f.number(per100.kcal))}
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-caption text-muted-foreground">{t.recipes.whole}</dt>
+                <dd className="text-small font-semibold">
+                  {t.unit.kcal(f.number(recipe.total.kcal))}
+                </dd>
+              </div>
+              {portionGrams === undefined && (
+                <div className="min-w-0">
+                  <dt className="text-caption text-muted-foreground">{t.recipes.weight}</dt>
+                  <dd className="text-small font-semibold">
+                    {approx}
+                    {grams(recipe.weight)}
+                  </dd>
+                </div>
+              )}
+            </dl>
+            <div className="flex flex-wrap items-start gap-x-3 gap-y-2 border-t pt-3">
+              <Scale aria-hidden className="mt-0.5 size-4.5 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1 basis-48 space-y-0.5">
+                <p className="font-medium">
+                  {weighed ? t.recipes.weighed(grams(recipe.weight)) : t.recipes.notWeighed}
+                </p>
+                <p className="text-small text-muted-foreground">
+                  {weighed
+                    ? [
+                        ...(recipe.portions === undefined || portionGrams === undefined
+                          ? []
+                          : [
+                              t.recipes.portionsOf(
+                                t.recipes.portions(f.number(recipe.portions), recipe.portions),
+                                grams(portionGrams),
+                              ),
+                            ]),
+                        ...(recipe.raw_weight === undefined
+                          ? []
+                          : [
+                              t.recipes.ofRaw(
+                                f.percent((recipe.weight / recipe.raw_weight) * 100, 0),
+                              ),
+                            ]),
+                      ].join(' · ')
+                    : t.recipes.notWeighedWhy(grams(recipe.weight))}
+                </p>
+              </div>
+              {!weighed && !food.archived && (
+                <Button
+                  ref={weighButton}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSheet('weigh')
+                  }}
+                >
+                  {t.recipes.weighIt}
+                </Button>
+              )}
+            </div>
+          </section>
+          {/* Log it, on a row of its own (its amount as long as "Log ⅒ of
+          the recipe"); under it cook it again and, as an icon, edit it. One
+          archived is brought back instead. */}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            {!food.archived && <LogFood food={eaten} className="col-span-2" />}
+            {!food.archived && (
+              <Button
+                ref={cookedButton}
+                variant="outline"
+                onClick={() => {
+                  setSheet('cooked')
+                }}
+              >
+                <CookingPot aria-hidden />
+                {t.recipes.cookedAgain}
+              </Button>
+            )}
+            {food.archived && <ArchiveButton food={food} archive={archive} />}
+            <Link
+              to="/foods/$id"
+              params={{ id: food.id }}
+              search={{ ...search, edit: true }}
+              state={{ fromFood: true }}
+              aria-label={t.recipes.editTitle}
+              className={buttonVariants({
+                variant: 'outline',
+                size: 'icon',
+                className: 'shrink-0',
+              })}
             >
-              {t.recipes.weighIt}
-            </Button>
+              <Pencil aria-hidden />
+            </Link>
+          </div>
+          {food.archived && <SaveStatus change={archive} />}
+          {changed.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md bg-surface-2 px-3 py-2.5 text-small">
+              <Info aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+              <p className="min-w-0 flex-1 basis-48">
+                {t.recipes.changed(f.list(changed.map((i) => i.name)))}
+              </p>
+              <Button variant="outline" size="sm" disabled={again.isPending} onClick={takeNew}>
+                <RefreshCw aria-hidden />
+                {t.recipes.takeNew}
+              </Button>
+              <SaveStatus change={again} onRetry={takeNew} />
+            </div>
           )}
         </div>
-      </section>
-      <div className="grid grid-cols-2 gap-2">
-        {!food.archived && <LogFood food={eaten} className="col-span-2" />}
-        {!food.archived && (
-          <Button
-            ref={cookedButton}
-            variant="outline"
-            onClick={() => {
-              setSheet('cooked')
-            }}
-          >
-            <CookingPot aria-hidden />
-            {t.recipes.cookedAgain}
-          </Button>
-        )}
-        <Link
-          to="/foods/$id"
-          params={{ id: food.id }}
-          search={{ ...search, edit: true }}
-          state={{ fromFood: true }}
-          className={buttonVariants({ variant: 'outline' })}
-        >
-          <Pencil aria-hidden />
-          {t.foods.edit}
-        </Link>
-        {food.archived && <ArchiveButton food={food} archive={archive} />}
+        <div className="space-y-4">
+          <section aria-labelledby={`${id}-items`} className={cn(card, 'space-y-2')}>
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 id={`${id}-items`} className="text-h3">
+                {t.recipes.ingredientsTitle}
+              </h2>
+              <span className="text-small text-muted-foreground">{f.number(items.length)}</span>
+            </div>
+            <ul aria-labelledby={`${id}-items`} className="divide-y">
+              {items.map((item, i) => {
+                const words = (
+                  <>
+                    <span className="min-w-0 flex-1 space-y-0.5">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-medium break-words">{item.name}</span>
+                        {item.brand && (
+                          <span className="text-muted-foreground">· {item.brand}</span>
+                        )}
+                        {item.source === 'recipe' && <Badge tone="primary">{t.recipes.mark}</Badge>}
+                        {item.theirs === true && <Badge>{t.sharing.theirs}</Badge>}
+                      </span>
+                      <span className="block text-small text-muted-foreground">
+                        {ingredientAmount(item, t, f)}
+                        {item.changed === true && ` · ${t.recipes.changedMark}`}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-sm whitespace-nowrap text-muted-foreground">
+                      {t.unit.kcal(f.number(item.nutrients.kcal))}
+                    </span>
+                  </>
+                )
+                return (
+                  <li key={`${item.food_id}-${String(i)}`}>
+                    {item.theirs === true ? (
+                      <span className="flex items-center gap-3 py-2.5">
+                        {words}
+                        <AddToMine food={food} position={i} name={item.name} />
+                      </span>
+                    ) : item.source === 'recipe' ? (
+                      <Link
+                        to="/foods/$id"
+                        params={{ id: item.food_id }}
+                        search={{ q: search.q, filter: search.filter, order: search.order }}
+                        aria-label={t.recipes.open(item.name)}
+                        className="-mx-2 flex min-h-11 items-center gap-3 rounded-md px-2 py-2.5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {words}
+                        <ChevronRight
+                          aria-hidden
+                          className="size-4 shrink-0 text-muted-foreground"
+                        />
+                      </Link>
+                    ) : (
+                      <span className="flex items-center gap-3 py-2.5">{words}</span>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+            <p className="flex justify-between gap-2 border-t pt-2.5 text-small font-semibold">
+              <span>{t.recipes.rawSum}</span>
+              <span>
+                {recipe.raw_weight === undefined ? '' : `${grams(recipe.raw_weight)} · `}
+                {t.unit.kcal(f.number(recipe.total.kcal))}
+              </span>
+            </p>
+            <p className="text-caption text-muted-foreground">{t.recipes.valuesOfSave}</p>
+          </section>
+          <RecipeSharing food={food} className={card} />
+        </div>
       </div>
-      <SaveStatus change={archive} />
-      {changed.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md bg-surface-2 px-3 py-2.5 text-small">
-          <Info aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-          <p className="min-w-0 flex-1 basis-48">
-            {t.recipes.changed(f.list(changed.map((i) => i.name)))}
-          </p>
-          <Button variant="outline" size="sm" disabled={again.isPending} onClick={takeNew}>
-            <RefreshCw aria-hidden />
-            {t.recipes.takeNew}
-          </Button>
-          <SaveStatus change={again} onRetry={takeNew} />
-        </div>
-      )}
-      <section aria-labelledby={`${id}-items`} className={cn(card, 'space-y-2')}>
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 id={`${id}-items`} className="text-h3">
-            {t.recipes.ingredientsTitle}
-          </h2>
-          <span className="text-small text-muted-foreground">{f.number(items.length)}</span>
-        </div>
-        <ul aria-labelledby={`${id}-items`} className="divide-y">
-          {items.map((item, i) => {
-            const words = (
-              <>
-                <span className="min-w-0 flex-1 space-y-0.5">
-                  <span className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-medium break-words">{item.name}</span>
-                    {item.brand && <span className="text-muted-foreground">· {item.brand}</span>}
-                    {item.source === 'recipe' && <Badge tone="primary">{t.recipes.mark}</Badge>}
-                    {item.theirs === true && <Badge>{t.sharing.theirs}</Badge>}
-                  </span>
-                  <span className="block text-small text-muted-foreground">
-                    {ingredientAmount(item, t, f)}
-                    {item.changed === true && ` · ${t.recipes.changedMark}`}
-                  </span>
-                </span>
-                <span className="shrink-0 text-sm whitespace-nowrap text-muted-foreground">
-                  {t.unit.kcal(f.number(item.nutrients.kcal))}
-                </span>
-              </>
-            )
-            return (
-              <li key={`${item.food_id}-${String(i)}`}>
-                {item.theirs === true ? (
-                  <span className="flex items-center gap-3 py-2.5">
-                    {words}
-                    <AddToMine food={food} position={i} name={item.name} />
-                  </span>
-                ) : item.source === 'recipe' ? (
-                  <Link
-                    to="/foods/$id"
-                    params={{ id: item.food_id }}
-                    search={{ q: search.q, filter: search.filter, order: search.order }}
-                    aria-label={t.recipes.open(item.name)}
-                    className="-mx-2 flex min-h-11 items-center gap-3 rounded-md px-2 py-2.5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {words}
-                    <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-                  </Link>
-                ) : (
-                  <span className="flex items-center gap-3 py-2.5">{words}</span>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-        <p className="flex justify-between gap-2 border-t pt-2.5 text-small font-semibold">
-          <span>{t.recipes.rawSum}</span>
-          <span>
-            {recipe.raw_weight === undefined ? '' : `${grams(recipe.raw_weight)} · `}
-            {t.unit.kcal(f.number(recipe.total.kcal))}
-          </span>
-        </p>
-        <p className="text-caption text-muted-foreground">{t.recipes.valuesOfSave}</p>
-      </section>
-      <RecipeSharing food={food} className={card} />
+      {/* What it brings, across both columns: its amounts' segments whole. */}
       <NutritionTable food={food} />
       {food.note && (
         <section className={cn(card, 'space-y-1.5')}>
@@ -309,6 +335,7 @@ export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody 
           <p className="whitespace-pre-line text-muted-foreground">{food.note}</p>
         </section>
       )}
+      <HouseholdMark recipe className={card} />
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 px-1 text-small">
         <dt className="text-muted-foreground">{t.foods.from}</dt>
         <dd>{t.foods.sources.recipe}</dd>
@@ -333,8 +360,10 @@ export function RecipeDetail({ food, recipe }: { food: Food; recipe: RecipeBody 
         )}
       </dl>
       {!food.archived && (
-        <div>
+        // Its status beside it, at the page's end.
+        <div className="space-y-2">
           <ArchiveButton food={food} archive={archive} small />
+          <SaveStatus change={archive} />
         </div>
       )}
       <CookedAgain
@@ -358,10 +387,12 @@ function ArchiveButton({
   food,
   archive,
   small = false,
+  className,
 }: {
   food: Food
   archive: ReturnType<typeof useSaveFood>
   small?: boolean
+  className?: string
 }) {
   const t = useMessages()
 
@@ -369,6 +400,7 @@ function ArchiveButton({
     <Button
       variant="outline"
       size={small ? 'sm' : 'default'}
+      className={className}
       disabled={archive.isPending}
       onClick={() => {
         archive.mutate(
