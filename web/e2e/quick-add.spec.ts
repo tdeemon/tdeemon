@@ -98,6 +98,8 @@ test.describe('on a desktop', () => {
     await signIn(page)
     await eaten(page, ['Kiwi'])
     await page.goto('/')
+    // The day first: a key pressed before the app is up is no shortcut.
+    await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
     await page.keyboard.press('n')
     const sheet = page.getByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
     const search = sheet.getByLabel('Find a food or a meal')
