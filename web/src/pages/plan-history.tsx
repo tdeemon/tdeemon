@@ -1,8 +1,9 @@
 import { Link, useSearch } from '@tanstack/react-router'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, History } from 'lucide-react'
 import { useId } from 'react'
 
 import { $api } from '@/api/client'
+import { EmptyState } from '@/components/empty-state'
 import { LoadError } from '@/components/load-error'
 import { RevisionDetail, RevisionList } from '@/components/plan/revisions'
 import { Skeleton } from '@/components/skeleton'
@@ -32,7 +33,7 @@ export function PlanHistoryPage() {
       <Skeleton blocks={['h-14', 'h-14', 'h-14']} />
     )
   } else if (plan.data.revisions.length === 0) {
-    body = <p className="text-sm text-muted-foreground">{r.none}</p>
+    body = <EmptyState icon={History}>{r.none}</EmptyState>
   } else {
     const { revisions } = plan.data
     // A revision asked for that the plan's latest do not hold is said

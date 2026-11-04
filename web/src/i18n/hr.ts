@@ -1382,6 +1382,7 @@ export const hr: Messages = {
     copy: 'Kopiraj',
     copied: 'Kopirano',
     copiedSaid: 'Kopirano. Zalijepi to svom AI treneru.',
+    copyFailed: 'Kopiranje nije uspjelo. Poruka je označena, kopiraj je ručno.',
     lands: 'Prijedlog dolazi u Plan; ništa se ne mijenja dok ga ne prihvatiš.',
     later: 'Kasnije',
     how: {

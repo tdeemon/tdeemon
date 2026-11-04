@@ -173,7 +173,7 @@ test('a browser that cannot copy selects the message, to copy by hand', async ()
   )
   fireEvent.click(coach.getByRole('button', { name: 'Copy' }))
   expect((await coach.findByRole('alert')).textContent).toBe(
-    "Couldn't copy. It's selected, so copy it by hand.",
+    "Couldn't copy. The message is selected, so copy it by hand.",
   )
   expect(window.getSelection()?.toString()).toContain('Look at my profile')
   Reflect.deleteProperty(navigator, 'clipboard')
@@ -338,4 +338,24 @@ test('the first meal is the one eaten earliest, not the one eaten again lately',
   const steps4 = await card()
   expect(await steps4.findByText('1 of 4')).toBeDefined()
   expect(steps()[3]).toBe('Done:Your first meal|Oats')
+})
+
+test('a failed copy says so in Croatian, of the message', async () => {
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: () => Promise.reject(new Error('denied')) },
+    configurable: true,
+  })
+  fakeServer(newUser('hr'))
+  renderAt('/')
+
+  const coach = within(
+    within(await screen.findByRole('region', { name: 'Prvi koraci' })).getByRole('region', {
+      name: 'Zatim: zatraži plan od svog AI trenera',
+    }),
+  )
+  fireEvent.click(coach.getByRole('button', { name: 'Kopiraj' }))
+  expect((await coach.findByRole('alert')).textContent).toBe(
+    'Kopiranje nije uspjelo. Poruka je označena, kopiraj je ručno.',
+  )
+  Reflect.deleteProperty(navigator, 'clipboard')
 })

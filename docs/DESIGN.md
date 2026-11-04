@@ -1729,8 +1729,9 @@ the first spec.
     ("Couldn't load today."), why, and Try again, not in an error's red.
     A place with nothing in it yet (the day's meals, a list of foods, the
     access keys, the devices notified, the household, the recent
-    changes) says so as each other does: an icon in a soft tile, one
-    sentence, and the one action that fills it, where there is one.
+    changes, the plan's history, the day's measurements) says so as
+    each other does: an icon in a soft tile, one sentence, and the one
+    action that fills it, where there is one.
     What came stays when asking for it again fails (TanStack Query's
     error with data), under a thin bar over the page that says since when
     ("Offline · data from 21:14", or "Not updated" when the server

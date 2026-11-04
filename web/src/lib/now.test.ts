@@ -5,6 +5,7 @@ import { useNow } from '@/lib/now'
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 
 test('the time now is asked again each minute', () => {
@@ -36,5 +37,4 @@ test('a page shown again asks the time at once, one hidden does not', () => {
     document.dispatchEvent(new Event('visibilitychange'))
   })
   expect(result.current).toBe(Date.parse('2026-10-23T19:00:00Z'))
-  hidden.mockRestore()
 })

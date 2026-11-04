@@ -290,7 +290,7 @@ function AskCoach({ user }: { user: string }) {
       <output className="sr-only">{copied === 'yes' ? s.copiedSaid : ''}</output>
       {copied === 'failed' && (
         <p role="alert" className="mt-2 text-small text-destructive">
-          {t.settings.copyFailed}
+          {s.copyFailed}
         </p>
       )}
       <p className="mt-2 text-caption text-muted-foreground">{s.lands}</p>

@@ -1580,6 +1580,7 @@ export const en = {
     copied: 'Copied',
     // Said as the message is copied, to a screen reader too.
     copiedSaid: 'Copied. Paste it to your AI coach.',
+    copyFailed: "Couldn't copy. The message is selected, so copy it by hand.",
     lands: 'The proposal lands in Plan; nothing changes until you accept it.',
     later: 'Later',
     // Beside the steps on a desktop: the loop, in four rows.

@@ -65,8 +65,9 @@ Undo on the next, each number of
 calibration's an ⓘ away from what it is, a page that loads a skeleton
 of its shape under its header, one that did not load saying so there
 with a way to ask again, a place with nothing yet an icon, a sentence
-and the action that fills it, and what came kept, under a bar that says
-since when, when it cannot be asked again, in English and Croatian)
+and the action that fills it where there is one, and what came kept,
+under a bar that says since when, when it cannot be asked again, in
+English and Croatian)
 with the day (shown at once, with what it shows above its meals, so
 nothing moves them after; under a header of one row, ‹ the title ›, a
 Today pill on another day and the user's mark; a new user's first
