@@ -2,7 +2,8 @@
 # Prints the version the next release gets, such as v0.2.0, or nothing
 # when the commits since the last release make none. The release
 # workflow and `make next-version` run it; the rules are in
-# docs/conventions.md ("Releases").
+# docs/conventions.md ("Releases"). A Release-As trailer sets the
+# version outright (below).
 #
 # cog bump --auto takes the version from the Conventional Commits since
 # the last tag (cog.toml). Before 1.0.0 it raises nothing for a breaking
@@ -49,6 +50,31 @@ if [[ -z $last || $last == v0.* ]]; then
       exit 1
     fi
   fi
+fi
+
+# A "Release-As: vX.Y.Z" trailer in a commit since the last tag (the
+# squash merge's body, from its pull request's description) sets the
+# version outright, such as v1.0.0, which the rules above never reach
+# from v0.x. It must be past the last tag and the version computed; a
+# commit of any type makes that release.
+range=HEAD
+if [[ -n $last ]]; then
+  range=$last..HEAD
+fi
+wanted=$(git log --format='%(trailers:key=Release-As,valueonly)' "$range" | sed '/^[[:space:]]*$/d' | sort -uV | tail -n 1)
+if [[ -n $wanted ]]; then
+  wanted=${wanted//[[:space:]]/}
+  if [[ ! $wanted =~ $semver ]]; then
+    printf 'next-version: Release-As %s: want vX.Y.Z\n' "$wanted" >&2
+    exit 1
+  fi
+  for floor in $last $next; do
+    if [[ $(printf '%s\n%s\n' "$floor" "$wanted" | sort -V | tail -n 1) != "$wanted" || $floor == "$wanted" ]]; then
+      printf 'next-version: Release-As %s is not past %s\n' "$wanted" "$floor" >&2
+      exit 1
+    fi
+  done
+  next=$wanted
 fi
 
 if [[ -n $next ]]; then
