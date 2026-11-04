@@ -48,15 +48,15 @@ function ordered<T>(things: readonly T[], times: (t: T) => number, had: (t: T) =
 // suggestMeals are meals of before (the latest first), as the quick add
 // offers them at a moment: those eaten at its meal of the day in the last
 // two weeks, the most often first, then the others, then those the day
-// had; and how many of the first are of the meal of the day (ofSlot).
+// had; and how many of them the day has not had (fresh).
 export function suggestMeals(
   meals: readonly RecentMeal[],
   at: Moment,
-): { meals: RecentMeal[]; ofSlot: number } {
+): { meals: RecentMeal[]; fresh: number } {
   const had = (m: RecentMeal) => m.eaten.some((e) => e.day === at.date)
   return {
     meals: ordered(meals, (m) => timesAt(m.eaten, at), had),
-    ofSlot: meals.filter((m) => !had(m) && timesAt(m.eaten, at) > 0).length,
+    fresh: meals.filter((m) => !had(m)).length,
   }
 }
 

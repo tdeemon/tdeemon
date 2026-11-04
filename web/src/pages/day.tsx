@@ -366,6 +366,13 @@ export function DayPage() {
               </h2>
               {day.data.meals.length > 0 && (
                 <span className="text-small text-muted-foreground">
+                  {/* A desktop's table says its keys, which the shortcuts
+                      list for a screen reader. */}
+                  {desktop && (
+                    <span aria-hidden className="mr-3 hidden xl:inline">
+                      {t.day.mealKeys}
+                    </span>
+                  )}
                   {t.day.mealsTotal(day.data.meals.length, f.number(day.data.total.kcal))}
                 </span>
               )}

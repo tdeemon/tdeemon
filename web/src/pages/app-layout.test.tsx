@@ -283,14 +283,14 @@ test('Log a meal opens the form on today over the section, which stays', async (
   }
   fireEvent.click(bar)
 
-  const sheet = await screen.findByRole('dialog', { name: 'New meal' })
+  const sheet = await screen.findByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
   expect(router.state.location.pathname).toBe('/foods')
   expect(router.state.location.search).toEqual({ filter: 'archived' })
 
   // Closed, the focus is back on the bar's Log a meal.
   fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }))
   await waitFor(() => {
-    expect(screen.queryByRole('dialog', { name: 'New meal' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })).toBeNull()
   })
   expect(document.activeElement).toBe(bar)
 })
@@ -304,11 +304,11 @@ test('N logs a meal, / finds a food, and ? lists the shortcuts', async () => {
   await nav()
 
   fireEvent.keyDown(window, { key: 'n' })
-  const sheet = await screen.findByRole('dialog', { name: 'New meal' })
+  const sheet = await screen.findByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
   expect(router.state.location.pathname).toBe('/foods')
   fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }))
   await waitFor(() => {
-    expect(screen.queryByRole('dialog', { name: 'New meal' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })).toBeNull()
   })
 
   fireEvent.keyDown(document.body, { key: '/' })

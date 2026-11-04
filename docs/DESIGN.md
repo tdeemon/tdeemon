@@ -703,7 +703,10 @@ the foods, by the meal of the day being logged (breakfast, lunch, a
 snack, dinner, on the user's clock): first those eaten at it in the
 last 14 days, the most often first, then the others, and last those the
 day had already, as the meal logged a minute ago is not the next; with
-nothing searched for, the first meals of it are cards above the search.
+nothing searched for, the first meals (two on a phone, three on a
+desktop) are cards on top of the first list, named by the meal of the
+day ("For a snack"), and a food that is a card's only one is not listed
+again under them; Meals lists them all.
 The slot and the order are the app's: the server says only when.
 The charts read
 `GET /api/v1/history?from=&to=&granularity=day|week`, the tool
@@ -1550,23 +1553,38 @@ the first spec.
     takes back that change only (`last`, §5); a delete asks nothing first,
     and its toast stays 10 s, as one that warns, 6 s the others; none goes
     while the pointer or the focus is on the toasts, or a finger touched
-    them last. After the toast, the recent changes (a page of the settings, and
-    a sheet from an undo's toast) list the latest changes, made by the user,
-    their AI coach or a device, each said as its toast said it, with Undo on the
-    one undo takes back next. The toasts are over a sheet too, so a change made
-    in one is taken back there, and clear of its buttons, which a tap under them
-    would miss: at the top of a phone, beside the panel on a desktop; F6 takes
-    the focus to them from a sheet, which keeps Tab within it. A sheet is Base
-    UI's Drawer: from the bottom on a phone, with a handle, dragged down to
-    close (from anywhere its list is at its top), and at the right on a desktop,
-    dragged away by its title; its × stays, for the keyboard and a screen
-    reader. What a finger taps is 44 px or more either way, but a link in a
-    sentence. A sheet has one primary button at a time: the quick add's new food
-    (in short, its other fields under More and on its page) and its estimate are
-    a step of their own, in the search's place, with Add to meal alone. The
-    quick add's search takes the focus as it opens, but on a touch screen
-    (`pointer: coarse`), whose keyboard would cover what it lists, only when
-    tapped.
+    them last. After the toast, the recent changes (a page of the settings,
+    and a sheet from an undo's toast) list the latest changes, made by the
+    user, their AI coach or a device, each said as its toast said it, with
+    Undo on the one undo takes back next. The toasts are over a sheet too,
+    so a change made in one is taken back there, and clear of its buttons,
+    which a tap under them would miss: at the top of a phone, beside the
+    panel on a desktop; F6 takes the focus to them from a sheet, which
+    keeps Tab within it. A sheet is Base UI's Drawer: from the bottom on a
+    phone, with a handle, dragged down to close (from anywhere its list is
+    at its top), and at the right on a desktop, 440 px wide (Esc said in
+    its head), dragged away by its title; its × stays, for the keyboard
+    and a screen reader. What a finger taps is 44 px or more either way,
+    but a link in a sentence. A sheet has one primary button at a time,
+    and none waits disabled for what it needs. Log a meal is titled by
+    the meal of the day of its time ("Snack"), the time under it with a
+    way to change it and the meal's name. A food's + puts it in the meal
+    in the amount its row says (the last eaten, or its default, with its
+    kcal), is checked while it is there and takes it out again in a tap,
+    and the search stays as it was, its words selected for the next; the
+    tray at the sheet's foot comes with the first item: how many, their
+    kcal and macros, Edit amounts (each item's amount and unit, or the
+    item taken out, and what the day has after the meal) and the one
+    button, "Log snack · 440 kcal", ⌘↵ or Ctrl+↵ from anywhere in the
+    sheet on a keyboard. The quick add's new food (in short, its other
+    fields under More and on its page) and its estimate (the kcal chip
+    beside the lists: its kcal first, its name and macros left out if
+    need be) are a step of their own, in the search's place, with Add to
+    meal alone; an estimate in a meal of nothing else logs it at once
+    (Log snack), Add to meal beside it, so kcal alone take three
+    actions. The quick add's search takes the focus as it opens, but on
+    a touch screen (`pointer: coarse`), whose keyboard would cover what
+    it lists, only when tapped.
   - The day's header is one row at every width: ‹ its title › (Today,
     its date under it, or another day's date), a Today pill back to
     today on another day, and the user's mark, to the settings, where a

@@ -13,7 +13,7 @@ async function openLog(page: Page): Promise<Locator> {
     .getByRole('navigation', { name: 'Sections' })
     .getByRole('button', { name: 'Log a meal' })
     .click()
-  const sheet = page.getByRole('dialog', { name: 'New meal' })
+  const sheet = page.getByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
   await expect(sheet).toBeVisible()
   await slidIn(sheet)
   return sheet
@@ -76,10 +76,12 @@ test.describe('on a desktop', () => {
   test('a sheet is dragged away to the right by its title', async ({ page }) => {
     await signIn(page)
     await page.keyboard.press('n')
-    const sheet = page.getByRole('dialog', { name: 'New meal' })
+    const sheet = page.getByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
     await expect(sheet).toBeVisible()
     await slidIn(sheet)
-    const title = await sheet.getByRole('heading', { name: 'New meal' }).boundingBox()
+    const title = await sheet
+      .getByRole('heading', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
+      .boundingBox()
     if (title === null) {
       throw new Error('no title to drag')
     }

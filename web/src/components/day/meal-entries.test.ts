@@ -1,3 +1,4 @@
+import { renderHook } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
 import type { Food, Item, Meal } from '@/api/types'
@@ -5,6 +6,7 @@ import {
   amountOf,
   amountWrong,
   converted,
+  entryAmountLabel,
   entryValues,
   entryWrong,
   foodEntry,
@@ -22,6 +24,7 @@ import {
   type Entry,
 } from '@/components/day/meal-entries'
 import { en } from '@/i18n/en'
+import { useFormat } from '@/i18n/format'
 import { hr } from '@/i18n/hr'
 
 const field = (n: number) => String(n)
@@ -416,4 +419,27 @@ test('what is wrong with an amount is said in a few words', () => {
     'Najviše 10.000 kcal.',
   )
   expect(sayWrong({ kind: 'name' }, hr, broj)).toBe('Upiši naziv procjene.')
+})
+
+test("an entry's amount is said as its field has it, a recipe's as a share or portions", () => {
+  const f = renderHook(() => useFormat()).result.current
+  const curry: Food = {
+    ...bread,
+    id: '0193c3a5-0000-7000-8000-0000000000f3',
+    name: 'Curry',
+    source: 'recipe',
+    servings: [
+      { name: 'portion', amount: 250 },
+      { name: 'recipe', amount: 1000 },
+    ],
+  }
+  const of = (food: Food, amount: string, unit: string) =>
+    entryAmountLabel({ key: 'k', kind: 'food', food, amount, unit }, en, f)
+  expect(of(bread, '60', 'g')).toBe('60 g')
+  expect(of(bread, '2', 'serving:slice')).toBe('2 slice')
+  expect(of(stew, '2', 'portion')).toBe('2 portions')
+  expect(of(curry, '1/3', 'serving:recipe')).toBe('⅓ of the recipe')
+  expect(of(curry, '1', 'serving:portion')).toBe('1 portion')
+  // Typed, and no number yet: as typed.
+  expect(of(bread, 'a few', 'serving:slice')).toBe('a few slice')
 })

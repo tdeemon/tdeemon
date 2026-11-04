@@ -21,7 +21,7 @@ test('a meal is logged by hand, of a food and an estimate', async ({ page }) => 
   await page.goto(`/?date=${date}`)
   // The day's own, of its day: the bar's is today's.
   await page.getByRole('main').getByRole('button', { name: 'Log a meal' }).click()
-  const sheet = page.getByRole('dialog', { name: 'New meal' })
+  const sheet = page.getByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
   await sheet.getByRole('button', { name: 'Change the name and time' }).click()
   await sheet.getByLabel('What it was').fill('Dinner')
   await sheet.getByLabel('Time', { exact: true }).fill('19:30')
@@ -34,10 +34,15 @@ test('a meal is logged by hand, of a food and an estimate', async ({ page }) => 
   await expect(sheet.getByLabel('Amount: Basmati rice')).toHaveValue('1.67')
   await sheet.getByLabel('Amount: Basmati rice').fill('2')
   await sheet.getByLabel('Amount: Basmati rice').press('Enter')
+  // The tray names the meal of the day of its time, and opens for the
+  // amounts.
+  await expect(sheet.getByRole('heading', { name: 'Dinner' })).toBeVisible()
+  await sheet.getByRole('button', { name: 'Edit amounts' }).click()
   const meal = sheet.getByRole('list', { name: 'In the meal' })
   await expect(meal).toContainText('Basmati rice · 2 cup · 420 kcal')
-  // An estimate is a step of its own, with one button.
-  await sheet.getByRole('button', { name: 'An estimate', exact: true }).click()
+  // An estimate is a step of its own, with one button: the meal has an
+  // item, so it goes into it.
+  await sheet.getByRole('button', { name: 'An estimate in kcal' }).click()
   await sheet.getByLabel('What it is').fill('Curry')
   await sheet.getByLabel('Energy (kcal)').fill('400')
   await sheet.getByLabel('Protein (g)').fill('20')
@@ -45,7 +50,7 @@ test('a meal is logged by hand, of a food and an estimate', async ({ page }) => 
   await sheet.getByLabel('Fat (g)', { exact: true }).fill('28')
   await sheet.getByRole('button', { name: 'Add to meal' }).click()
   await expect(meal).toContainText('Curry · 400 kcal')
-  await sheet.getByRole('button', { name: 'Log 2 items · 820 kcal' }).click()
+  await sheet.getByRole('button', { name: 'Log dinner · 820 kcal' }).click()
 
   await expect(page.getByText(/^Logged: Dinner · 820 kcal/)).toBeVisible()
   await expect(sheet).toBeHidden()

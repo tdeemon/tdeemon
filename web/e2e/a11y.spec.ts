@@ -244,6 +244,34 @@ const screens: Screen[] = [
       await settled(page)
     },
   },
+  // The tray, once a food is in the meal, open for its amounts.
+  {
+    name: 'quick-add-tray',
+    open: async (page) => {
+      await page.goto('/?log=true')
+      const sheet = page.getByRole('dialog')
+      await sheet
+        .getByRole('button', { name: /^(Add|Dodaj): / })
+        .first()
+        .click()
+      await sheet.getByRole('button', { name: /^(Edit amounts|Uredi količine)$/ }).click()
+      await expect(sheet.getByRole('list', { name: /^(In the meal|U obroku)$/ })).toBeVisible()
+      await settled(page)
+    },
+  },
+  // An estimate's kcal alone, logged at once or added.
+  {
+    name: 'quick-add-kcal',
+    open: async (page) => {
+      await page.goto('/?log=true')
+      await page.getByRole('button', { name: /^(An estimate in kcal|Procjena u kcal)$/ }).click()
+      await page.getByRole('textbox', { name: /^(Energy|Energija) \(kcal\)$/ }).fill('300')
+      await expect(
+        page.getByRole('button', { name: /^(Add to meal|Dodaj u obrok)$/ }),
+      ).toBeVisible()
+      await settled(page)
+    },
+  },
   {
     name: 'quick-add-food',
     open: async (page) => {
@@ -343,7 +371,9 @@ const screens: Screen[] = [
         .getByRole('main')
         .getByRole('button', { name: /^(Log it|Upiši)$/ })
         .click()
-      const sheet = page.getByRole('dialog', { name: /^(New meal|Novi obrok)$/ })
+      const sheet = page.getByRole('dialog', {
+        name: /^(Breakfast|Lunch|Snack|Dinner|Doručak|Ručak|Užina|Večera)$/,
+      })
       await expect(sheet.getByRole('group', { name: /^(Quick|Brzo): / })).toBeVisible()
       await sheet.getByRole('combobox', { name: /^(Unit|Jedinica): / }).selectOption('g')
       await expect(sheet.getByText(/^≈ /)).toBeVisible()
@@ -370,13 +400,15 @@ const screens: Screen[] = [
         .getByRole('main')
         .getByRole('button', { name: /^(Log|Upiši) 80 g$/ })
         .click()
-      const sheet = page.getByRole('dialog', { name: /^(New meal|Novi obrok)$/ })
+      const sheet = page.getByRole('dialog', {
+        name: /^(Breakfast|Lunch|Snack|Dinner|Doručak|Ručak|Užina|Večera)$/,
+      })
       // The food, open on its amount, first in the list.
       await sheet
         .getByRole('button', { name: /^(Add|Dodaj): / })
         .first()
         .click()
-      await sheet.getByRole('button', { name: /^(Log 1 item|Upiši 1 stavku) · / }).click()
+      await sheet.getByRole('button', { name: /^(Log|Upiši) \p{L}+ · /u }).click()
       await expect(
         page.getByRole('link', { name: /^(See it today|Pogledaj danas)$/ }),
       ).toBeVisible()

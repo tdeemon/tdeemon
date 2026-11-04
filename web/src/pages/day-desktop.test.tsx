@@ -90,7 +90,9 @@ test("a desktop's day: the meals a table with their total, the week, the body an
   const meal = within(meals).getByRole('article', { name: 'Oats with a banana' })
   const row = within(meal).getByRole('button', { expanded: false })
   expect(row.textContent).toBe('8:45 AMOats with a bananaAI520520 kcalP 18C 92F 9')
-  const heads = meals.querySelector('[aria-hidden="true"]')
+  // Its keys said beside the heading, for the eye.
+  expect(within(meals).getByText('↑↓ move · Enter edit · R repeat · ⌫ delete')).toBeDefined()
+  const heads = meals.querySelector('div[aria-hidden="true"]')
   expect(Array.from(heads?.children ?? [], (c) => c.textContent)).toEqual([
     'Time',
     'Meal',

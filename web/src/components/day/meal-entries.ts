@@ -536,6 +536,28 @@ export function servingsOf(n: string, servings: number, serving: string): string
   return servings === 1 ? serving : `${n} × ${serving}`
 }
 
+// entryAmountLabel is how much of a food an entry has, as its field says
+// so: a serving's by servingsOf, a recipe's as a meal's item says so by
+// recipeQuantity (⅓ of the recipe). An amount that is no number is as
+// typed.
+export function entryAmountLabel(entry: FoodEntry, t: Messages, f: Format): string {
+  const serving = servingOf(entry.unit)
+  const n = entryAmount(entry, f.parse)
+  const ofRecipe =
+    serving === undefined || n === undefined
+      ? undefined
+      : recipeQuantity(entry.food.source, { servings: n, serving }, t, f.number)
+  if (ofRecipe !== undefined) {
+    return ofRecipe
+  }
+  if (entry.unit === 'portion') {
+    return `${entry.amount} ${t.log.portions(f.parse(entry.amount) ?? Number.NaN)}`
+  }
+  return serving === undefined
+    ? `${entry.amount} ${entry.unit}`
+    : servingsOf(entry.amount, f.parse(entry.amount) ?? Number.NaN, serving)
+}
+
 // lastAmountOf is how much of a food was eaten last, as it was given: "2
 // slice", "1.5 portions", "200 g", of a recipe "⅒ of the recipe" or "1
 // portion" (recipeQuantity); undefined for a food not eaten yet. In the

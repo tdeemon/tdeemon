@@ -28,10 +28,10 @@ test('a food is made, logged, found, corrected, archived and brought back', asyn
 
   // Logged from its page: the meal to log opens on its amount.
   await page.getByRole('button', { name: 'Log it' }).click()
-  const sheet = page.getByRole('dialog', { name: 'New meal' })
+  const sheet = page.getByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
   await expect(sheet.getByLabel('Amount: Buckwheat')).toHaveValue('100')
   await sheet.getByRole('button', { name: 'Add: Buckwheat' }).click()
-  await sheet.getByRole('button', { name: 'Log 1 item · 370 kcal' }).click()
+  await sheet.getByRole('button', { name: /^Log \w+ · 370 kcal$/ }).click()
   await expect(page.getByText(/^Logged: .* · 370 kcal$/)).toBeVisible()
   await expect(page.getByText(/^1× · last /)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Log 100 g' })).toBeVisible()

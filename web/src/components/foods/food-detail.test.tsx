@@ -274,7 +274,9 @@ test('Log 80 g opens the meal to log on the food, in the amount it was eaten in 
 
   fireEvent.click(await screen.findByRole('button', { name: 'Log 80 g' }))
 
-  const sheet = within(await screen.findByRole('dialog', { name: 'New meal' }))
+  const sheet = within(
+    await screen.findByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ }),
+  )
   const amount = sheet.getByLabelText(/^Amount: /)
   expect(amount).toHaveProperty('value', '80')
   await waitFor(() => {
@@ -282,11 +284,12 @@ test('Log 80 g opens the meal to log on the food, in the amount it was eaten in 
   })
   fireEvent.change(amount, { target: { value: '120' } })
   fireEvent.click(sheet.getByRole('button', { name: /^Add: / }))
+  fireEvent.click(sheet.getByRole('button', { name: 'Edit amounts' }))
   const basket = within(sheet.getByRole('list', { name: 'In the meal' })).getAllByRole('listitem')
-  expect(basket.map((li) => li.textContent.replace('×', ''))).toEqual([
+  expect(basket.map((li) => li.querySelector('span')?.textContent)).toEqual([
     'Rolled oats · 120 g · 444 kcal',
   ])
-  fireEvent.click(sheet.getByRole('button', { name: 'Log 1 item · 444 kcal' }))
+  fireEvent.click(sheet.getByRole('button', { name: /^Log \w+ · 444 kcal$/ }))
 
   // The toast says what the server answered.
   expect(await screen.findByText(/^Logged: Breakfast · /)).toBeDefined()
@@ -301,7 +304,7 @@ test('Log 80 g opens the meal to log on the food, in the amount it was eaten in 
   ])
   // The food's page stays, the sheet closed.
   await waitFor(() => {
-    expect(screen.queryByRole('dialog', { name: 'New meal' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })).toBeNull()
   })
   expect(screen.getByRole('heading', { name: 'Rolled oats', level: 1 })).toBeDefined()
 })

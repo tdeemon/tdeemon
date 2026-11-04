@@ -100,11 +100,16 @@ corrections in a sheet that
 says its total as it changes, an item's amount with its unit and its
 other ways in a menu, its day picked by name and its time on the
 language's clock, a meal repeated or deleted taken there, a meal logged by hand
-in a sheet of the foods found (the catalog's after them, marked), eaten
+in a sheet titled by the meal of the day (a side panel of 440 px on a
+desktop), of the foods found (the catalog's after them, marked), eaten
 lately or most and the meals of before, those eaten at the meal of the
-day lately first and today's last, the meals of it as cards above the
-search, whose keyboard waits
-on a phone for a tap, a new food, an estimate or a barcode (the
+day lately first and today's last, the first of them as cards on top of
+the first list, none said twice, whose search's keyboard waits
+on a phone for a tap, a food's + putting it in the tray in the amount
+its row says while the search stays, the tray there with its first item
+(their count, kcal and macros, the amounts to edit, and "Log snack",
+⌘↵ on a keyboard), a new food, an estimate (kcal alone, from its chip,
+logged in three actions) or a barcode (the
 camera's, or its digits typed) a step of its own with one button, or
 a weigh-in from its chip, a recipe found marked, in a portion, a share
 of it typed as a fraction (1/10) or chosen in its chips (½, ⅓, ¼, 1/…)

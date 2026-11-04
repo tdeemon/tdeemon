@@ -151,7 +151,7 @@ test('after N and a meal logged, the focus is on its row', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
 
   await page.keyboard.press('n')
-  const sheet = page.getByRole('dialog', { name: 'New meal' })
+  const sheet = page.getByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
   await sheet.getByRole('button', { name: `Repeat: ${name}` }).click()
 
   await expect(sheet).toBeHidden()

@@ -1,5 +1,5 @@
 import { useLocation, useSearch } from '@tanstack/react-router'
-import { useId, useRef, useState, type RefObject } from 'react'
+import { useEffect, useId, useRef, useState, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 
 import { detailOf, statusOf } from '@/api/errors'
@@ -8,24 +8,22 @@ import type { components } from '@/api/schema'
 import type { Food, Meal } from '@/api/types'
 import { Finder } from '@/components/day/finder'
 import {
-  entryAmount,
   entryValues,
+  entryWrong,
   foodEntry,
   itemOf,
   repeatOf,
-  servingOf,
-  servingsOf,
   type Entry,
+  type Wrong,
 } from '@/components/day/meal-entries'
 import { mealName, namedBy, slotAt } from '@/components/day/meal-slot'
 import { NewEntry, type Making } from '@/components/day/new-entry'
 import { SaveStatus } from '@/components/day/save-status'
 import { ScanEntry } from '@/components/day/scan-entry'
+import { Tray } from '@/components/day/tray'
 import { WeighInChip } from '@/components/day/weigh-in-chip'
 import { isRecipe } from '@/components/recipes/recipe-values'
-import { recipeQuantity } from '@/components/recipes/share'
-import { Sheet } from '@/components/sheet'
-import { Button } from '@/components/ui/button'
+import { Sheet, SheetHead } from '@/components/sheet'
 import { TimeInput } from '@/components/ui/time-input'
 import { rounded, useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
@@ -58,15 +56,19 @@ interface Start {
   onLogged?: ((meal: Meal) => void) | undefined
 }
 
-// QuickAdd logs a meal of the day by hand, in a sheet: the foods of the
-// user's that a search finds, or that were eaten lately or most, each in
-// the amount it was eaten in last or another, and estimates, gathered in
-// the meal at the sheet's foot with what each brings, the total, and what
-// the day has left after it; or a meal of before, repeated in a tap,
-// those eaten lately at the meal of the day first. A new food or an
-// estimate is a step of its own, in the search's place. The meal is
-// timed now (on another day, at noon), and named by what is in it, both
-// of which can be changed. Each opening is a meal anew. The focus goes to
+// QuickAdd logs a meal of the day by hand, in a sheet titled by the meal
+// of the day (Snack), its time under it: the foods of the user's that a
+// search finds, or that were eaten lately or most, each added by its +
+// in the amount it was eaten in last or opened for another, and
+// estimates, gathered in the tray at the sheet's foot, there once it has
+// an item, with their total, their amounts to change and what the day
+// has left after it, and the one button that logs the meal (⌘↵ on a
+// keyboard); or a meal of before, repeated in a tap, those eaten lately
+// at the meal of the day first. A new food or an estimate (kcal alone,
+// logged at once when it is all the meal has) is a step of its own, in
+// the search's place. The meal is timed now (on another day, at noon),
+// and named by what is in it, both of which can be changed. Each opening
+// is a meal anew. The focus goes to
 // the search, but on a touch screen, whose keyboard would cover the
 // lists, until it is tapped. A food it opens with (initial) is in the
 // meal; a recipe, or any food when pick is set, open for its amount
@@ -86,7 +88,6 @@ export function QuickAdd({
     onOpenChange: (open: boolean) => void
     opener?: RefObject<HTMLElement | null>
   }) {
-  const t = useMessages()
   const search = useRef<HTMLInputElement>(null)
   const amount = useRef<HTMLInputElement>(null)
   const choosing = meal.initial !== undefined && (meal.pick === true || isRecipe(meal.initial))
@@ -94,7 +95,8 @@ export function QuickAdd({
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
-      title={t.log.title}
+      // The meal of the day, which its time may change: the Composer's.
+      title={undefined}
       initialFocus={choosing ? amount : search}
       tapToType
       finalFocus={opener}
@@ -119,7 +121,8 @@ export function QuickAdd({
 // and a toast says so, with what the server warned of it and Undo, and,
 // over another page than its day's, the way to the day. Its
 // next step (a new food, an estimate) takes the search's place, which
-// stays as it was under it, and the foot's: one button, Add to meal.
+// stays as it was under it, and the tray's: one button, Add to meal (or,
+// an estimate alone, Log snack).
 function Composer({
   remaining,
   initial,
@@ -167,6 +170,10 @@ function Composer({
     initial === undefined || choosing ? [] : [foodEntry(initial, f.field)],
   )
   const [details, setDetails] = useState(false)
+  // Whether the tray shows the items, for their amounts; and what is
+  // wrong with one, by its key, once the meal is logged.
+  const [trayOpen, setTrayOpen] = useState(false)
+  const [wrongs, setWrongs] = useState<Readonly<Record<string, Wrong>>>({})
   const [description, setDescription] = useState('')
   // Now on today's, noon on another day's. Today's time left as it is
   // is the instant the meal is sent (eatenAt): the sheet may have been
@@ -196,6 +203,19 @@ function Composer({
   // The button that opened the next step, which the focus goes back to.
   const maker = useRef<HTMLElement | null>(null)
   const logButton = useRef<HTMLButtonElement>(null)
+  // What the sheet holds, whose keys are heard (onKey).
+  const keys = useRef<HTMLDivElement>(null)
+  const onKey = useRef<(e: KeyboardEvent) => void>(() => undefined)
+  useEffect(() => {
+    const element = keys.current
+    const listener = (e: KeyboardEvent) => {
+      onKey.current(e)
+    }
+    element?.addEventListener('keydown', listener)
+    return () => {
+      element?.removeEventListener('keydown', listener)
+    }
+  }, [])
 
   const values = entries.map((e) => entryValues(e, f.parse))
   const kcal = values.reduce((sum, v) => sum + (v?.kcal ?? 0), 0)
@@ -224,11 +244,23 @@ function Composer({
     return today && !timeSet ? {} : { eaten_at: at }
   }
 
-  function submit() {
+  // submit logs the meal of these entries. Each was checked as it came,
+  // and an amount changed in the tray since is checked again: one wrong
+  // is said there, and nothing is sent.
+  function submit(these: Entry[]) {
+    const wrong = Object.fromEntries(
+      these.flatMap((e) => {
+        const why = e.kind === 'food' ? entryWrong(e, f.parse) : undefined
+        return why === undefined ? [] : [[e.key, why] as const]
+      }),
+    )
+    setWrongs(wrong)
+    if (Object.keys(wrong).length > 0) {
+      setTrayOpen(true)
+      return
+    }
     const when = eatenAt()
-    // Each entry was checked as it came: a food's amount, an estimate's
-    // values.
-    const items = entries.flatMap((e) => {
+    const items = these.flatMap((e) => {
       const item = itemOf(e, f.parse)
       return item === undefined ? [] : [item]
     })
@@ -248,11 +280,16 @@ function Composer({
     }
   }
 
-  // added takes an entry into the meal, from the lists or the next step,
-  // and readies the search for the next: emptied, with the focus; on a
-  // touch screen, whose keyboard would cover the lists, the meal's button
-  // has it.
+  // added takes an entry into the meal from the lists, whose search
+  // stays as it was (Finder): the next of the same results is a tap away.
   function added(entry: Entry) {
+    setEntries((es) => [...es, entry])
+  }
+
+  // made takes an entry into the meal from the next step, back to the
+  // search, emptied, with the focus; on a touch screen, whose keyboard
+  // would cover the lists, the meal's button has it.
+  function made(entry: Entry) {
     flushSync(() => {
       setEntries((es) => [...es, entry])
       setQuery('')
@@ -271,57 +308,138 @@ function Composer({
     maker.current?.focus()
   }
 
-  // amountOf is how much of a food an entry has, as its field says it (a
-  // serving's, servingsOf); of a recipe, as a meal's item says it
-  // (recipeQuantity): ⅓ of the recipe.
-  function amountOf(entry: Entry & { kind: 'food' }): string {
-    const serving = servingOf(entry.unit)
-    const n = entryAmount(entry, f.parse)
-    const ofRecipe =
-      serving === undefined || n === undefined
-        ? undefined
-        : recipeQuantity(entry.food.source, { servings: n, serving }, t, f.number)
-    if (ofRecipe !== undefined) {
-      return ofRecipe
+  const label = t.log.logSlot[slotOf]
+  const tray = (
+    <Tray
+      entries={entries}
+      values={values}
+      wrong={wrongs}
+      open={trayOpen}
+      onOpen={setTrayOpen}
+      onChange={(entry) => {
+        setEntries((es) => es.map((e) => (e.key === entry.key ? entry : e)))
+        setWrongs(({ [entry.key]: _was, ...rest }) => rest)
+      }}
+      onRemove={(key) => {
+        setEntries((es) => es.filter((e) => e.key !== key))
+        setWrongs(({ [key]: _was, ...rest }) => rest)
+      }}
+      after={
+        after === undefined
+          ? undefined
+          : after >= 0
+            ? t.log.after(f.number(Math.round(after)))
+            : t.log.afterOver(f.number(Math.round(-after)))
+      }
+      label={label}
+      held={held}
+      onLog={() => {
+        submit(entries)
+      }}
+      logButton={logButton}
+      status={
+        later || badTime || refused || log.isError ? (
+          <div className="space-y-1">
+            {(later || badTime) && (
+              <p role="alert" className="text-sm text-destructive">
+                {badTime ? t.meal.timeFormat(f.clock('19:30')) : t.meal.timeToCome}
+              </p>
+            )}
+            {refused ? (
+              <p role="alert" className="text-sm text-destructive">
+                {t.log.refused(detailOf(log.error))}
+              </p>
+            ) : (
+              <SaveStatus
+                change={log}
+                // Again, as it was sent, under its id: the server takes the same
+                // meal sent again for the one it has.
+                onRetry={() => {
+                  if (log.variables) {
+                    send(log.variables.body)
+                  }
+                }}
+              />
+            )}
+          </div>
+        ) : null
+      }
+    />
+  )
+
+  // The ids of the foods in the meal, whose + the lists check.
+  const chosen = new Set(entries.flatMap((e) => (e.kind === 'food' ? [e.food.id] : [])))
+
+  // ⌘↵ or Ctrl+↵ logs the meal from anywhere in the sheet but a next
+  // step, which has a button of its own.
+  useEffect(() => {
+    onKey.current = (e: KeyboardEvent) => {
+      if (
+        e.key === 'Enter' &&
+        (e.metaKey || e.ctrlKey) &&
+        making === undefined &&
+        entries.length > 0 &&
+        !held
+      ) {
+        e.preventDefault()
+        submit(entries)
+      }
     }
-    if (entry.unit === 'portion') {
-      return `${entry.amount} ${t.log.portions(f.parse(entry.amount) ?? Number.NaN)}`
-    }
-    return serving === undefined
-      ? `${entry.amount} ${entry.unit}`
-      : servingsOf(entry.amount, f.parse(entry.amount) ?? Number.NaN, serving)
-  }
+  })
 
   return (
-    <>
+    <div ref={keys} className="contents">
+      <SheetHead
+        title={slot}
+        subtitle={
+          <span className="flex flex-wrap items-baseline gap-x-1">
+            <span>{t.log.at(today ? t.log.today : f.short(date), f.time(at, timeZone))}</span>
+            <span aria-hidden>·</span>
+            <button
+              type="button"
+              aria-expanded={details}
+              aria-controls={`${id}-details`}
+              aria-label={t.log.changeOf}
+              disabled={held || making !== undefined}
+              className={cn(
+                linkTarget,
+                'font-semibold text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60',
+              )}
+              onClick={() => {
+                setDetails((d) => !d)
+              }}
+            >
+              {t.log.change}
+            </button>
+          </span>
+        }
+      />
       {making === 'scan' ? (
-        <ScanEntry onBack={back} onAdd={added} />
+        <ScanEntry onBack={back} onAdd={made} />
       ) : (
         making !== undefined && (
-          <NewEntry making={making} name={query.trim()} onBack={back} onAdd={added} />
+          <NewEntry
+            making={making}
+            name={query.trim()}
+            onBack={back}
+            // With nothing else in the meal, an estimate's button logs it:
+            // its kcal, typed, and logged; Add to meal goes on to more.
+            onAdd={made}
+            {...(making === 'estimate' && entries.length === 0
+              ? {
+                  logAs: (energy: string) => t.log.logAs(label, energy),
+                  // In the tray, where what is said of it is.
+                  onLog: (entry: Entry) => {
+                    made(entry)
+                    submit([entry])
+                  },
+                }
+              : {})}
+          />
         )
       )}
       {/* Under the next step, as it was. */}
       <div hidden={making !== undefined} className="contents">
-        <div className="flex flex-wrap items-baseline gap-x-2 px-4 pt-2 text-small text-muted-foreground">
-          <span>{t.log.when(slot, today ? t.log.today : f.short(date), f.time(at, timeZone))}</span>
-          <button
-            type="button"
-            aria-expanded={details}
-            aria-controls={`${id}-details`}
-            aria-label={t.log.changeOf}
-            disabled={held}
-            className={cn(
-              linkTarget,
-              'font-semibold text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring',
-            )}
-            onClick={() => {
-              setDetails((d) => !d)
-            }}
-          >
-            {t.log.change}
-          </button>
-        </div>
         <fieldset disabled={held} className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto p-4">
           {details && (
             <div id={`${id}-details`} className="space-y-1">
@@ -387,6 +505,11 @@ function Composer({
             onRepeat={repeat}
             initial={choosing ? initial : undefined}
             amount={amount}
+            chosen={chosen}
+            onUnchoose={(food) => {
+              setEntries((es) => es.filter((e) => e.kind !== 'food' || e.food.id !== food.id))
+            }}
+            stay
             onMake={(m, button) => {
               maker.current = button
               setMaking(m)
@@ -394,88 +517,8 @@ function Composer({
           />
           <WeighInChip date={date} />
         </fieldset>
-        <div className="space-y-2 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          {entries.length > 0 ? (
-            <ul aria-label={t.log.basket} className="flex flex-wrap gap-1.5">
-              {entries.map((entry, i) => {
-                const name = entry.kind === 'food' ? entry.food.name : entry.name
-                const v = values[i]
-                return (
-                  <li
-                    key={entry.key}
-                    className="flex items-center gap-0.5 rounded-full bg-surface-2 pl-3 text-small"
-                  >
-                    <span>
-                      {[
-                        name,
-                        ...(entry.kind === 'food' ? [amountOf(entry)] : []),
-                        ...(v === undefined ? [] : [t.unit.kcal(f.number(v.kcal))]),
-                      ].join(' · ')}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="rounded-full"
-                      aria-label={t.log.remove(name)}
-                      disabled={held}
-                      onClick={() => {
-                        setEntries((es) => es.filter((e) => e.key !== entry.key))
-                      }}
-                    >
-                      <span aria-hidden>×</span>
-                    </Button>
-                  </li>
-                )
-              })}
-            </ul>
-          ) : (
-            <p id={`${id}-empty`} className="text-small text-muted-foreground">
-              {t.log.empty}
-            </p>
-          )}
-          {after !== undefined && entries.length > 0 && (
-            <p className="text-small text-muted-foreground">
-              {after >= 0
-                ? t.log.after(f.number(Math.round(after)))
-                : t.log.afterOver(f.number(Math.round(-after)))}
-            </p>
-          )}
-          {(later || badTime) && (
-            <p role="alert" className="text-sm text-destructive">
-              {badTime ? t.meal.timeFormat(f.clock('19:30')) : t.meal.timeToCome}
-            </p>
-          )}
-          {refused ? (
-            <p role="alert" className="text-sm text-destructive">
-              {t.log.refused(detailOf(log.error))}
-            </p>
-          ) : (
-            <SaveStatus
-              change={log}
-              // Again, as it was sent, under its id: the server takes the same
-              // meal sent again for the one it has.
-              onRetry={() => {
-                if (log.variables) {
-                  send(log.variables.body)
-                }
-              }}
-            />
-          )}
-          {/* Disabled, it stays in reach of the focus, and says what it waits for. */}
-          <Button
-            ref={logButton}
-            className="h-13 w-full text-base"
-            disabled={held || entries.length === 0}
-            focusableWhenDisabled
-            aria-describedby={entries.length === 0 ? `${id}-empty` : undefined}
-            onClick={submit}
-          >
-            {entries.length > 0
-              ? t.log.logItems(entries.length, f.number(Math.round(kcal)))
-              : t.log.save}
-          </Button>
-        </div>
+        {tray}
       </div>
-    </>
+    </div>
   )
 }

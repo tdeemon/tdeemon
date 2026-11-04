@@ -1,4 +1,4 @@
-import { ChevronDown, Pencil, Repeat2, Trash2 } from 'lucide-react'
+import { ChevronDown, Pencil, Repeat2, Sparkles, Trash2 } from 'lucide-react'
 import { useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 
 import { statusOf } from '@/api/errors'
@@ -208,7 +208,12 @@ export function MealCard({
   )
   const marks = (
     <>
-      {models.has(meal.client) && <Badge>{t.meal.ai}</Badge>}
+      {models.has(meal.client) && (
+        <Badge tone="coach" className="gap-1">
+          <Sparkles aria-hidden className="size-3" />
+          {t.meal.ai}
+        </Badge>
+      )}
       {meal.items.some((item) => item.source === 'estimate') && (
         <Badge tone="warning">{t.meal.estimate}</Badge>
       )}
