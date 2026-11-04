@@ -119,16 +119,27 @@ export function PendingProposal({
   useShortcuts(
     desktop
       ? {
-          a: () => {
-            if (canAccept) {
-              onAccept()
-            }
-          },
-          x: () => {
-            if (canReject) {
-              onReject()
-            }
-          },
+          // A capital too, as Caps Lock types it.
+          ...Object.fromEntries(
+            ['a', 'A'].map((k) => [
+              k,
+              () => {
+                if (canAccept) {
+                  onAccept()
+                }
+              },
+            ]),
+          ),
+          ...Object.fromEntries(
+            ['x', 'X'].map((k) => [
+              k,
+              () => {
+                if (canReject) {
+                  onReject()
+                }
+              },
+            ]),
+          ),
         }
       : {},
   )

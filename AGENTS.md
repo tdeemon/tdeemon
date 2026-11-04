@@ -168,7 +168,8 @@ expires, why in three lines, the limits' warnings each rule once, in a
 row that opens, and what the data say beside it, Accept and Reject at
 its foot (A and X on a desktop), each answer said in a toast, marked
 on the plan's section and in a banner on the day, the targets by type of
-day (one, every day's, without training days, and a way to add them)
+day (one, every day's, without training days, but a training target
+of its own for a workout's day, and a way to add them)
 and the deficit they plan, edited with the training days in a sheet,
 the history of its revisions, a page of its own (its rows beside the
 one open on a desktop, the latest beside the plan) with a revert said

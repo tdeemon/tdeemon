@@ -1506,6 +1506,7 @@ export const hr: Messages = {
       everyDay: 'Svaki dan',
       allDays: 'svaki dan',
       addDays: 'Dodaj dane treninga',
+      workoutDays: 'dani kad upišeš trening',
       none: 'Još nema cilja.',
       average: 'Tjedni prosjek',
       perDay: (kcal: string) => `${kcal} kcal na dan`,
@@ -1680,6 +1681,7 @@ export const hr: Messages = {
       loosen: 'Popusti je u granicama',
       daysHint: 'Ostali dani su dani odmora.',
       noDaysHint: 'Bez dana treninga: jedan cilj za svaki dan.',
+      workoutHint: 'Bez dana treninga: cilj treninga vrijedi za dane kad upišeš trening.',
       saved: {
         phase: 'Faza promijenjena',
         next: 'Sljedeća faza isplanirana',

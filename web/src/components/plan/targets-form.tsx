@@ -68,7 +68,15 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
   const [trainingDays, setTrainingDays] = useState<Weekday[]>(() =>
     week.filter((d) => plan.training_weekdays.includes(d)),
   )
-  const split = trainingDays.length > 0
+  // A target of the training days' own (not the rest days') holds
+  // without training weekdays too: a day of a workout logged, or marked
+  // so, is a training day. It is shown, never kept out of sight.
+  const ownTraining =
+    now !== undefined &&
+    (now.training.kcal !== now.rest.kcal ||
+      now.training.protein !== now.rest.protein ||
+      now.training.fat !== now.rest.fat)
+  const split = trainingDays.length > 0 || ownTraining
   const shown = split ? dayTypes : (['rest'] as const)
   const daysChanged =
     trainingDays.length !== plan.training_weekdays.length ||
@@ -93,17 +101,9 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
     protein: f.parse(typed[d].protein),
     fat: f.parse(typed[d].fat),
   })
-  // Without training days, the training days' target follows every
-  // day's, the rest days', when it was the same or none; one of its own
-  // is kept as it is.
-  const follows =
-    !split &&
-    (now === undefined ||
-      (now.training.kcal === now.rest.kcal &&
-        now.training.protein === now.rest.protein &&
-        now.training.fat === now.rest.fat))
+  // One target, every day's, is the training days' too.
   const values = {
-    training: follows ? parsed('rest') : parsed('training'),
+    training: split ? parsed('training') : parsed('rest'),
     rest: parsed('rest'),
   }
   // A day's target as it is sent: the carbs are what the kcal leave, and
@@ -202,7 +202,7 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
         }}
       >
         <p id={`${id}-days`} className="text-small text-muted-foreground">
-          {split ? e.daysHint : e.noDaysHint}
+          {trainingDays.length > 0 ? e.daysHint : split ? e.workoutHint : e.noDaysHint}
         </p>
       </WeekSegments>
       {shown.map((d) => {

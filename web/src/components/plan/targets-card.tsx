@@ -14,10 +14,16 @@ import { useMessages } from '@/i18n/messages'
 type Plan = components['schemas']['PlanBody']
 type DayTarget = components['schemas']['DayTargetBody']
 
+// same tells two days' targets alike: one target, every day's.
+function same(a: DayTarget, b: DayTarget): boolean {
+  return a.kcal === b.kcal && a.protein === b.protein && a.fat === b.fat
+}
+
 // TargetsCard is what the plan sets a day to eat by its type, training
 // and rest: the kcal and the macros of each, and the days of the week
-// each is; without training days, one target, every day's, and a way to
-// add them; the weekly average they come to over the training days,
+// each is; without training days, one target, every day's (or the
+// training days' own beside it, for the days a workout is logged), and
+// a way to add them; the weekly average they come to over the training days,
 // against the TDEE calibration measures; and the targets to come. The
 // user edits them and the training days from today on, or, before the
 // plan's first target, that one from its day, in a sheet.
@@ -82,7 +88,7 @@ export function TargetsCard({ plan }: { plan: Plan }) {
         </>
       ) : (
         <>
-          {training.length === 0 ? (
+          {training.length === 0 && same(target.training, target.rest) ? (
             <DayTile name={g.everyDay} day={target.rest} />
           ) : (
             <div className="grid grid-cols-2 gap-2">
@@ -156,7 +162,11 @@ function DayTile({
       </p>
       {days !== undefined && (
         <p className="text-caption text-muted-foreground">
-          {days.length === 7 ? g.allDays : `${g.days(days.length)} · ${words.days([...days])}`}
+          {days.length === 7
+            ? g.allDays
+            : days.length === 0
+              ? g.workoutDays
+              : `${g.days(days.length)} · ${words.days([...days])}`}
         </p>
       )}
     </div>

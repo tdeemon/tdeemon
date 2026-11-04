@@ -1700,6 +1700,8 @@ export const en = {
       everyDay: 'Every day',
       allDays: 'every day',
       addDays: 'Add training days',
+      // A training target of its own, without training weekdays.
+      workoutDays: 'days you log a workout',
       none: 'No target yet.',
       average: 'Weekly average',
       perDay: (kcal: string) => `${kcal} kcal a day`,
@@ -1897,6 +1899,7 @@ export const en = {
       // The training days, in the targets' sheet.
       daysHint: 'The other days are rest days.',
       noDaysHint: 'No training days: one target for every day.',
+      workoutHint: 'No training days: the training target is for days you log a workout.',
       saved: {
         phase: 'Phase changed',
         next: 'Next phase planned',

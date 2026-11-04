@@ -96,12 +96,16 @@ export function ProposalDiff({
   const add = (day: string, rows: Row[]) => {
     tables.set(day, [...(tables.get(day) ?? []), ...rows])
   }
-  // The target the change sets before each, of the days it changes.
-  let set: TargetValues | undefined
+  // The plan's targets as the changes before each leave them, so a later
+  // one is told against what the proposal sets (or deletes) before it.
+  let timeline: readonly Target[] = targets
   for (const ch of changes.targets.toSorted((a, b) => a.from.localeCompare(b.from))) {
-    const before = ch.before ?? set ?? priorOf(ch, targets)
+    const before = priorOf(ch, timeline)
     const after = ch.after
-    set = after
+    timeline = [
+      ...timeline.filter((tg) => tg.effective_from !== ch.from),
+      ...(after === undefined ? [] : [{ effective_from: ch.from, ...after }]),
+    ].toSorted((a, b) => a.effective_from.localeCompare(b.effective_from))
     add(
       ch.from,
       unsplit(before) && unsplit(after)

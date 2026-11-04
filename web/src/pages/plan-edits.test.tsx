@@ -270,6 +270,49 @@ test('a sheet saved unchanged sends nothing', async () => {
 // says it once and offers to add them, which opens the sheet on the days.
 test('without training days, one target and a way to add them', async () => {
   const sent: unknown[] = []
+  const rest = { kcal: 1950, protein: 160, carbs: 197, fat: 58 }
+  fakeServer({
+    ...signedIn(),
+    'GET /api/v1/limits': () => Response.json(limitsBody()),
+    'GET /api/v1/plan': () =>
+      Response.json(
+        planBody({
+          ...plan,
+          training_weekdays: [],
+          targets: [{ effective_from: '2026-09-07', training: rest, rest }],
+        }),
+      ),
+    'POST /api/v1/plan/changes': async (r) => {
+      sent.push(await r.json())
+      return Response.json({ proposal: applied, preview: { checks: [] } })
+    },
+  })
+  renderAt('/plan')
+  const card = within(await screen.findByRole('region', { name: 'Targets' }))
+  expect(card.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+    'Every day',
+  ])
+  fireEvent.click(card.getByRole('button', { name: 'Add training days' }))
+  const sheet = within(await screen.findByRole('dialog', { name: 'Targets by type of day' }))
+  sheet.getByText('No training days: one target for every day.')
+  // One target, every day's, until a day is chosen.
+  expect(sheet.queryByRole('group', { name: 'Training' })).toBeNull()
+  sheet.getByRole('group', { name: 'Every day' })
+  const days = within(sheet.getByRole('group', { name: 'Training days' }))
+  fireEvent.click(days.getByRole('checkbox', { name: 'Tue' }))
+  fireEvent.click(days.getByRole('checkbox', { name: 'Thu' }))
+  expect(field('Training', 'kcal')).toHaveProperty('value', '1950')
+  fireEvent.click(sheet.getByRole('button', { name: 'Save' }))
+  await waitFor(() => {
+    expect(sent).toEqual([{ training_weekdays: ['tuesday', 'thursday'] }])
+  })
+})
+
+// A training target of its own holds without training weekdays too (a
+// day of a workout logged is a training day): it is shown, in the card
+// and the sheet, and sent as it is seen.
+test('without training days, a training target of its own is shown, not hidden', async () => {
+  const sent: unknown[] = []
   fakeServer({
     ...signedIn(),
     'GET /api/v1/limits': () => Response.json(limitsBody()),
@@ -282,22 +325,28 @@ test('without training days, one target and a way to add them', async () => {
   renderAt('/plan')
   const card = within(await screen.findByRole('region', { name: 'Targets' }))
   expect(card.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-    'Every day',
+    'Training',
+    'Rest',
   ])
-  expect(card.queryByText('2,250 kcal')).toBeNull()
-  fireEvent.click(card.getByRole('button', { name: 'Add training days' }))
+  card.getByText('days you log a workout')
+  fireEvent.click(card.getByRole('button', { name: 'Edit targets' }))
   const sheet = within(await screen.findByRole('dialog', { name: 'Targets by type of day' }))
-  sheet.getByText('No training days: one target for every day.')
-  // One target, every day's, until a day is chosen.
-  expect(sheet.queryByRole('group', { name: 'Training' })).toBeNull()
-  sheet.getByRole('group', { name: 'Every day' })
-  const days = within(sheet.getByRole('group', { name: 'Training days' }))
-  fireEvent.click(days.getByRole('checkbox', { name: 'Tue' }))
-  fireEvent.click(days.getByRole('checkbox', { name: 'Thu' }))
+  sheet.getByText('No training days: the training target is for days you log a workout.')
   expect(field('Training', 'kcal')).toHaveProperty('value', '2250')
+  fireEvent.change(field('Rest', 'kcal'), { target: { value: '1800' } })
   fireEvent.click(sheet.getByRole('button', { name: 'Save' }))
   await waitFor(() => {
-    expect(sent).toEqual([{ training_weekdays: ['tuesday', 'thursday'] }])
+    expect(sent).toEqual([
+      {
+        targets: [
+          {
+            from: '2026-10-23',
+            training: { kcal: 2250, protein: 165, fat: 65 },
+            rest: { kcal: 1800, protein: 160, fat: 58 },
+          },
+        ],
+      },
+    ])
   })
 })
 

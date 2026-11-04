@@ -354,7 +354,8 @@ test('on a desktop A accepts a proposal and X rejects one', async () => {
   const accepted = coachServer({ pending: step })
   renderAt('/plan')
   await screen.findByRole('region', { name: 'A proposed change' })
-  fireEvent.keyDown(document.body, { key: 'a' })
+  // With Caps Lock on, as the key comes.
+  fireEvent.keyDown(document.body, { key: 'A' })
   await waitFor(() => {
     expect(accepted.sent).toEqual([`POST /api/v1/proposals/${step.id}/apply`])
   })
@@ -1245,6 +1246,38 @@ test("a limit's warning is said in plain words, with why it matters", async () =
 function below(day_type: 'training' | 'rest', value: number) {
   return { rule: 'below_bmr' as const, day_type, value, threshold: 1830 }
 }
+
+// A period the proposal deletes is not the one a later period is told
+// against: the target before it is.
+test('a period after one deleted is told against the target before it', async () => {
+  const lower = (kcal: number) => ({
+    training: { ...splitTarget.training, kcal: kcal + 300 },
+    rest: { ...splitTarget.rest, kcal },
+  })
+  const deleted = { effective_from: '2026-10-26', ...lower(1700) }
+  planPage({
+    targets: [splitTarget, deleted],
+    training_weekdays: ['monday'],
+    pending: {
+      ...step,
+      changes: {
+        phases: [],
+        targets: [
+          { from: '2026-10-26', before: lower(1700) },
+          { from: '2026-11-07', after: lower(1800) },
+        ],
+        limits: [],
+      },
+    },
+  })
+  renderAt('/plan')
+  const region = await screen.findByRole('region', { name: 'A proposed change' })
+  expect(rowsOf(region).slice(3)).toEqual([
+    ['From Nov 7', 'Now', 'New', 'Δ'],
+    ['Training kcal', '2,250', '2,100', '-150'],
+    ['Rest kcal', '1,950', '1,800', '-150'],
+  ])
+})
 
 // A rule the limits warn of on both types of day, in two periods, is
 // said once, with the values from the least to the most (U2 PL1).
