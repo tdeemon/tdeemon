@@ -159,6 +159,14 @@ docker exec <container> /tdeemon user create --admin \
 kubectl exec deploy/tdeemon -- /tdeemon user create --admin --email you@example.com
 ```
 
+After that, the app does the rest. In **Settings › Users** the admin
+invites someone by their address and copies the link it shows once,
+revokes an invite, deactivates a user, brings one back or makes one an
+admin; the link opens the app's `/invite` page, which makes the
+account. Each user exports their data or deletes their account in
+**Settings › Account**. The commands and the API calls below do the
+same from a shell:
+
 - It prints a generated password once; keep it in a password manager.
   To choose the password instead, add `--password-stdin` and pass it on
   the first line of standard input (`docker exec -i`).
@@ -202,10 +210,6 @@ kubectl exec deploy/tdeemon -- /tdeemon user create --admin --email you@example.
   `tdeemon.json`, every table of theirs, and a CSV file of each, without
   the secrets (hashes of the password, tokens and sessions; the
   devices' push subscriptions).
-- In the web app, the admin invites, revokes and changes users in the
-  settings' Users, which shows the link once to copy; the link opens
-  the app's `/invite` page, which makes the account. A user exports
-  their data or deletes their account in the settings' Account.
 - `tdeemon user demo --email demo@example.com` adds a user with three
   months of made-up data, to try tdeemon without your own or to take
   screenshots: a profile, a cut with its targets and training days,
@@ -495,85 +499,10 @@ sheet says when the client first calls with it.
 
 ### MCP
 
-Any MCP client that takes tools reaches tdeemon, with any model: a
-client from Anthropic or OpenAI, an open model such as DeepSeek, or a
-local one. The address is `<TDEEMON_BASE_URL>/mcp` (MCP over Streamable
-HTTP), with an API token as a Bearer token: one with `tools` for every
-tool, or `read` for those that only read. Each tool is the operation of
-the API above, with its validation and its answers, and a meal or a
-change made through MCP is the client `mcp`'s. The server tells every
-client how to log (its MCP instructions), so a client's own skill, if
-any, shrinks to a few lines.
-
-The app's Connect gives the token, the address being the instance's
-(`TDEEMON_BASE_URL`, which `GET /api/v1/info` says as `base_url`), and
-the commands for Claude Code and Claude Desktop. For a few clients:
-
-- **Claude Code:**
-
-  ```sh
-  claude mcp add --transport http tdeemon https://tdeemon.example.com/mcp \
-    --header "Authorization: Bearer tdm_…"
-  ```
-
-- **Claude Desktop:** its configuration, through
-  [mcp-remote](https://www.npmjs.com/package/mcp-remote), which passes
-  the header on (the app's Connect gives it).
-- **Codex:** the token in an environment variable of the shell Codex
-  runs in, then
-
-  ```sh
-  export TDEEMON_TOKEN=tdm_…
-  codex mcp add tdeemon --url https://tdeemon.example.com/mcp \
-    --bearer-token-env-var TDEEMON_TOKEN
-  ```
-
-- **Hermes Agent:** in its `config.yaml`, the token in its environment
-  (`.env`):
-
-  ```yaml
-  mcp_servers:
-    tdeemon:
-      url: https://tdeemon.example.com/mcp
-      headers:
-        Authorization: Bearer ${MCP_TDEEMON_API_KEY}
-  ```
-
-  Hermes finds a server's tools by searching them and does not pass the
-  server's instructions to its model: its own skill names the tools it
-  should use, `get_coaching_guide` for a coaching session among them.
-
-To check a token and the address before a client, ask the server what
-it is (MCP's `initialize`; the server keeps no session between
-requests):
-
-```sh
-curl -H 'Authorization: Bearer tdm_…' -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}' \
-  https://tdeemon.example.com/mcp
-```
-
-It answers with `serverInfo` (`tdeemon` and its version) and the
-instructions; a bad token, 401.
-
-ChatGPT's and claude.ai's connectors sign in with OAuth rather than a
-header, which tdeemon does not offer; whether they would work, on a
-phone above all, is not checked yet. The built-in chat (planned) is the
-way in from a phone.
-
-#### Coaching sessions
-
-Ask in words, in any client: "do a monthly review", "my weight has
-stalled", "plan a bulk from January". The model calls
-`get_coaching_guide` first, which answers the session's steps and
-[how tdeemon reads the numbers](methodology.md), and follows them:
-a monthly review, a plateau check or a new phase. A change of the plan
-is a proposal, applied only after your yes. A client that shows MCP
-prompts lists the same sessions as commands (in Claude Code,
-`/mcp__tdeemon__monthly_review`, `…plateau_check`, `…new_phase`, with
-what you want from it after them), and serves the methodology as the
-resource `tdeemon://methodology`.
+An AI coach reaches tdeemon over MCP, at `<TDEEMON_BASE_URL>/mcp`, with
+an API token of the `tools` or the `read` scope. The clients, the
+tools, the coaching sessions and an example are in
+[AI coach](ai-coach.md).
 
 ### Import from Apple Health
 

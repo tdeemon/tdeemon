@@ -5,7 +5,10 @@
     // Prose wraps at 80 columns; tables, code and headings may run longer.
     "MD013": { "line_length": 80, "tables": false, "code_blocks": false, "headings": false },
     // The same heading may appear under different parents.
-    "MD024": { "siblings_only": true }
+    "MD024": { "siblings_only": true },
+    // The README's centred top and the docs' screenshots, a phone's at
+    // its width and a theme's in its colours, need a little HTML.
+    "MD033": { "allowed_elements": ["picture", "source", "img", "p", "a", "h1", "b", "br", "sub"] }
   },
   "globs": ["**/*.md"],
   // CODE_OF_CONDUCT.md is the Contributor Covenant as published, its
