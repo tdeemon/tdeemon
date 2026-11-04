@@ -17,9 +17,9 @@ import { sayChange, sayFailed } from '@/lib/toast'
 // logged again from anywhere: the command palette's and its key's, R.
 // label is its name at an instant, none while today or yesterday is not
 // known, or yesterday had no such meal: yesterday is asked for while
-// shown (the palette open); run logs the one of now, if there is one,
-// asking for yesterday first when it must. Done, a toast says so, with
-// Undo; refused, why.
+// shown (the palette open); run logs the one of now, asking the server
+// for yesterday anew (a coach may have changed it since), or says there
+// is none. Done, a toast says so, with Undo; refused, why.
 export function useRepeatYesterday(shown: boolean): {
   label: (now: number) => string | undefined
   run: () => Promise<void>
@@ -64,13 +64,14 @@ export function useRepeatYesterday(shown: boolean): {
       }
       let meals
       try {
-        meals = (await queryClient.query({ ...before, staleTime: 'static' })).meals
+        meals = (await queryClient.query(before)).meals
       } catch (error) {
         sayFailed(problem(t, error))
         return
       }
       const at = mealAt(Date.now(), meals)
       if (at === undefined) {
+        sayFailed(t.palette.nothingToRepeat)
         return
       }
       log.mutate(

@@ -104,7 +104,12 @@ export function AppLayout() {
       w: () => {
         weigh(null)
       },
+      // A meal's row of the day repeats itself on R: a phone's card,
+      // whose row takes no key of its own, is no other meal's either.
       r: () => {
+        if (globalThis.document.activeElement?.closest('[data-meal]')) {
+          return
+        }
         void repeat.run()
       },
       '/': find,
@@ -253,6 +258,7 @@ export function AppLayout() {
         }}
         initial={palette.initial}
         actions={actions}
+        opener={paletteFrom}
       />
       <ShortcutsDialog open={shortcuts} onOpenChange={setShortcuts} />
     </>

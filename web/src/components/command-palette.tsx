@@ -18,7 +18,15 @@ import {
   Utensils,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type RefObject,
+} from 'react'
 
 import { $api } from '@/api/client'
 import { useFindFoods } from '@/api/foods'
@@ -80,11 +88,13 @@ export function CommandPalette({
   onOpenChange,
   initial,
   actions,
+  opener,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   initial: string
   actions: (now: number) => Command[]
+  opener: RefObject<HTMLElement | null>
 }) {
   const t = useMessages()
   // The command chosen, run once the palette has closed.
@@ -106,6 +116,9 @@ export function CommandPalette({
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-(--duration-base) data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Popup
           data-palette=""
+          // Back to what had the focus before it (opener): the field
+          // took it before the dialog could see that.
+          finalFocus={opener}
           className="fixed top-[max(1rem,12dvh)] left-1/2 z-50 flex max-h-[min(36rem,calc(100dvh-2rem))] w-[min(35rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-1.5 rounded-xl bg-card p-3 shadow-sheet transition-opacity duration-(--duration-base) outline-none data-ending-style:opacity-0 data-starting-style:opacity-0"
         >
           <Dialog.Title className="sr-only">{t.palette.title}</Dialog.Title>
@@ -147,6 +160,13 @@ function PaletteBody({
   const [now] = useState(Date.now)
   const [active, setActive] = useState(0)
   const list = useRef<HTMLDivElement>(null)
+  const field = useRef<HTMLInputElement>(null)
+  // The field takes the focus as it shows, before the dialog's own
+  // (a frame later): a key typed fast after the one that opened the
+  // palette is the field's, not the page's.
+  useLayoutEffect(() => {
+    field.current?.focus()
+  }, [])
   const placed = useRef(false)
   const groups = useGroups(query, actions(now))
   const rows = groups.flatMap((g) => g.commands)
@@ -193,6 +213,7 @@ function PaletteBody({
       <div className="flex h-12 shrink-0 items-center gap-2.5 rounded-lg border border-control-border bg-card px-3 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
         <Search aria-hidden className="size-5 shrink-0 text-muted-foreground" />
         <input
+          ref={field}
           role="combobox"
           aria-expanded
           aria-controls={`${id}-list`}

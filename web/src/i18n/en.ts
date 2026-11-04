@@ -672,6 +672,8 @@ export const en = {
         ? 'No results'
         : `${String(n)} ${plural('en', n, { one: 'result', other: 'results' })}`,
     none: 'Nothing found.',
+    // R, or the palette, when yesterday had no meal at this time of day.
+    nothingToRepeat: 'Yesterday has no meal of this time of day to repeat.',
   },
   quick: {
     title: 'Quick add',

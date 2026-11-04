@@ -57,11 +57,13 @@ const porridge: Meal = {
 function server(over: Record<string, Handler> = {}) {
   const todays = dayServer()
   const logged: unknown[] = []
+  // Yesterday's meals, which a test changes as a coach would.
+  const yesterday = { meals: [porridge] }
   fakeServer({
     ...signedIn(),
     ...todays.routes,
     'GET /api/v1/days/2026-10-22': () =>
-      Response.json(day({ date: '2026-10-22', meals: [porridge] })),
+      Response.json(day({ date: '2026-10-22', meals: yesterday.meals })),
     'GET /api/v1/foods': (request) =>
       Response.json({
         foods: new URL(request.url).searchParams.get('query') === 'oat' ? [oats] : [],
@@ -77,7 +79,7 @@ function server(over: Record<string, Handler> = {}) {
     },
     ...over,
   })
-  return { sent: todays.sent, logged }
+  return { sent: todays.sent, logged, yesterday }
 }
 
 // palette is the command palette, once open.
@@ -275,4 +277,48 @@ test('the palette says it in Croatian, and nothing found', async () => {
   })
   expect(p.getByText('Ništa nije pronađeno.')).toBeDefined()
   expect(p.queryByRole('option')).toBeNull()
+})
+
+// R asks for yesterday anew: a meal deleted since the palette showed it
+// is not logged again, and R says there is none. A meal's own row, a
+// phone's card too, takes R itself; a refusal is said.
+test('R repeats yesterday as it is now, never a focused meal, and says why it did not', async () => {
+  const { logged, yesterday } = server({
+    'POST /api/v1/meals': () =>
+      Response.json(
+        { status: 409, title: 'Conflict', detail: 'the food is archived' },
+        { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+      ),
+  })
+  renderAt('/foods')
+  await screen.findByRole('heading', { name: 'Foods', level: 1 })
+  fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
+  const p = await palette()
+  await p.findByRole('option', { name: "Repeat yesterday's breakfast" })
+  fireEvent.keyDown(p.getByRole('combobox'), { key: 'Escape' })
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  // A meal's row has the focus: R is its own.
+  const row = document.createElement('button')
+  row.dataset.meal = porridge.id
+  document.body.append(row)
+  row.focus()
+  fireEvent.keyDown(row, { key: 'r' })
+  row.remove()
+
+  // Refused, R says why.
+  fireEvent.keyDown(document.body, { key: 'r' })
+  expect(
+    await screen.findByText('The server did not take this meal: the food is archived'),
+  ).toBeDefined()
+
+  // Deleted since, as a coach would: nothing logged, and R says so.
+  yesterday.meals = []
+  fireEvent.keyDown(document.body, { key: 'r' })
+  expect(
+    await screen.findByText('Yesterday has no meal of this time of day to repeat.'),
+  ).toBeDefined()
+  expect(logged).toEqual([])
 })

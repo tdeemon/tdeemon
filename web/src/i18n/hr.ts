@@ -574,6 +574,7 @@ export const hr: Messages = {
         ? 'Nema rezultata'
         : `${String(n)} ${plural('hr', n, { one: 'rezultat', few: 'rezultata', other: 'rezultata' })}`,
     none: 'Ništa nije pronađeno.',
+    nothingToRepeat: 'Jučer nema obroka ovog doba dana za ponoviti.',
   },
   quick: {
     title: 'Brzo dodaj',
