@@ -228,7 +228,7 @@ test('the progress says the TDEE and how the phase goes, then the charts and the
     within(verdict)
       .getByText(/^Intake/, { selector: 'p' })
       .textContent.replaceAll(/\s+/g, ' '),
-  ).toBe('Intake 1,740 + trend -0.6 kg/wk (≈ 660) = 2,400 · 40 logged days, 38 weigh-ins')
+  ).toBe('Intake 1,740 + trend −0.6 kg/wk (≈ 660) = 2,400 · 40 logged days, 38 weigh-ins')
   expect(within(verdict).getByText('On track.')).toBeDefined()
   expect(
     within(verdict).getByText("You're losing 0.68% a week, within the phase's range (0.65–0.85%)."),
@@ -323,7 +323,7 @@ test("the TDEE's chart has two layers, more a tap away: the space to the 7 days'
 
   // Its table is of each day's own values: the target the day's, not
   // the 7 days' average the chart draws.
-  fireEvent.click(within(tdee).getByRole('button', { name: 'Table' }))
+  fireEvent.click(within(tdee).getByRole('button', { name: 'TDEE and intake: table' }))
   const rows = within(
     within(tdee).getByRole('table', { name: 'TDEE and intake, by day' }),
   ).getAllByRole('row')
@@ -675,7 +675,7 @@ test('the charts and the weeks start at the first data, not at the span’s firs
       ?.get('from'),
   ).toBe('2025-10-23')
   expect(within(weight).getByRole('img', { name: /, 18 weigh-ins\.$/ })).toBeDefined()
-  fireEvent.click(within(weight).getByRole('button', { name: 'Table' }))
+  fireEvent.click(within(weight).getByRole('button', { name: 'Weight: table' }))
   const table = within(weight).getByRole('table', { name: 'Weight, by day' })
   // The latest first, 14 of them, the rest a tap away.
   const rows = within(table).getAllByRole('row')
@@ -815,7 +815,7 @@ test('the measurements are small charts, each a whole one a tap away', async () 
     within(sheet).getByRole('img', { name: 'Resting heart rate 58 bpm on average.' }),
   ).toBeDefined()
   // Its values by day, a tap away.
-  fireEvent.click(within(sheet).getByRole('button', { name: 'Table' }))
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Resting heart rate: table' }))
   const table = within(sheet).getByRole('table', { name: 'Resting heart rate, by day' })
   expect(within(table).getAllByRole('row')[1]?.textContent).toBe('Fri, Oct 2358 bpm')
   expect(within(sheet).queryByRole('img')).toBeNull()
@@ -1144,3 +1144,73 @@ test.each([
     })
   },
 )
+
+// desktop makes the window a desktop's width, as matchMedia says.
+function desktop() {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query === '(min-width: 64rem)',
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }))
+}
+
+test("a desktop's hero is beside the TDEE, its skeleton too; what did not load is as wide as the page", async () => {
+  desktop()
+  let up = true
+  progressServer({
+    'GET /api/v1/history': (r) => (up ? historyAnswer(r) : problem(500)),
+  })
+  renderAt('/progress')
+
+  const tdee = await screen.findByRole('region', { name: 'TDEE and intake' }, { timeout: 10_000 })
+  const row = tdee.parentElement
+  expect(row?.firstElementChild).toBe(await hero())
+  expect(row?.className).toContain('grid-cols-[380px_minmax(0,1fr)]')
+  cleanup()
+
+  // A history that did not come: under the hero, not in its column.
+  up = false
+  renderAt('/progress?days=30')
+  const alert = await screen.findByRole('alert', {}, { timeout: 10_000 })
+  const verdict = await hero()
+  expect(verdict.parentElement?.className).toContain('grid-cols-1')
+  expect(verdict.parentElement?.contains(alert)).toBe(true)
+})
+
+test('each chart’s table is a switch of its own name', async () => {
+  progressServer()
+  renderAt('/progress')
+
+  const weight = await screen.findByRole('region', { name: 'Weight' }, { timeout: 10_000 })
+  expect(within(weight).getByRole('button', { name: 'Weight: table' }).textContent).toBe('Table')
+  expect(screen.getByRole('button', { name: 'TDEE and intake: table' })).toBeDefined()
+})
+
+test.each([
+  // A slope of 0 kg a week is no term: the few kcal are rounding, the sum
+  // about.
+  {
+    tdee: { kcal: 2405, intake_kcal: 2400, kg_per_week: 0.004 },
+    said: 'Intake 2,400 + trend 0 kg/wk (≈ 0) ≈ 2,405',
+  },
+  // A gain, with the minus sign, not a hyphen.
+  {
+    tdee: { kcal: 2400, intake_kcal: 2730, kg_per_week: 0.3 },
+    said: 'Intake 2,730 − trend +0.3 kg/wk (≈ 330) = 2,400',
+  },
+  {
+    tdee: { kcal: 2400, intake_kcal: 1740, kg_per_week: -0.6 },
+    said: 'Intake 1,740 + trend −0.6 kg/wk (≈ 660) = 2,400',
+  },
+])('the hero’s sum says $said', async ({ tdee, said }) => {
+  progressServer({
+    'GET /api/v1/summary': () => Response.json(summaryOf(onTrack, { ...trusted, ...tdee })),
+  })
+  renderAt('/progress')
+
+  const sum = within(await hero()).getByText(/^Intake/, { selector: 'p' })
+  expect(sum.textContent.replaceAll(/\s+/g, ' ')).toMatch(
+    new RegExp(`^${said.replaceAll(/[+()]/g, '\\$&')} ·`),
+  )
+})

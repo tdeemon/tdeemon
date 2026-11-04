@@ -106,7 +106,7 @@ export function MetricTile({
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-3">
             <p className="text-small text-muted-foreground">{said}</p>
-            <Toggle pressed={tabled} onChange={setTabled}>
+            <Toggle pressed={tabled} onChange={setTabled} label={t.charts.tableOfChart(title)}>
               {t.charts.table}
             </Toggle>
           </div>

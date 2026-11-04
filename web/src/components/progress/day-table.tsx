@@ -78,16 +78,21 @@ export function DayTable({ title, table }: { title: string; table: DayRows }) {
 export function Toggle({
   pressed,
   onChange,
+  label,
   children,
 }: {
   pressed: boolean
   onChange: (pressed: boolean) => void
+  // Its name, when its words alone would be one of several alike: the
+  // chart's ("Weight: table"), its words in it.
+  label?: string | undefined
   children: ReactNode
 }) {
   return (
     <button
       type="button"
       aria-pressed={pressed}
+      aria-label={label}
       onClick={() => {
         onChange(!pressed)
       }}

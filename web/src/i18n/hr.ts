@@ -998,6 +998,7 @@ export const hr: Messages = {
     moreLayers: 'Više slojeva',
     table: 'Tablica',
     date: 'Datum',
+    tableOfChart: (chart: string) => `${chart}: tablica`,
     tableOf: (chart: string) => `${chart}, po danima`,
     allDays: (n: number) => `Prikaži sve dane (${String(n)})`,
     change: (kg: string) => `${kg} kg u ovim danima`,

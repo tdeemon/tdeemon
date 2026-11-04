@@ -1134,6 +1134,7 @@ export const en = {
     table: 'Table',
     date: 'Date',
     // A chart's table, to a screen reader.
+    tableOfChart: (chart: string) => `${chart}: table`,
     tableOf: (chart: string) => `${chart}, by day`,
     allDays: (n: number) => `Show all days (${String(n)})`,
     // The trend weight's change over the days shown.

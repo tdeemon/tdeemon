@@ -167,6 +167,7 @@ export function ChartsPage() {
   // What came stays while asking for it again fails: the bar over the
   // page says since when.
   let body
+  let loading = false
   let charts: Charts | undefined
   if (me.data === undefined && me.isError) {
     body = (
@@ -181,6 +182,7 @@ export function ChartsPage() {
       />
     )
   } else if (!history.data || today === undefined || first === undefined) {
+    loading = true
     body = <ProgressSkeleton />
   } else if (history.data.days.every((d) => !drawn(d))) {
     body = <Empty />
@@ -237,6 +239,7 @@ export function ChartsPage() {
         hero={hero}
         charts={charts}
         fallback={body}
+        loading={loading}
         busy={history.isPlaceholderData}
         desktop={desktop}
       />
@@ -293,12 +296,14 @@ function Progress({
   hero,
   charts,
   fallback,
+  loading,
   busy,
   desktop,
 }: {
   hero: ReactNode
   charts: Charts | undefined
   fallback: ReactNode
+  loading: boolean
   busy: boolean
   desktop: boolean
 }) {
@@ -311,9 +316,16 @@ function Progress({
     >
       {desktop ? (
         <>
-          <div className="grid grid-cols-[380px_minmax(0,1fr)] items-start gap-4">
+          {/* The hero beside the TDEE, or its skeleton; what did not come
+              (an error, no days) under it, as wide as the page. */}
+          <div
+            className={cn(
+              'grid items-start gap-4',
+              cards !== undefined || loading ? 'grid-cols-[380px_minmax(0,1fr)]' : 'grid-cols-1',
+            )}
+          >
             {hero}
-            {cards?.tdee ?? fallback}
+            {cards?.tdee ?? (loading ? <ChartSkeleton loading /> : fallback)}
           </div>
           {cards !== undefined && (
             <>
@@ -323,6 +335,12 @@ function Progress({
               </div>
               <div className="grid grid-cols-2 items-start gap-4">{cards.weekly}</div>
             </>
+          )}
+          {cards === undefined && loading && (
+            <div aria-busy className="grid grid-cols-2 items-start gap-4">
+              <ChartSkeleton />
+              <TilesSkeleton />
+            </div>
           )}
         </>
       ) : (
@@ -731,39 +749,44 @@ function HeroSkeleton() {
   )
 }
 
-// ProgressSkeleton stands in the charts' place, in their shape, while
-// their days come.
-function ProgressSkeleton() {
+// ChartSkeleton stands in a chart's card while its days come; loading
+// says so to a screen reader, once on the page.
+function ChartSkeleton({ loading = false }: { loading?: boolean }) {
   const t = useMessages()
 
   return (
-    <div aria-busy className="space-y-3 lg:space-y-4">
-      <output className="sr-only">{t.loading}</output>
-      <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
-        {[0, 1].map((i) => (
-          <div key={i} className={cn(card, 'space-y-3')}>
-            <div className="space-y-1.5">
-              <Skeleton className="h-5 w-32" />
-              <Skeleton className="h-4 w-48" />
-            </div>
-            <Skeleton className="h-4 w-56" />
-            <Skeleton className="h-60" />
-          </div>
-        ))}
+    <div aria-busy className={cn(card, 'space-y-3')}>
+      {loading && <output className="sr-only">{t.loading}</output>}
+      <div className="space-y-1.5">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-4 w-48" />
       </div>
-      <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
-        <div className={cn(card, 'space-y-3')}>
-          <Skeleton className="h-5 w-24" />
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-7" />
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-36 rounded-lg" />
-          ))}
-        </div>
-      </div>
+      <Skeleton className="h-4 w-56" />
+      <Skeleton className="h-60" />
+    </div>
+  )
+}
+
+// TilesSkeleton stands in the measurements in small.
+function TilesSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
+      {[0, 1, 2].map((i) => (
+        <Skeleton key={i} className="h-36 rounded-lg" />
+      ))}
+    </div>
+  )
+}
+
+// ProgressSkeleton stands in the charts' place on a phone, in their
+// shape, one after the other, while their days come (a desktop's are
+// beside the hero: ChartSkeleton, TilesSkeleton).
+function ProgressSkeleton() {
+  return (
+    <div aria-busy className="space-y-3">
+      <ChartSkeleton loading />
+      <ChartSkeleton />
+      <TilesSkeleton />
     </div>
   )
 }

@@ -187,13 +187,18 @@ function Sum({ tdee }: { tdee: Tdee }) {
   }
   const kcal = Math.round(tdee.kcal)
   const intake = Math.round(tdee.intake_kcal)
-  const stored = kcal - intake
+  // A slope that rounds to 0 kg a week is no term of the sum: the few kcal
+  // between the intake and the TDEE are rounding, said by ≈ on the sum.
+  const flat = Math.round(tdee.kg_per_week * 100) === 0
+  const stored = flat ? 0 : kcal - intake
   const number = (n: number) => <b className="font-semibold tabular-nums">{f.number(n)}</b>
+  // The minus sign, not a hyphen, in either language.
+  const kg = flat ? f.number(0) : f.signed(tdee.kg_per_week, 2).replace('-', '−')
 
   return (
     <p className="rounded-md bg-surface-2 px-3 py-2.5 text-small">
-      {h.intake} {number(intake)} {stored < 0 ? '−' : '+'} {h.trend(f.signed(tdee.kg_per_week, 2))}{' '}
-      (≈ {number(Math.abs(stored))}) = {number(kcal)} {of}
+      {h.intake} {number(intake)} {stored < 0 ? '−' : '+'} {h.trend(kg)} (≈{' '}
+      {number(Math.abs(stored))}) {flat && kcal !== intake ? '≈' : '='} {number(kcal)} {of}
     </p>
   )
 }

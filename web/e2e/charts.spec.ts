@@ -49,11 +49,11 @@ test('the progress says how calibration goes, and shows the days logged and thei
   ).toBeVisible()
   await expect(weight.locator('[role="img"] svg')).toBeVisible()
   // Its days as a table, a tap away: today's weigh-in, the one day of it.
-  await weight.getByRole('button', { name: 'Table' }).click()
+  await weight.getByRole('button', { name: 'Weight: table' }).click()
   const days = weight.getByRole('table', { name: 'Weight, by day' })
   await expect(days.getByRole('row')).toHaveCount(2)
   await expect(days).toContainText('80.5')
-  await weight.getByRole('button', { name: 'Table' }).click()
+  await weight.getByRole('button', { name: 'Weight: table' }).click()
   await expect(weight.locator('[role="img"] svg')).toBeVisible()
   await page.getByText('30 d', { exact: true }).click()
   await expect(page).toHaveURL(/days=30/)

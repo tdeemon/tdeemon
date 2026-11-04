@@ -57,7 +57,7 @@ export function ChartCard({
               {t.charts.moreLayers}
             </Toggle>
           )}
-          <Toggle pressed={tabled} onChange={setTabled}>
+          <Toggle pressed={tabled} onChange={setTabled} label={t.charts.tableOfChart(title)}>
             {t.charts.table}
           </Toggle>
         </div>

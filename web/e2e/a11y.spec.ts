@@ -398,7 +398,7 @@ const screens: Screen[] = [
       await page.goto('/progress')
       await settled(page)
       const weight = page.getByRole('region', { name: /^(Weight|Kilaža)$/ })
-      await weight.getByRole('button', { name: /^(Table|Tablica)$/ }).click()
+      await weight.getByRole('button', { name: /^(Weight: table|Kilaža: tablica)$/ }).click()
       await expect(weight.getByRole('table')).toBeVisible()
       await page
         .getByRole('region', { name: /^(TDEE and intake|TDEE i unos)$/ })
