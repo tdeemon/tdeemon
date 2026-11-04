@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
-	"github.com/zarnautovic/tdeemon/internal/store"
-	"github.com/zarnautovic/tdeemon/internal/store/storetest"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/store/storetest"
 )
 
 const issuer = "https://auth.example.com/application/o/tdeemon/"

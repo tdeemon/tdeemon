@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
 )
 
 // The workouts in testdata/strong are made up.

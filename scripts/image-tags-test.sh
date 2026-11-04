@@ -23,18 +23,18 @@ expect() {
   fi
 }
 
-expect "a release" "ghcr.io/zarnautovic/tdeemon:1.2.3
-ghcr.io/zarnautovic/tdeemon:1.2
-ghcr.io/zarnautovic/tdeemon:latest
-ghcr.io/zarnautovic/tdeemon:sha-0123456789ab" v1.2.3 "$sha" zarnautovic/tdeemon
+expect "a release" "ghcr.io/tdeemon/tdeemon:1.2.3
+ghcr.io/tdeemon/tdeemon:1.2
+ghcr.io/tdeemon/tdeemon:latest
+ghcr.io/tdeemon/tdeemon:sha-0123456789ab" v1.2.3 "$sha" tdeemon/tdeemon
 expect "two-digit parts" "ghcr.io/o/r:10.20.30
 ghcr.io/o/r:10.20
 ghcr.io/o/r:latest
 ghcr.io/o/r:sha-0123456789ab" v10.20.30 "$sha" o/r
-expect "the repository in lower case" "ghcr.io/zarnautovic/tdeemon:0.1.0
-ghcr.io/zarnautovic/tdeemon:0.1
-ghcr.io/zarnautovic/tdeemon:latest
-ghcr.io/zarnautovic/tdeemon:sha-0123456789ab" v0.1.0 "$sha" ZArnautovic/TDEEMON
+expect "the repository in lower case" "ghcr.io/tdeemon/tdeemon:0.1.0
+ghcr.io/tdeemon/tdeemon:0.1
+ghcr.io/tdeemon/tdeemon:latest
+ghcr.io/tdeemon/tdeemon:sha-0123456789ab" v0.1.0 "$sha" TDeemon/TDEEMON
 expect "no v" fail 1.2.3 "$sha" o/r
 expect "a pre-release" fail v1.2.3-rc.1 "$sha" o/r
 expect "a short commit" fail v1.2.3 0123456 o/r

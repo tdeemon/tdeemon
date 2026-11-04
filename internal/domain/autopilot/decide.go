@@ -5,11 +5,11 @@ import (
 	"slices"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/calibration"
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/domain/plan"
-	"github.com/zarnautovic/tdeemon/internal/domain/proposal"
+	"github.com/tdeemon/tdeemon/internal/domain/calibration"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/domain/plan"
+	"github.com/tdeemon/tdeemon/internal/domain/proposal"
 )
 
 // Outcome is what a review did.

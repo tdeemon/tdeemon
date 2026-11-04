@@ -14,9 +14,9 @@ import (
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/clientid"
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/event"
+	"github.com/tdeemon/tdeemon/internal/domain/clientid"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/event"
 )
 
 // undoLeaves lists the kinds of events UndoLast passes over, besides an

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
 )
 
 // metrics are a day's measurements, kind and value in turn.

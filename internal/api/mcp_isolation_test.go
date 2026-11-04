@@ -10,8 +10,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/clientid"
-	"github.com/zarnautovic/tdeemon/internal/domain/meal"
+	"github.com/tdeemon/tdeemon/internal/domain/clientid"
+	"github.com/tdeemon/tdeemon/internal/domain/meal"
 )
 
 // mcpIsolationCase calls a tool as the other party, through cs, their

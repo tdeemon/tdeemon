@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/text"
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/domain/text"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
 )
 
 // Date is a calendar date, with no time and no time zone.

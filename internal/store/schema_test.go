@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/store/storetest"
+	"github.com/tdeemon/tdeemon/internal/store/storetest"
 )
 
 var update = flag.Bool("update", false, "rewrite testdata/schema.sql from the migrations")

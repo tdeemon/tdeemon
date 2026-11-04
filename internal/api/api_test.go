@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/api"
-	"github.com/zarnautovic/tdeemon/internal/store/storetest"
+	"github.com/tdeemon/tdeemon/internal/api"
+	"github.com/tdeemon/tdeemon/internal/store/storetest"
 )
 
 var testInfo = api.ServerInfo{Name: "tdeemon", Version: "v9.9.9"}

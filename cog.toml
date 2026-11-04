@@ -20,7 +20,7 @@ tag_prefix = "v"
 [changelog]
 template = ".github/release-notes.tera"
 remote = "github.com"
-owner = "zarnautovic"
+owner = "tdeemon"
 repository = "tdeemon"
 
 [commit_types]

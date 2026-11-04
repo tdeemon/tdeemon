@@ -2,7 +2,7 @@
 # breaking change, cuts a release: the next version from the
 # Conventional Commits since the last tag (scripts/next-version.sh,
 # cog.toml), a vX.Y.Z tag, a GitHub Release with the notes, and the
-# image ghcr.io/zarnautovic/tdeemon:X.Y.Z (also :X.Y, :latest and
+# image ghcr.io/tdeemon/tdeemon:X.Y.Z (also :X.Y, :latest and
 # :sha-<commit>).
 #
 # The image is a job here, not a workflow of its own on the release: a

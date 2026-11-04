@@ -3,8 +3,8 @@ package calibration
 import (
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/plan"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/plan"
 )
 
 // weighEvery leaves a weigh-in on every n-th day of days, counted back

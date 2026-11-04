@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/api"
-	"github.com/zarnautovic/tdeemon/internal/off"
+	"github.com/tdeemon/tdeemon/internal/api"
+	"github.com/tdeemon/tdeemon/internal/off"
 )
 
 // openFoodFacts is a fake Open Food Facts: its URL, and how many times it

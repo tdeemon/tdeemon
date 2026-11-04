@@ -91,7 +91,7 @@ formatters:
         clothe-returns: true
     goimports:
       local-prefixes:
-        - github.com/zarnautovic/tdeemon
+        - github.com/tdeemon/tdeemon
 
 issues:
   # Report everything, not the first few of each kind.

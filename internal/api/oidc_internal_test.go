@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/config"
+	"github.com/tdeemon/tdeemon/internal/config"
 )
 
 // An https issuer whose discovery document sends the token exchange or

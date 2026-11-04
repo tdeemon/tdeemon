@@ -6,7 +6,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
 )
 
 // Warning is something about a logged meal the client should look at, and

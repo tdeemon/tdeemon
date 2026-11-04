@@ -7,7 +7,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/store/storetest"
+	"github.com/tdeemon/tdeemon/internal/store/storetest"
 )
 
 // Users lists every user in the order they were created.

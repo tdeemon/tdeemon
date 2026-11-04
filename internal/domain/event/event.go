@@ -10,7 +10,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/text"
+	"github.com/tdeemon/tdeemon/internal/domain/text"
 )
 
 // ActorKind is who made a write.

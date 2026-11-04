@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/auth"
 )
 
 func TestLimiter(t *testing.T) {

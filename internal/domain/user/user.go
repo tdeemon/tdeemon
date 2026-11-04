@@ -17,7 +17,7 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/text"
+	"github.com/tdeemon/tdeemon/internal/domain/text"
 )
 
 // Role is what a user may do on the instance.

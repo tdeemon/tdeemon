@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/docs"
-	"github.com/zarnautovic/tdeemon/internal/coaching"
+	"github.com/tdeemon/tdeemon/docs"
+	"github.com/tdeemon/tdeemon/internal/coaching"
 )
 
 func TestSessions(t *testing.T) {

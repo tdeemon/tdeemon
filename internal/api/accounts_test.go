@@ -7,7 +7,7 @@ import (
 	"testing"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
 )
 
 // addUser adds Zoe, without a password, to in's instance.

@@ -11,8 +11,8 @@ import (
 	"math"
 	"slices"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/metric"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/metric"
 )
 
 // PhaseType is the kind of a phase. Nothing assumes a loss: each type has

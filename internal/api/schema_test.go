@@ -21,14 +21,14 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/zarnautovic/tdeemon/internal/api"
-	"github.com/zarnautovic/tdeemon/internal/auth"
-	"github.com/zarnautovic/tdeemon/internal/coaching"
-	"github.com/zarnautovic/tdeemon/internal/domain/clientid"
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
-	"github.com/zarnautovic/tdeemon/internal/domain/meal"
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/api"
+	"github.com/tdeemon/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/coaching"
+	"github.com/tdeemon/tdeemon/internal/domain/clientid"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/domain/meal"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
 )
 
 // document is the API's description: the operations by the route they
@@ -790,7 +790,7 @@ func nullableFields(t reflect.Type, seen map[reflect.Type]bool) []string {
 		t = t.Elem()
 	}
 	// An answer's body is often a struct with no name, and no package.
-	foreign := t.Name() != "" && !strings.HasPrefix(t.PkgPath(), "github.com/zarnautovic/tdeemon/")
+	foreign := t.Name() != "" && !strings.HasPrefix(t.PkgPath(), "github.com/tdeemon/tdeemon/")
 	if t.Kind() != reflect.Struct || seen[t] || foreign {
 		return nil
 	}

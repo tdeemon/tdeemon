@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/auth"
 )
 
 // from is in.do's header map for a request from addr (host:port).

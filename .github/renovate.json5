@@ -55,7 +55,7 @@
   packageRules: [
     {
       description: "deploy/compose runs tdeemon's own image at :latest on purpose: no digest, no update.",
-      matchPackageNames: ['ghcr.io/zarnautovic/tdeemon'],
+      matchPackageNames: ['ghcr.io/tdeemon/tdeemon'],
       enabled: false,
     },
     {

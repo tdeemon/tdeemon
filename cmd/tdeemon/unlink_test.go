@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 // user unlink removes a user's identities, at one issuer or all, so the

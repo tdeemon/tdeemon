@@ -19,9 +19,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/zarnautovic/tdeemon/docs"
-	"github.com/zarnautovic/tdeemon/internal/auth"
-	"github.com/zarnautovic/tdeemon/internal/coaching"
+	"github.com/tdeemon/tdeemon/docs"
+	"github.com/tdeemon/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/coaching"
 )
 
 // mcpInstructions is the policy of logging the server gives every MCP

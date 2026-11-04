@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/metric"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/metric"
 )
 
 // Day is the values a payload gives one day, at most one of each kind,

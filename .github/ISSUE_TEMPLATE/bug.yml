@@ -8,7 +8,7 @@ body:
         Issues are public. Leave out personal data such as your weights and
         meals, and secrets such as keys and tokens. Report a security
         vulnerability privately instead, as the
-        [security policy](https://github.com/zarnautovic/tdeemon/security/policy)
+        [security policy](https://github.com/tdeemon/tdeemon/security/policy)
         describes.
   - type: textarea
     id: what

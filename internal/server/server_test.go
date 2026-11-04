@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/server"
+	"github.com/tdeemon/tdeemon/internal/server"
 )
 
 // start runs server.Run in the background and returns the base URL, a

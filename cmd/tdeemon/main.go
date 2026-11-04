@@ -20,17 +20,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/api"
-	"github.com/zarnautovic/tdeemon/internal/config"
-	"github.com/zarnautovic/tdeemon/internal/notify"
-	"github.com/zarnautovic/tdeemon/internal/off"
-	"github.com/zarnautovic/tdeemon/internal/push"
-	"github.com/zarnautovic/tdeemon/internal/scheduler"
-	"github.com/zarnautovic/tdeemon/internal/server"
-	"github.com/zarnautovic/tdeemon/internal/store"
-	"github.com/zarnautovic/tdeemon/internal/telegram"
-	"github.com/zarnautovic/tdeemon/internal/watchdog"
-	"github.com/zarnautovic/tdeemon/internal/webui"
+	"github.com/tdeemon/tdeemon/internal/api"
+	"github.com/tdeemon/tdeemon/internal/config"
+	"github.com/tdeemon/tdeemon/internal/notify"
+	"github.com/tdeemon/tdeemon/internal/off"
+	"github.com/tdeemon/tdeemon/internal/push"
+	"github.com/tdeemon/tdeemon/internal/scheduler"
+	"github.com/tdeemon/tdeemon/internal/server"
+	"github.com/tdeemon/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/telegram"
+	"github.com/tdeemon/tdeemon/internal/watchdog"
+	"github.com/tdeemon/tdeemon/internal/webui"
 )
 
 // version can be set at build time with -ldflags "-X main.version=v1.2.3".
@@ -108,7 +108,7 @@ least once, which creates and migrates it; the server may be running.
 
 Configure tdeemon with TDEEMON_* environment variables; the user commands
 read the same ones as the server. See
-https://github.com/zarnautovic/tdeemon/blob/main/docs/self-hosting.md#configuration
+https://github.com/tdeemon/tdeemon/blob/main/docs/self-hosting.md#configuration
 `
 
 // errUsage marks a command line tdeemon does not accept.
@@ -221,7 +221,7 @@ func serve(ctx context.Context, lookup config.LookupFunc, logOut io.Writer) erro
 	if cfg.OpenFoodFactsURL != "" {
 		apiCfg.OpenFoodFacts = &off.Client{
 			BaseURL:   cfg.OpenFoodFactsURL,
-			UserAgent: "tdeemon/" + serverVersion + " (https://github.com/zarnautovic/tdeemon)",
+			UserAgent: "tdeemon/" + serverVersion + " (https://github.com/tdeemon/tdeemon)",
 		}
 	}
 	// The VAPID key is the secret key's: the browsers' subscriptions hold

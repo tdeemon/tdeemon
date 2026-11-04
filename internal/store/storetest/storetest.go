@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 // template is a database with every migration applied, as the bytes of one

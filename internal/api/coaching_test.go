@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/docs"
-	"github.com/zarnautovic/tdeemon/internal/api"
-	"github.com/zarnautovic/tdeemon/internal/coaching"
+	"github.com/tdeemon/tdeemon/docs"
+	"github.com/tdeemon/tdeemon/internal/api"
+	"github.com/tdeemon/tdeemon/internal/coaching"
 )
 
 // guideBody is get-coaching-guide's answer.

@@ -12,7 +12,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/api"
+	"github.com/tdeemon/tdeemon/internal/api"
 )
 
 var update = flag.Bool("update", false, "rewrite api/openapi.json from the Go operations")

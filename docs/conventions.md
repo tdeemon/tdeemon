@@ -281,7 +281,7 @@ A change is done when:
   - the release is a `vX.Y.Z` tag and a GitHub Release whose notes list
     the commits by type, with a link to each, and for a breaking change
     a BREAKING mark and its footer (`.github/release-notes.tera`);
-  - and the image `ghcr.io/zarnautovic/tdeemon`, for linux/amd64 and
+  - and the image `ghcr.io/tdeemon/tdeemon`, for linux/amd64 and
     linux/arm64, tagged `X.Y.Z`, `X.Y`, `latest` and `sha-<commit>`
     (`scripts/image-tags.sh`), with its SBOM and provenance; it builds
     without a cache, in a job of the same workflow, as a release the

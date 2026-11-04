@@ -11,7 +11,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/zarnautovic/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/auth"
 )
 
 // An operation open to one scope takes a token with it, and only that;

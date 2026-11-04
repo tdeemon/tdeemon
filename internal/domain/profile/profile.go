@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/text"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/text"
 )
 
 // Sex is the sex the energy equations take: they have a term for each.
