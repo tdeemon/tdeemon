@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,7 +25,7 @@ func healthcheck(ctx context.Context, args []string, lookup config.LookupFunc) e
 	if len(args) > 0 {
 		return fmt.Errorf("%w: healthcheck takes no arguments", errUsage)
 	}
-	url, err := healthzURL(lookup)
+	url, err := healthzURL(ctx, lookup)
 	if err != nil {
 		return err
 	}
@@ -51,7 +52,7 @@ func healthcheck(ctx context.Context, args []string, lookup config.LookupFunc) e
 
 // healthzURL is the address of /healthz on the server TDEEMON_LISTEN
 // binds: on the loopback address when it binds every address.
-func healthzURL(lookup config.LookupFunc) (string, error) {
+func healthzURL(ctx context.Context, lookup config.LookupFunc) (string, error) {
 	listen := ":8080"
 	if v, ok := lookup(config.Prefix + "LISTEN"); ok && strings.TrimSpace(v) != "" {
 		listen = strings.TrimSpace(v)
@@ -63,5 +64,11 @@ func healthzURL(lookup config.LookupFunc) (string, error) {
 	if addr, err := netip.ParseAddr(host); host == "" || (err == nil && addr.IsUnspecified()) {
 		host = "127.0.0.1"
 	}
-	return "http://" + net.JoinHostPort(host, port) + "/healthz", nil
+	// The server takes a service's name for a port (:http); a URL takes a
+	// number only.
+	n, err := net.DefaultResolver.LookupPort(ctx, "tcp", port)
+	if err != nil {
+		return "", fmt.Errorf("%sLISTEN %q: %w", config.Prefix, listen, err)
+	}
+	return "http://" + net.JoinHostPort(host, strconv.Itoa(n)) + "/healthz", nil
 }

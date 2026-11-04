@@ -105,18 +105,21 @@ func TestHealthzURL(t *testing.T) {
 		{"127.0.0.2:9000", true, "http://127.0.0.2:9000/healthz"},
 		{"[::1]:9000", true, "http://[::1]:9000/healthz"},
 		{"localhost:9000", true, "http://localhost:9000/healthz"},
+		{":http", true, "http://127.0.0.1:80/healthz"},
 	} {
 		env := map[string]string{}
 		if tc.set {
 			env["TDEEMON_LISTEN"] = tc.listen
 		}
-		got, err := healthzURL(lookup(env))
+		got, err := healthzURL(t.Context(), lookup(env))
 		if err != nil || got != tc.want {
 			t.Errorf("TDEEMON_LISTEN %q: %q, %v; want %q", tc.listen, got, err, tc.want)
 		}
 	}
-	if _, err := healthzURL(lookup(map[string]string{"TDEEMON_LISTEN": "8080"})); err == nil {
-		t.Error("TDEEMON_LISTEN 8080 (no colon) was accepted")
+	for _, bad := range []string{"8080", ":no-such-service"} {
+		if _, err := healthzURL(t.Context(), lookup(map[string]string{"TDEEMON_LISTEN": bad})); err == nil {
+			t.Errorf("TDEEMON_LISTEN %q was accepted", bad)
+		}
 	}
 }
 

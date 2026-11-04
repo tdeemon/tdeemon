@@ -33,32 +33,41 @@ services:
 EOF2
 
 export TDEEMON_IMAGE=$1
-compose() { docker compose --project-directory "$dir" -p "$project" "$@"; }
+# Run from the directory, as a self-hoster does: Compose reads .env, and
+# COMPOSE_FILE in it, from there.
+compose() { (cd "$dir" && docker compose -p "$project" "$@"); }
+all=(-f compose.yaml -f compose.caddy.yaml -f compose.test.yaml)
 cleanup() {
   status=$?
   if ((status != 0)); then
-    compose -f "$dir/compose.yaml" -f "$dir/compose.caddy.yaml" -f "$dir/compose.test.yaml" logs || true
+    compose "${all[@]}" logs || true
   fi
-  compose -f "$dir/compose.yaml" -f "$dir/compose.caddy.yaml" -f "$dir/compose.test.yaml" down -v --remove-orphans || true
+  compose "${all[@]}" down -v --remove-orphans || true
   # The network of tdeemon alone, which no service behind Caddy uses.
-  compose -f "$dir/compose.yaml" down -v || true
+  compose -f compose.yaml down -v || true
   rm -rf "$dir"
   exit "$status"
 }
 trap cleanup EXIT
 
 echo "== tdeemon alone"
-compose -f "$dir/compose.yaml" up -d --wait --wait-timeout 180
+compose up -d --wait --wait-timeout 180
 curl -fsS --retry 5 --retry-connrefused http://127.0.0.1:8080/healthz
 curl -fsS http://127.0.0.1:8080/api/v1/info
 echo
 
 echo "== behind Caddy"
-compose -f "$dir/compose.yaml" -f "$dir/compose.caddy.yaml" -f "$dir/compose.test.yaml" up -d --wait --wait-timeout 180
+# As .env.example says, with the test's file too.
+echo "COMPOSE_FILE=compose.yaml:compose.caddy.yaml:compose.test.yaml" >>"$dir/.env"
+compose up -d --wait --wait-timeout 180
 curl -fsS --retry 10 --retry-connrefused -H "Host: localhost" http://127.0.0.1:8081/healthz
 # tdeemon publishes no port of its own any more.
 if curl -fsS --max-time 5 http://127.0.0.1:8080/healthz >/dev/null 2>&1; then
   echo "tdeemon still answers on 127.0.0.1:8080 behind Caddy" >&2
   exit 1
 fi
+
+echo "== an upgrade behind Caddy keeps tdeemon on Caddy's network"
+compose up -d --wait --wait-timeout 180 --force-recreate tdeemon
+curl -fsS --retry 10 --retry-connrefused -H "Host: localhost" http://127.0.0.1:8081/healthz
 echo "ok"

@@ -4,6 +4,10 @@
 #
 #   docker compose -f compose.yaml -f compose.caddy.yaml up -d --wait
 #
+# or, with COMPOSE_FILE=compose.yaml:compose.caddy.yaml in .env (see
+# .env.example), plain `docker compose up -d --wait`. Every later command,
+# an upgrade's too, must take both files, or tdeemon leaves Caddy's network.
+#
 # tdeemon then publishes no port: only Caddy reaches it, on a network of
 # their own, where Caddy has a fixed address tdeemon trusts to name the
 # client (TDEEMON_TRUSTED_PROXIES). Should that subnet clash with one of

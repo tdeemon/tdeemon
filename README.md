@@ -138,8 +138,10 @@ docker compose up -d --wait
   same machine that terminates HTTPS. Without one,
   `compose.caddy.yaml` adds Caddy, with a certificate from Let's
   Encrypt for the host of `TDEEMON_BASE_URL`, which must point at the
-  machine, ports 80 and 443 open:
-  `docker compose -f compose.yaml -f compose.caddy.yaml up -d --wait`.
+  machine, ports 80 and 443 open. Uncomment
+  `COMPOSE_FILE=compose.yaml:compose.caddy.yaml` in `.env`, so that every
+  `docker compose` command, an upgrade's too, takes both files; then
+  `docker compose up -d --wait` as above.
 - The image is `ghcr.io/zarnautovic/tdeemon:latest`, the newest
   release; pin `:X.Y.Z` in `compose.yaml` to upgrade when you choose.
   `docker compose pull && docker compose up -d --wait` upgrades.
