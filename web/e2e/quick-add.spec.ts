@@ -61,7 +61,9 @@ test("the bar's + logs a meal over the foods, which stay, its toast the way to t
   await sheet.getByRole('button', { name: 'An estimate in kcal' }).click()
   await sheet.getByLabel('Energy (kcal)').fill('120')
   await sheet.getByLabel('What it is').fill('Flat white')
-  await sheet.getByRole('button', { name: /^Log \w+ · 120 kcal$/ }).click()
+  // Enter presses its primary button, as the eye sees it: Log.
+  await expect(sheet.getByRole('button', { name: /^Log \w+ · 120 kcal$/ })).toBeVisible()
+  await sheet.getByLabel('What it is').press('Enter')
 
   await expect(page.getByText(/^Logged: Flat white · 120 kcal/)).toBeVisible()
   await expect(sheet).toBeHidden()

@@ -53,7 +53,7 @@ export function NewEntry({
   said?: ReactNode
   onBack: () => void
   onAdd: (entry: Entry) => void
-  logAs?: ((kcal: string) => string) | undefined
+  logAs?: ((kcal: string | undefined) => string) | undefined
   onLog?: ((entry: Entry) => void) | undefined
   ingredient?: boolean
 }) {
@@ -76,6 +76,9 @@ export function NewEntry({
   const saving = useIsMutating({ mutationKey: ['post', '/api/v1/foods/new'] }) > 0
   // An estimate that logs the meal of it alone.
   const logs = making === 'estimate' && onLog !== undefined && logAs !== undefined
+  // The kcal typed, as the button says them: none while they are none.
+  const parsedKcal = f.parse(estimate.kcal)
+  const typedKcal = parsedKcal === undefined ? undefined : f.number(Math.round(parsedKcal))
   // The focus goes to the first field, as the button that opened the step
   // is hidden under it.
   useEffect(() => {
@@ -151,30 +154,28 @@ export function NewEntry({
         )}
       </div>
       <div className="flex gap-2 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {/* The primary first, which Enter in a field presses; Add to meal
+            before it to the eye. */}
+        <Button
+          type="submit"
+          form={form}
+          className="order-2 h-13 min-w-0 flex-1 text-base"
+          disabled={saving}
+          focusableWhenDisabled
+        >
+          {ingredient ? t.recipes.addToRecipe : logs ? logAs(typedKcal) : t.log.addToMeal}
+        </Button>
         {logs && (
           <Button
             type="submit"
             form={form}
             variant="outline"
             data-add=""
-            className="h-13 shrink-0 text-base"
+            className="order-1 h-13 shrink-0 text-base"
           >
             {t.log.addToMeal}
           </Button>
         )}
-        <Button
-          type="submit"
-          form={form}
-          className="h-13 min-w-0 flex-1 text-base"
-          disabled={saving}
-          focusableWhenDisabled
-        >
-          {ingredient
-            ? t.recipes.addToRecipe
-            : logs
-              ? logAs(f.number(Math.round(f.parse(estimate.kcal) ?? 0)))
-              : t.log.addToMeal}
-        </Button>
       </div>
     </>
   )

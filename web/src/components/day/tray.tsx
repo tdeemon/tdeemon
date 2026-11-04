@@ -67,7 +67,10 @@ export function Tray({
     return null
   }
   return (
-    <div className="shrink-0 space-y-2.5 border-t bg-popover p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div
+      data-tray=""
+      className="shrink-0 space-y-2.5 border-t bg-popover p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+    >
       {items && open && (
         <div id={`${id}-items`} className="max-h-[40dvh] space-y-2 overflow-y-auto">
           <ul aria-label={t.log.basket} className="divide-y">

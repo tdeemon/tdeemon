@@ -441,6 +441,8 @@ test('an amount changed in the tray is checked as the meal is logged, and said t
   fireEvent.click(sheet.getByRole('button', { name: /^Log snack · / }))
 
   expect(sheet.getByRole('alert').textContent).toBe('Write a number, such as 72.5.')
+  // The wrong amount has the focus.
+  expect(document.activeElement).toBe(sheet.getByLabelText('Amount in the meal: Rye bread'))
   expect(sheet.getByLabelText('Amount in the meal: Rye bread').getAttribute('aria-invalid')).toBe(
     'true',
   )
@@ -727,6 +729,8 @@ test('what is wrong with an estimate is no longer said once it is given up', asy
 
   const sheet = await openSheet()
   fireEvent.click(sheet.getByRole('button', { name: 'An estimate in kcal' }))
+  // No kcal typed, no kcal said.
+  expect(sheet.getByRole('button', { name: 'Log snack' })).toBeDefined()
   fireEvent.click(sheet.getByRole('button', { name: 'Add to meal' }))
   // Its kcal alone it needs; its name and macros may be left out.
   expect(sheet.getByRole('alert').textContent).toBe('Write a number, such as 72.5.')
@@ -1820,4 +1824,38 @@ test('⌘↵ logs the meal from the search, but not from a next step', async () 
   await waitFor(() => {
     expect(server.sent).toHaveLength(1)
   })
+})
+
+test("⌘↵ in a food's amount logs the meal with the food, not without it", async () => {
+  const server = logServer()
+  renderAt('/')
+
+  const sheet = await openSheet()
+  await giveEstimate(sheet, 'Tea', '5')
+  await findRye(sheet)
+  fireEvent.change(sheet.getByLabelText('Amount: Rye bread'), { target: { value: '3' } })
+  fireEvent.keyDown(sheet.getByLabelText('Amount: Rye bread'), { key: 'Enter', ctrlKey: true })
+
+  await waitFor(() => {
+    expect(server.sent).toHaveLength(1)
+  })
+  expect(server.sent[0]).toMatchObject({
+    items: [{ name: 'Tea' }, { food_id: bread.id, serving: 'slice', servings: 3 }],
+  })
+})
+
+test("a checked + takes out the food's latest entry alone", async () => {
+  logServer()
+  renderAt('/')
+
+  const sheet = await openSheet()
+  await findRye(sheet)
+  fireEvent.click(sheet.getByRole('button', { name: 'Add: Rye bread' }))
+  fireEvent.click(sheet.getByRole('button', { name: /^Rye bread/ }))
+  fireEvent.click(sheet.getByRole('button', { name: 'slice (40 g)' }))
+  fireEvent.click(sheet.getByRole('button', { name: 'Add: Rye bread' }))
+  expect(basket(sheet)).toHaveLength(2)
+
+  fireEvent.click(sheet.getByRole('button', { name: 'Add: Rye bread', pressed: true }))
+  expect(basket(sheet)).toEqual(['Rye bread · 2 slice · 207 kcal'])
 })

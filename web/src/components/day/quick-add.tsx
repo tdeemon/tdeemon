@@ -203,11 +203,12 @@ function Composer({
   // The button that opened the next step, which the focus goes back to.
   const maker = useRef<HTMLElement | null>(null)
   const logButton = useRef<HTMLButtonElement>(null)
-  // What the sheet holds, whose keys are heard (onKey).
+  // What the sheet holds; its keys are heard (onKey) in all of the
+  // sheet, its head too.
   const keys = useRef<HTMLDivElement>(null)
   const onKey = useRef<(e: KeyboardEvent) => void>(() => undefined)
   useEffect(() => {
-    const element = keys.current
+    const element = keys.current?.closest<HTMLElement>('[role="dialog"]')
     const listener = (e: KeyboardEvent) => {
       onKey.current(e)
     }
@@ -256,7 +257,11 @@ function Composer({
     )
     setWrongs(wrong)
     if (Object.keys(wrong).length > 0) {
-      setTrayOpen(true)
+      // Opened on the first wrong amount, which has the focus.
+      flushSync(() => {
+        setTrayOpen(true)
+      })
+      keys.current?.querySelector<HTMLElement>('[data-tray] [aria-invalid="true"]')?.focus()
       return
     }
     const when = eatenAt()
@@ -371,7 +376,8 @@ function Composer({
   const chosen = new Set(entries.flatMap((e) => (e.kind === 'food' ? [e.food.id] : [])))
 
   // ⌘↵ or Ctrl+↵ logs the meal from anywhere in the sheet but a next
-  // step, which has a button of its own.
+  // step, which has a button of its own, and a food's amount open, which
+  // logs the meal with that food (Finder's onLog).
   useEffect(() => {
     onKey.current = (e: KeyboardEvent) => {
       if (
@@ -379,7 +385,8 @@ function Composer({
         (e.metaKey || e.ctrlKey) &&
         making === undefined &&
         entries.length > 0 &&
-        !held
+        !held &&
+        !(e.target instanceof Element && e.target.closest('[data-amount]') !== null)
       ) {
         e.preventDefault()
         submit(entries)
@@ -427,7 +434,8 @@ function Composer({
             onAdd={made}
             {...(making === 'estimate' && entries.length === 0
               ? {
-                  logAs: (energy: string) => t.log.logAs(label, energy),
+                  logAs: (energy: string | undefined) =>
+                    energy === undefined ? label : t.log.logAs(label, energy),
                   // In the tray, where what is said of it is.
                   onLog: (entry: Entry) => {
                     made(entry)
@@ -506,8 +514,19 @@ function Composer({
             initial={choosing ? initial : undefined}
             amount={amount}
             chosen={chosen}
+            // The food's latest entry, as its + added one.
             onUnchoose={(food) => {
-              setEntries((es) => es.filter((e) => e.kind !== 'food' || e.food.id !== food.id))
+              setEntries((es) => {
+                const last = es.findLastIndex((e) => e.kind === 'food' && e.food.id === food.id)
+                return es.filter((_, i) => i !== last)
+              })
+            }}
+            // A food's amount open, ⌘↵ logs the meal with it.
+            onLog={(entry) => {
+              flushSync(() => {
+                setEntries((es) => [...es, entry])
+              })
+              submit([...entries, entry])
             }}
             stay
             onMake={(m, button) => {

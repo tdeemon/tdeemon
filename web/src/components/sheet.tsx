@@ -120,8 +120,8 @@ const HeadSlot = createContext<HTMLElement | null>(null)
 // what it holds, which puts it in the title's place.
 export function SheetHead({ title, subtitle }: { title: string; subtitle?: ReactNode }) {
   const slot = useContext(HeadSlot)
-  const head = <Head title={title} subtitle={subtitle} />
-  return slot === null ? head : createPortal(head, slot)
+  // Once the sheet has its place: one title, mounted once.
+  return slot === null ? null : createPortal(<Head title={title} subtitle={subtitle} />, slot)
 }
 
 function Head({ title, subtitle }: { title: string; subtitle?: ReactNode }) {

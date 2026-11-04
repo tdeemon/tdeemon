@@ -82,6 +82,7 @@ export function Finder({
   amount,
   chosen,
   onUnchoose,
+  onLog,
   stay = false,
 }: {
   search: RefObject<HTMLInputElement | null>
@@ -96,6 +97,7 @@ export function Finder({
   amount?: RefObject<HTMLInputElement | null>
   chosen?: ReadonlySet<string>
   onUnchoose?: (food: Food) => void
+  onLog?: (entry: Entry) => void
   stay?: boolean
 }) {
   const t = useMessages()
@@ -250,6 +252,19 @@ export function Finder({
         onAdd={(e) => {
           add(e, true)
         }}
+        onLog={
+          onLog === undefined
+            ? undefined
+            : (e) => {
+                const wrong = entryWrong(e, f.parse)
+                if (wrong !== undefined) {
+                  setPickedWrong(wrong)
+                  return
+                }
+                setPicked(undefined)
+                onLog(e)
+              }
+        }
       />
     ) : undefined
 
@@ -689,12 +704,15 @@ export function Amount({
   wrong,
   onChange,
   onAdd,
+  onLog,
 }: {
   entry: FoodEntry
   field?: RefObject<HTMLInputElement | null> | undefined
   wrong: Wrong | undefined
   onChange: (entry: FoodEntry) => void
   onAdd: (entry: FoodEntry) => void
+  // ⌘↵ or Ctrl+↵: the meal logged with it.
+  onLog?: ((entry: FoodEntry) => void) | undefined
 }) {
   const t = useMessages()
   const f = useFormat()
@@ -734,7 +752,7 @@ export function Amount({
   const waiting = isShare(food, entry.unit) && /\/\s*$/.test(entry.amount)
 
   return (
-    <div className="space-y-2">
+    <div data-amount="" className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <input
           ref={field}
@@ -752,8 +770,13 @@ export function Amount({
             onChange({ ...rest, amount: e.currentTarget.value })
           }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
+            if (e.key !== 'Enter') {
+              return
+            }
+            e.preventDefault()
+            if (e.metaKey || e.ctrlKey) {
+              onLog?.(entry)
+            } else {
               onAdd(entry)
             }
           }}
