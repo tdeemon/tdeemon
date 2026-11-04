@@ -1380,9 +1380,8 @@ the first spec.
     (`workout_days`), each workout on the logical day it starts in, as a
     meal (`internal/ingest`). The HAE route takes the automation of
     Workouts too: its strength workouts are days of workouts of their
-    own source; a payload adds its days and removes the source's days
-    it lacks strictly between its first and its last workout's days, up
-    to today, as those two may be covered in part.
+    own source, only ever added, as a payload cannot tell that it holds
+    every workout of a day; the check-in's toggle undoes one.
   - All use a per-user `ingest` token, not a web session. tdeemon keeps
     the values it reads, not the bodies: health data outside the
     database would escape a user's export and deletion.

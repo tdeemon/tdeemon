@@ -124,96 +124,57 @@ func second(_, _ []day.Date, err error) error { return err }
 
 var haeActor = event.Actor{Kind: event.Import, Client: "hae"}
 
-// An import of a span replaces the source's days within it and leaves
-// those outside it, and the other source's; a day of either is a day of
-// a workout.
-func TestWorkoutDaysBetween(t *testing.T) {
+// An import of Health Auto Export's adds days and removes none, and
+// leaves Strong's days and another user's; a day of either source is a
+// day of a workout.
+func TestAddWorkoutDays(t *testing.T) {
 	t.Parallel()
 
 	db, ana, ivo := withTwoUsers(t)
 	d := day.DateOf(t0)
-	between := func(userID uuid.UUID, from, to day.Date, ds ...day.Date) ([]day.Date, []day.Date) {
+	add := func(userID uuid.UUID, ds ...day.Date) []day.Date {
 		t.Helper()
-		added, removed, err := db.SetWorkoutDaysBetween(t.Context(), userID, haeActor, store.HAE, from, to, ds, t0)
+		added, err := db.AddWorkoutDays(t.Context(), userID, haeActor, store.HAE, ds, t0)
 		if err != nil {
-			t.Fatalf("SetWorkoutDaysBetween: %v", err)
+			t.Fatalf("AddWorkoutDays: %v", err)
 		}
-		return added, removed
+		return added
 	}
-	setWorkouts(t, db, ana, d.AddDays(-20))
-	between(ivo, d.AddDays(-30), d, d.AddDays(-3))
-	if added, removed := between(ana, d.AddDays(-14), d.AddDays(-7), d.AddDays(-12), d.AddDays(-9)); !reflect.DeepEqual(added, []day.Date{d.AddDays(-12), d.AddDays(-9)}) || removed != nil {
-		t.Errorf("the first span added %v, removed %v", added, removed)
+	setWorkouts(t, db, ana, d.AddDays(-20), d.AddDays(-9))
+	add(ivo, d.AddDays(-3))
+	if added := add(ana, d.AddDays(-12), d.AddDays(-9)); !reflect.DeepEqual(added, []day.Date{d.AddDays(-12), d.AddDays(-9)}) {
+		t.Errorf("the first import added %v", added)
 	}
-	// A later span that overlaps: the days within it are its own, the
-	// day before it stays.
-	added, removed := between(ana, d.AddDays(-10), d, d.AddDays(-2))
-	if !reflect.DeepEqual(added, []day.Date{d.AddDays(-2)}) || !reflect.DeepEqual(removed, []day.Date{d.AddDays(-9)}) {
-		t.Errorf("the overlapping span added %v, removed %v", added, removed)
+	if added := add(ana, d.AddDays(-2)); !reflect.DeepEqual(added, []day.Date{d.AddDays(-2)}) {
+		t.Errorf("the second import added %v", added)
 	}
 	got, err := db.WorkoutDays(t.Context(), ana, d.AddDays(-30), d)
-	want := map[day.Date]bool{d.AddDays(-20): true, d.AddDays(-12): true, d.AddDays(-2): true}
+	want := map[day.Date]bool{d.AddDays(-20): true, d.AddDays(-12): true, d.AddDays(-9): true, d.AddDays(-2): true}
 	if err != nil || !reflect.DeepEqual(got, want) {
-		t.Errorf("days = %v, %v; want %v (Strong's day, the first span's day before the second, the second's)", got, err, want)
+		t.Errorf("days = %v, %v; want %v (Strong's and both imports')", got, err, want)
 	}
 	es, err := db.Events(t.Context(), ana, 1)
 	if err != nil || len(es) != 1 || es[0].Action != event.WorkoutsSet || es[0].Entity != "hae" || es[0].Actor != haeActor {
 		t.Errorf("the event = %+v, %v", es, err)
+	}
+	n := countRows(t, db, "events")
+	if added := add(ana, d.AddDays(-2), d.AddDays(-12)); added != nil || countRows(t, db, "events") != n {
+		t.Errorf("the same days again added %v", added)
 	}
 	if got, _ := db.WorkoutDays(t.Context(), ivo, d.AddDays(-30), d); !reflect.DeepEqual(got, map[day.Date]bool{d.AddDays(-3): true}) {
 		t.Errorf("Ivo's days = %v", got)
 	}
 }
 
-// A span without workouts removes the source's days within it; the same
-// again records nothing.
-func TestWorkoutDaysBetweenEmpty(t *testing.T) {
-	t.Parallel()
-
-	db, ana, _ := withTwoUsers(t)
-	d := day.DateOf(t0)
-	if _, _, err := db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-3), d, []day.Date{d.AddDays(-2)}, t0); err != nil {
-		t.Fatal(err)
-	}
-	_, removed, err := db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-3), d, nil, t0)
-	if err != nil || !reflect.DeepEqual(removed, []day.Date{d.AddDays(-2)}) {
-		t.Errorf("the empty span removed %v, %v", removed, err)
-	}
-	n := countRows(t, db, "events")
-	added, removed, err := db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-3), d, nil, t0)
-	if err != nil || added != nil || removed != nil || countRows(t, db, "events") != n {
-		t.Errorf("the same span again added %v, removed %v, %v", added, removed, err)
-	}
-}
-
-// The days of ds outside the span are added, never removed; a span that
-// ends before it starts removes nothing.
-func TestWorkoutDaysBetweenEdges(t *testing.T) {
-	t.Parallel()
-
-	db, ana, _ := withTwoUsers(t)
-	d := day.DateOf(t0)
-	if _, _, err := db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-9), d, []day.Date{d.AddDays(-9), d.AddDays(-5)}, t0); err != nil {
-		t.Fatal(err)
-	}
-	added, removed, err := db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-4), d.AddDays(-6), []day.Date{d.AddDays(-1)}, t0)
-	if err != nil || !reflect.DeepEqual(added, []day.Date{d.AddDays(-1)}) || removed != nil {
-		t.Errorf("a span backwards added %v, removed %v, %v; want the day added, none removed", added, removed, err)
-	}
-	added, removed, err = db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-8), d.AddDays(-2), []day.Date{d.AddDays(-9), d}, t0)
-	if err != nil || !reflect.DeepEqual(added, []day.Date{d}) || !reflect.DeepEqual(removed, []day.Date{d.AddDays(-5)}) {
-		t.Errorf("days on the span's edges added %v, removed %v, %v", added, removed, err)
-	}
-}
-
-func TestWorkoutDaysBetweenRefuses(t *testing.T) {
+func TestAddWorkoutDaysRefuses(t *testing.T) {
 	t.Parallel()
 
 	db, ana, _ := withTwoUsers(t)
 	d := day.DateOf(t0)
 	for name, err := range map[string]error{
-		"no actor":         second(db.SetWorkoutDaysBetween(t.Context(), ana, event.Actor{}, store.HAE, d, d, nil, t0)),
-		"Strong's source":  second(db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.Strong, d, d, nil, t0)),
+		"no actor":         first(db.AddWorkoutDays(t.Context(), ana, event.Actor{}, store.HAE, []day.Date{d}, t0)),
+		"Strong's source":  first(db.AddWorkoutDays(t.Context(), ana, haeActor, store.Strong, []day.Date{d}, t0)),
+		"a zero day":       first(db.AddWorkoutDays(t.Context(), ana, haeActor, store.HAE, []day.Date{{}}, t0)),
 		"HAE as a history": second(db.SetWorkoutDays(t.Context(), ana, haeActor, store.HAE, nil, t0)),
 	} {
 		if err == nil {
@@ -224,3 +185,5 @@ func TestWorkoutDaysBetweenRefuses(t *testing.T) {
 		t.Error("a refused import wrote")
 	}
 }
+
+func first(_ []day.Date, err error) error { return err }

@@ -35,10 +35,6 @@ type HAEWorkouts struct {
 	Sent bool
 	// Strength are the days of strength workouts.
 	Strength Workouts
-	// From and To are the span of days the payload's workouts cover, of
-	// any kind, both included; zero when it has none. A sync replaces the
-	// days of workouts within it.
-	From, To day.Date
 	// Skipped are the names of the other kinds of workouts it holds,
 	// sorted.
 	Skipped []string
@@ -59,10 +55,10 @@ type haeWorkout struct {
 
 // ParseHAEWorkouts reads the workouts of a Health Auto Export payload: the
 // day each starts in, by cal (the user's day start hour, as for Strong's
-// export), the days of strength workouts among them, and the span of days
-// they cover. A payload without a list of workouts is no error: it says
-// nothing of them (Sent is false). A workout whose start does not read
-// fails the payload, so a sync never replaces days it could not read.
+// export), and the days of strength workouts among them. A payload
+// without a list of workouts is no error: it says nothing of them (Sent
+// is false). A workout whose start does not read fails the payload, so
+// none of it is stored.
 func ParseHAEWorkouts(body []byte, cal day.Calendar) (HAEWorkouts, error) {
 	var p haeWorkoutsPayload
 	if err := json.Unmarshal(body, &p); err != nil {
@@ -79,12 +75,6 @@ func ParseHAEWorkouts(body []byte, cal day.Calendar) (HAEWorkouts, error) {
 			return HAEWorkouts{}, fmt.Errorf("health auto export workout %d (%q): start %q: %w", i+1, w.Name, w.Start, err)
 		}
 		d := cal.DayOf(at)
-		if out.From.IsZero() || d.Before(out.From) {
-			out.From = d
-		}
-		if out.To.IsZero() || out.To.Before(d) {
-			out.To = d
-		}
 		if !haeStrength[w.Name] {
 			skipped[w.Name] = true
 			continue

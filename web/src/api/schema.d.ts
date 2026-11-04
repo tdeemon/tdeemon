@@ -551,7 +551,7 @@ export interface paths {
         put?: never;
         /**
          * Import a Health Auto Export payload
-         * @description For the REST API automations of Health Auto Export, of Health Metrics and of Workouts: an API token with the ingest scope, not a web session. Each value belongs to the calendar date of its point; the merge keeps a manual value, the day's first weighing and the larger of a running total (DESIGN.md §4). A strength workout (Functional Strength Training, Traditional Strength Training) makes the day it starts in, by the user's day start hour, a training day unless the check-in's toggle says otherwise; the payload removes the days of workouts from Health Auto Export it lacks strictly between the days of its first and its last workout, up to today: those two may be covered in part. tdeemon keeps the values it reads, not the body.
+         * @description For the REST API automations of Health Auto Export, of Health Metrics and of Workouts: an API token with the ingest scope, not a web session. Each value belongs to the calendar date of its point; the merge keeps a manual value, the day's first weighing and the larger of a running total (DESIGN.md §4). A strength workout (Functional Strength Training, Traditional Strength Training) makes the day it starts in, by the user's day start hour, a training day unless the check-in's toggle says otherwise; days of workouts from Health Auto Export are only added, never removed, as a payload cannot tell that it holds every workout of a day. tdeemon keeps the values it reads, not the body.
          */
         post: operations["ingest-hae"];
         delete?: never;
@@ -1977,14 +1977,10 @@ export interface components {
             unfound: string[];
         };
         HaeWorkoutsBody: {
-            /** @description The days that became days with a workout. */
+            /** @description The days that became days with a workout. A day keeps its workout once added: a workout deleted in Apple Health is the check-in's toggle to undo. */
             added: string[];
-            /** @description The first day the payload replaced the days of workouts of: the day after its first workout's. Absent when it replaced none. */
-            from?: string;
             /** @description The days after the user's today with a strength workout, left out: a clock set wrong, or a time zone. */
             future: string[];
-            /** @description The days within the span that no longer are: their workouts are gone from Apple Health. */
-            removed: string[];
             /** @description The names of the other kinds of workouts in the payload, which make no training day. */
             skipped: string[];
             /**
@@ -1992,8 +1988,6 @@ export interface components {
              * @description The strength workouts in the payload up to today, which make their days training days.
              */
             strength: number;
-            /** @description The last day it replaced: the day before its last workout's, today at the latest. */
-            to?: string;
         };
         HistoryBody: {
             /** @description For granularity day, every day from from to to, in order; else empty. */

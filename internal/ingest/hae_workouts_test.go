@@ -36,7 +36,7 @@ func dates(t *testing.T, ss ...string) []day.Date {
 
 // Strength workouts make their days, by the day they start in on the
 // user's clock: one at 01:30 belongs to the day before. Other kinds are
-// skipped, and named; all of them make the span.
+// skipped, and named.
 func TestParseHAEWorkouts(t *testing.T) {
 	t.Parallel()
 
@@ -57,9 +57,6 @@ func TestParseHAEWorkouts(t *testing.T) {
 	if w.Strength.Count != 4 {
 		t.Errorf("count = %d, want 4 strength workouts", w.Strength.Count)
 	}
-	if w.From != dates(t, "2026-10-12")[0] || w.To != dates(t, "2026-10-18")[0] {
-		t.Errorf("span = %s to %s, want 2026-10-12 to 2026-10-18", w.From, w.To)
-	}
 	if !slices.Equal(w.Skipped, []string{"Running", "Walking"}) {
 		t.Errorf("skipped = %v", w.Skipped)
 	}
@@ -71,7 +68,7 @@ func TestParseHAEWorkouts(t *testing.T) {
 }
 
 // A payload without a list of workouts says nothing of them; an empty
-// list is a span of no days; a start that does not read fails it all.
+// list has no days; a start that does not read fails it all.
 func TestParseHAEWorkoutsEdges(t *testing.T) {
 	t.Parallel()
 
@@ -86,7 +83,7 @@ func TestParseHAEWorkoutsEdges(t *testing.T) {
 		}
 	}
 	w, err := ParseHAEWorkouts([]byte(`{"data": {"workouts": []}}`), cal)
-	if err != nil || !w.Sent || len(w.Strength.Days) != 0 || !w.From.IsZero() || !w.To.IsZero() {
+	if err != nil || !w.Sent || len(w.Strength.Days) != 0 {
 		t.Errorf("an empty list: %+v, %v", w, err)
 	}
 	for name, body := range map[string]string{

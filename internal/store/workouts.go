@@ -45,19 +45,19 @@ func (db *DB) SetWorkoutDays(ctx context.Context, userID uuid.UUID, a event.Acto
 	return db.setWorkoutDays(ctx, userID, a, source, ds, func(day.Date) bool { return true }, now)
 }
 
-// SetWorkoutDaysBetween adds the days of ds to the days source recorded a
-// workout on, and removes source's days from from to to, both included,
-// that ds lacks: an import that covers that span whole. A span that ends
-// before it starts removes nothing. It returns the days it added and
-// removed, in order, as SetWorkoutDays does.
-func (db *DB) SetWorkoutDaysBetween(ctx context.Context, userID uuid.UUID, a event.Actor, source WorkoutSource,
-	from, to day.Date, ds []day.Date, now time.Time,
-) (added, removed []day.Date, err error) {
+// AddWorkoutDays adds the days of ds to the days source recorded a
+// workout on, and removes none: an import that cannot tell what it does
+// not cover (Health Auto Export's, whose automations may send part of a
+// day, or some kinds of workouts). It returns the days it added, in
+// order; the same days again record nothing.
+func (db *DB) AddWorkoutDays(ctx context.Context, userID uuid.UUID, a event.Actor, source WorkoutSource, ds []day.Date,
+	now time.Time,
+) ([]day.Date, error) {
 	if source != HAE {
-		return nil, nil, fmt.Errorf("invalid workout source %q: want %q", source, HAE)
+		return nil, fmt.Errorf("invalid workout source %q: want %q", source, HAE)
 	}
-	in := func(d day.Date) bool { return !d.Before(from) && !to.Before(d) }
-	return db.setWorkoutDays(ctx, userID, a, source, ds, in, now)
+	added, _, err := db.setWorkoutDays(ctx, userID, a, source, ds, func(day.Date) bool { return false }, now)
+	return added, err
 }
 
 // setWorkoutDays adds the days of ds to source's, removes those in holds

@@ -676,10 +676,7 @@ type haeWorkoutsResponse struct {
 	ingestResponse
 	Workouts *struct {
 		Strength int      `json:"strength"`
-		From     string   `json:"from"`
-		To       string   `json:"to"`
 		Added    []string `json:"added"`
-		Removed  []string `json:"removed"`
 		Future   []string `json:"future"`
 		Skipped  []string `json:"skipped"`
 	} `json:"workouts"`
@@ -740,10 +737,8 @@ func TestIngestHAEWorkouts(t *testing.T) {
 	if w == nil {
 		t.Fatalf("no workouts in the answer: %+v", got)
 	}
-	// The span replaced is within the first and the last workout's days,
-	// today at the latest.
-	if w.Strength != 2 || w.From != "2026-10-18" || w.To != "2026-10-21" || !slices.Equal(w.Added, []string{"2026-10-17", "2026-10-20"}) ||
-		len(w.Removed) != 0 || !slices.Equal(w.Future, []string{"2026-10-23"}) || !slices.Equal(w.Skipped, []string{"Walking"}) || len(got.Days) != 0 {
+	if w.Strength != 2 || !slices.Equal(w.Added, []string{"2026-10-17", "2026-10-20"}) ||
+		!slices.Equal(w.Future, []string{"2026-10-23"}) || !slices.Equal(w.Skipped, []string{"Walking"}) || len(got.Days) != 0 {
 		t.Errorf("answer = %+v, workouts %+v", got, w)
 	}
 	if days := workoutDaysOf(t, in); !slices.Equal(days, []string{"2026-10-17", "2026-10-20"}) {
@@ -755,9 +750,12 @@ func TestIngestHAEWorkouts(t *testing.T) {
 	}
 }
 
-// A later sync of the last days, the workout of the 20th deleted in
-// Health: it goes, and the 17th, before the sync's span, stays.
-func TestIngestHAEWorkoutsLaterSync(t *testing.T) {
+// A later sync adds its days and removes none, whatever it lacks: an
+// automation may send part of a day, or some kinds of workouts, so a day
+// it lacks may still have one in Apple Health. Here: one of the 21st's
+// calendar day, whose walk at 01:00 falls on the 20th by the user's day
+// start hour, and which does not hold the 20th's strength workout.
+func TestIngestHAEWorkoutsAddsOnly(t *testing.T) {
 	t.Parallel()
 
 	in := newInstance(t, "http://localhost", "")
@@ -767,32 +765,13 @@ func TestIngestHAEWorkoutsLaterSync(t *testing.T) {
 		haeWorkout("Traditional Strength Training", "2026-10-20 18:00:00 +0200"),
 	))
 	again := postHAE(t, in, tok, `{"data": {"metrics": [], "workouts": [`+
-		haeWorkout("Traditional Strength Training", "2026-10-19 18:00:00 +0200")+","+
-		haeWorkout("Walking", "2026-10-21 08:00:00 +0200")+`]}}`)
-	if a := again.Workouts; a == nil || !slices.Equal(a.Added, []string{"2026-10-19"}) || !slices.Equal(a.Removed, []string{"2026-10-20"}) {
+		haeWorkout("Functional Strength Training", "2026-10-19 18:00:00 +0200")+","+
+		haeWorkout("Walking", "2026-10-21 01:00:00 +0200")+`]}}`)
+	if a := again.Workouts; a == nil || !slices.Equal(a.Added, []string{"2026-10-19"}) {
 		t.Errorf("the later sync = %+v", again.Workouts)
 	}
-	if days := workoutDaysOf(t, in); !slices.Equal(days, []string{"2026-10-17", "2026-10-19"}) {
-		t.Errorf("the workout days after the later sync = %v", days)
-	}
-}
-
-// The first and the last day of a payload may be covered in part: a sync
-// of the 21st's calendar day, with a walk at 01:00, before the user's day
-// starts at 04:00, holds the 20th's last hours alone, and leaves its
-// strength workout of 18:00, which it does not hold, its day.
-func TestIngestHAEWorkoutsPartialDays(t *testing.T) {
-	t.Parallel()
-
-	in := newInstance(t, "http://localhost", "")
-	tok := ingestToken(t, in, `"ingest"`)
-	postHAE(t, in, tok, haeWorkoutsBody(haeWorkout("Traditional Strength Training", "2026-10-20 18:00:00 +0200")))
-	got := postHAE(t, in, tok, haeWorkoutsBody(haeWorkout("Walking", "2026-10-21 01:00:00 +0200")))
-	if w := got.Workouts; w == nil || len(w.Removed) != 0 || w.From != "" || w.To != "" {
-		t.Errorf("the calendar day's sync = %+v, want nothing removed and no span", got.Workouts)
-	}
-	if days := workoutDaysOf(t, in); !slices.Equal(days, []string{"2026-10-20"}) {
-		t.Errorf("the workout days = %v, want the 20th kept", days)
+	if days := workoutDaysOf(t, in); !slices.Equal(days, []string{"2026-10-17", "2026-10-19", "2026-10-20"}) {
+		t.Errorf("the workout days after the later sync = %v, want all three", days)
 	}
 }
 
@@ -806,7 +785,7 @@ func TestIngestHAEWorkoutsEdges(t *testing.T) {
 	if got := postHAE(t, in, tok, haeBody); got.Workouts != nil {
 		t.Errorf("a payload of metrics answered workouts %+v", got.Workouts)
 	}
-	if got := postHAE(t, in, tok, `{"data": {"workouts": []}}`); got.Workouts == nil || got.Workouts.Strength != 0 || got.Workouts.From != "" {
+	if got := postHAE(t, in, tok, `{"data": {"workouts": []}}`); got.Workouts == nil || got.Workouts.Strength != 0 || len(got.Workouts.Added) != 0 {
 		t.Errorf("an empty list of workouts = %+v", got.Workouts)
 	}
 	for name, body := range map[string]string{
