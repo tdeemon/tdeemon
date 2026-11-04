@@ -6,7 +6,9 @@ for the author and the reviewer.
 ## Running the checks
 
 - **`make check`** runs every check CI runs, except five that only CI
-  runs: the Docker image build, the end-to-end tests (`make e2e`, which
+  runs: the Docker image build with its Compose test
+  (`scripts/compose-test.sh <image>`, which needs port 8080 free), the
+  end-to-end tests (`make e2e`, which
   need Chromium: `make e2e-browser` once), CodeQL, the pull request title
   check, and zizmor's online audits, which need `GH_TOKEN` set:
   - the linters and format checks for every language;
@@ -21,10 +23,12 @@ for the author and the reviewer.
 - **CI** (`.github/workflows/ci.yml`) runs the same targets on every pull
   request and on `main`, in six parallel jobs: Go, the web app, the end-to-end
   tests, the other files, the dependencies and secrets, and the Docker image,
-  which is built with its tests but not pushed. Only pushes to `main` write
-  the caches; pull requests read them. Each job installs only the tools it
-  runs (`install_args`), and mise does not install the others on demand, so a
-  tool that a job's make target starts using goes into that job's list too.
+  which is built with its tests but not pushed, and started with
+  `deploy/compose`, alone and behind Caddy, until it is healthy. Only
+  pushes to `main` write the caches; pull requests read them. Each job
+  installs only the tools it runs (`install_args`), and mise does not
+  install the others on demand, so a tool that a job's make target
+  starts using goes into that job's list too.
   Without it mise warns that the tool "is not installed and auto-install is
   disabled" and runs the runner's own copy if there is one (Node, Python,
   yamllint and shellcheck are), at whatever version; otherwise the job stops.
@@ -278,13 +282,14 @@ A change is done when:
     the commits by type, with a link to each, and for a breaking change
     a BREAKING mark and its footer (`.github/release-notes.tera`);
   - and the image `ghcr.io/zarnautovic/tdeemon`, for linux/amd64 and
-    linux/arm64, tagged `X.Y.Z`, `X.Y` and `sha-<commit>`
+    linux/arm64, tagged `X.Y.Z`, `X.Y`, `latest` and `sha-<commit>`
     (`scripts/image-tags.sh`), with its SBOM and provenance; it builds
     without a cache, in a job of the same workflow, as a release the
     workflow's token makes starts no other. If that job fails, use
     *Re-run failed jobs* within 30 days, and only while no newer release
-    has run, or its `X.Y` tag would go back: *Re-run all jobs* finds the
-    commit released and releases nothing, image included;
+    has run, or its `X.Y` and `latest` tags would go back: *Re-run all
+    jobs* finds the commit released and releases nothing, image
+    included;
   - the release job's token created the package `tdeemon` on ghcr.io,
     so it took this repository's visibility, public, and the image's
     `org.opencontainers.image.source` label links it here: anyone pulls

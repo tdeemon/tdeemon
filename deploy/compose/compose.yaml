@@ -1,0 +1,41 @@
+# tdeemon with Docker Compose: one service, one volume. README.md,
+# "Docker Compose", has the steps:
+#
+#   cp .env.example .env && chmod 600 .env   # then fill it in
+#   docker compose up -d --wait
+#
+# It serves on http://127.0.0.1:8080 only. In front of it put a reverse
+# proxy that terminates HTTPS: your own, or Caddy with compose.caddy.yaml.
+name: tdeemon
+
+services:
+  tdeemon:
+    # The newest release. Pin a version (ghcr.io/zarnautovic/tdeemon:X.Y.Z)
+    # to upgrade only when you choose; TDEEMON_IMAGE names another image,
+    # such as one you built.
+    image: ${TDEEMON_IMAGE:-ghcr.io/zarnautovic/tdeemon:latest}
+    restart: unless-stopped
+    # The settings, the secret key among them, come from .env (mode 0600),
+    # never from environment: here, where `docker inspect` and this file's
+    # readers would see them in plain text next to the command line.
+    env_file:
+      - path: .env
+        required: true
+    # Everything tdeemon writes goes to /data: the database and its
+    # snapshots. A named volume takes the right owner (uid 65532); a host
+    # directory must be writable by it (rootless Podman: ./data:/data:U).
+    volumes:
+      - tdeemon-data:/data
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - 127.0.0.1:8080:8080
+    # The server gives requests in flight up to 15 s on stop; Compose's
+    # default of 10 s would kill it first.
+    stop_grace_period: 20s
+    # The health check is the image's: `tdeemon healthcheck`, which asks
+    # /healthz without touching the database.
+
+volumes:
+  tdeemon-data:

@@ -1,0 +1,7 @@
+# Caddy for tdeemon (compose.caddy.yaml): HTTPS for the host of
+# TDEEMON_BASE_URL, and every request on to tdeemon. Caddy adds the
+# X-Forwarded-For tdeemon reads to know the client.
+{$TDEEMON_BASE_URL} {
+	encode zstd gzip
+	reverse_proxy tdeemon:8080
+}

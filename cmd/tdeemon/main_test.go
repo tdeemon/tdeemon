@@ -133,8 +133,8 @@ func TestRunRejectsArguments(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 	for _, args := range [][]string{
-		{"healthcheck"},
 		{"serve", "--port", "1"},
+		{"healthcheck", "--url", "http://localhost"},
 		{"-v"},
 		{"user"},
 		{"user", "delete"},
@@ -165,7 +165,7 @@ func TestRunRejectsArguments(t *testing.T) {
 func TestExitCode(t *testing.T) {
 	t.Parallel()
 
-	usageErr := run(t.Context(), []string{"healthcheck"}, lookup(nil), noInput(), io.Discard, io.Discard)
+	usageErr := run(t.Context(), []string{"serve"}, lookup(nil), noInput(), io.Discard, io.Discard)
 	for _, tc := range []struct {
 		name string
 		err  error
@@ -173,7 +173,7 @@ func TestExitCode(t *testing.T) {
 		out  string
 	}{
 		{"success", nil, 0, ""},
-		{"arguments", usageErr, 2, "tdeemon: invalid command line: unknown command \"healthcheck\"\n\n" + usage},
+		{"arguments", usageErr, 2, "tdeemon: invalid command line: unknown command \"serve\"\n\n" + usage},
 		{"failure", errors.New("database: disk full"), 1, "tdeemon: database: disk full\n"},
 	} {
 		var out bytes.Buffer
