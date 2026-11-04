@@ -10,10 +10,10 @@ and lets an AI coach adjust your plan (cut, maintenance, bulk or recomp)
 only through proposals you accept, within limits enforced in code.
 
 ![The day on a desktop: what is left of the target, the macros, the week,
-an AI coach's proposal and the meals](docs/screenshots/desktop-day.png)
+an AI coach's proposal and the meals](docs/screenshots/desktop-day-dark.png)
 
 ![Progress: the measured TDEE, the verdict on the phase, the TDEE
-against the intake and the weight's trend](docs/screenshots/desktop-progress.png)
+against the intake and the weight's trend](docs/screenshots/desktop-progress-dark.png)
 
 The screenshots show `tdeemon user demo`, three months of made-up data.
 

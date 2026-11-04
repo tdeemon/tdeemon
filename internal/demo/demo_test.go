@@ -436,3 +436,43 @@ func TestSeedDays(t *testing.T) {
 		t.Errorf("%+v, want %d days of meals", res, MinDays)
 	}
 }
+
+// Today has its morning whatever the seed, and when the demo is made
+// before the usual hour of the weigh-in too: the weight and the
+// device's sleep, resting heart rate and HRV.
+func TestSeedTodayHasItsMorning(t *testing.T) {
+	t.Parallel()
+
+	early := time.Date(2026, 11, 4, 6, 15, 0, 0, zagreb)
+	for seed := range uint64(12) {
+		at := now
+		if seed%2 == 1 {
+			at = early
+		}
+		db := storetest.Open(t)
+		u := user.User{
+			ID: uuid.NewV7(), Email: fmt.Sprintf("today-%d@example.com", seed), Name: "Demo", Role: user.RoleUser,
+			Locale: "en", TimeZone: "Europe/Zagreb", DayStartHour: user.DefaultDayStartHour, CreatedAt: at, UpdatedAt: at,
+		}
+		if err := db.CreateUser(t.Context(), u, ""); err != nil {
+			t.Fatal(err)
+		}
+		res, err := Seed(t.Context(), db, u, Options{Days: MinDays, Seed: seed, Now: at, Instance: limits.Instance()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		values, err := db.Metrics(t.Context(), u.ID, res.Today, res.Today)
+		if err != nil {
+			t.Fatal(err)
+		}
+		kinds := map[metric.Kind]bool{}
+		for _, v := range values[res.Today] {
+			kinds[v.Kind] = true
+		}
+		for _, k := range []metric.Kind{metric.Weight, metric.Sleep, metric.RestingHR, metric.HRV} {
+			if !kinds[k] {
+				t.Errorf("seed %d at %s: today has no %s", seed, at.Format("15:04"), k)
+			}
+		}
+	}
+}

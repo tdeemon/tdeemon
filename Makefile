@@ -14,7 +14,7 @@ LICENSES := MIT,MIT-0,Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC,0BSD,MPL-2.0,Blue
 WEB_DEPS := web/node_modules/.package-lock.json
 CODEGEN_DEPS := web/codegen/node_modules/.package-lock.json
 
-.PHONY: help check fmt lint lint-go lint-web lint-webui lint-other test test-go test-web test-webui webui-build e2e e2e-browser api audit audit-go audit-npm licenses secrets next-version test-scripts
+.PHONY: help check fmt lint lint-go lint-web lint-webui lint-other test test-go test-web test-webui webui-build e2e e2e-browser screenshots api audit audit-go audit-npm licenses secrets next-version test-scripts
 
 help: ## list the targets
 	@awk -F':.*## ' '/^[a-z-]+:.*## / {printf "%-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -77,6 +77,10 @@ test-webui: webui-build ## the Go tests behind the webui tag, against a fresh bu
 e2e: webui-build ## the end-to-end tests: the app in Chromium as on a phone, against the binary with it (Chromium first: make e2e-browser)
 	$(MISE) go build -tags webui -o .e2e/tdeemon ./cmd/tdeemon
 	cd web && $(MISE) npm run --silent e2e
+
+screenshots: webui-build ## the docs' screenshots in docs/screenshots, of a demo user's made-up data (Chromium first: make e2e-browser)
+	$(MISE) go build -tags webui -o .e2e/tdeemon ./cmd/tdeemon
+	cd web && $(MISE) npx playwright test --config playwright.screenshots.config.ts
 
 e2e-browser: $(WEB_DEPS) ## Chromium for make e2e, at Playwright's version; CI adds its system libraries (E2E_BROWSER_FLAGS=--with-deps)
 	cd web && $(MISE) npx playwright install $(E2E_BROWSER_FLAGS) chromium

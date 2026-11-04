@@ -226,9 +226,14 @@ func (sd *seeder) morning(ctx context.Context, d day.Date, b *body, k int) (cali
 	cd := calibration.Day{Status: day.Complete}
 	if d == sd.today {
 		cd.Status = day.Open
+		at = sd.morningOfToday(at)
 	}
-	weighed := (k == 0 || !sd.chance(noWeighIn)) && !at.After(sd.o.Now)
-	synced := !sd.chance(noDevice) && !at.After(sd.o.Now)
+	// Today always has its morning, so the day a demo user first sees,
+	// and the screenshots, show a weigh-in and the device's data; the
+	// chances are drawn all the same, so the days before stay as they
+	// were.
+	weighed := (k == 0 || !sd.chance(noWeighIn) || d == sd.today) && !at.After(sd.o.Now)
+	synced := (!sd.chance(noDevice) || d == sd.today) && !at.After(sd.o.Now)
 	steps := math.Round(math.Max(1500, sd.normal(meanSteps, 2600)))
 	vs := sd.metrics(d, b, k, shown, weighed, synced, steps)
 	for _, v := range vs {
@@ -250,6 +255,19 @@ func (sd *seeder) morning(ctx context.Context, d day.Date, b *body, k int) (cali
 		}
 	}
 	return cd, steps, nil
+}
+
+// morningOfToday returns when today's morning is weighed, at: before
+// now, when the demo is made before at, as long as that is still today,
+// so a demo made early in the day has its morning too.
+func (sd *seeder) morningOfToday(at time.Time) time.Time {
+	if !at.After(sd.o.Now) {
+		return at
+	}
+	if early := sd.o.Now.Add(-10 * time.Minute); sd.cal.DayOf(early) == sd.today {
+		return early
+	}
+	return at
 }
 
 // metrics returns day d's measurements: the weigh-in when weighed, with
