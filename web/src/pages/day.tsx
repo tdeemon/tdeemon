@@ -34,6 +34,7 @@ import { LogHereContext } from '@/lib/log-here'
 import { useDesktop } from '@/lib/media'
 import { useNow } from '@/lib/now'
 import { useShortcuts } from '@/lib/shortcuts'
+import { cn } from '@/lib/utils'
 import { dateAt } from '@/lib/zoned'
 import type { DaySearch } from '@/router'
 
@@ -309,6 +310,48 @@ export function DayPage() {
     />
   )
 
+  // The way to add a meal, but to a day to come: today's names the meal
+  // of the hour, and what is left. On a phone it is the meals' card's
+  // last row; on a desktop its foot, today's chips beside it; with no
+  // meal yet, the empty state's action.
+  const addLabel = isToday
+    ? [
+        t.log.add[slotAt(now, timeZone)],
+        ...(left !== undefined && left > 0 ? [t.log.left(f.number(left))] : []),
+      ].join(' · ')
+    : t.log.open
+  const addButton = (variant: 'ghost' | 'outline', className: string) => (
+    <Button
+      variant={variant}
+      className={cn('font-semibold text-primary', className)}
+      onClick={(e) => {
+        opener.current = e.currentTarget
+        setAdding({})
+      }}
+    >
+      <Plus aria-hidden />
+      {addLabel}
+    </Button>
+  )
+  const addMeal = future
+    ? undefined
+    : day.data.meals.length === 0
+      ? addButton('outline', '')
+      : desktop
+        ? addButton('ghost', '')
+        : addButton('ghost', 'h-13 w-full justify-start rounded-t-none rounded-b-lg px-4')
+  const quickChips = (
+    <QuickChips
+      date={day.data.date}
+      timeZone={timeZone}
+      now={now}
+      onFood={(food, from) => {
+        opener.current = from
+        setAdding({ food })
+      }}
+    />
+  )
+
   // A new user's first steps, in place of the hero before a plan.
   const hero = (
     <FirstSteps day={day.data}>
@@ -380,7 +423,9 @@ export function DayPage() {
               )}
             </div>
             {day.data.meals.length === 0 ? (
-              <EmptyState icon={Utensils}>{t.day.noMeals}</EmptyState>
+              <EmptyState icon={Utensils} action={addMeal}>
+                {t.day.noMeals}
+              </EmptyState>
             ) : (
               <MealList
                 day={day.data}
@@ -398,38 +443,22 @@ export function DayPage() {
                   }
                 }}
                 onRepeated={setArrived}
+                footer={
+                  addMeal &&
+                  (desktop ? (
+                    <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
+                      {addMeal}
+                      {isToday && <div className="ml-auto">{quickChips}</div>}
+                    </div>
+                  ) : (
+                    addMeal
+                  ))
+                }
               />
             )}
-            {!future && (
-              <Button
-                variant="outline"
-                className="h-13 w-full border-2 border-dashed bg-transparent font-semibold text-primary"
-                onClick={(e) => {
-                  opener.current = e.currentTarget
-                  setAdding({})
-                }}
-              >
-                <Plus aria-hidden />
-                {/* Today's names the meal of the hour, and what is left. */}
-                {isToday
-                  ? [
-                      t.log.add[slotAt(now, timeZone)],
-                      ...(left !== undefined && left > 0 ? [t.log.left(f.number(left))] : []),
-                    ].join(' · ')
-                  : t.log.open}
-              </Button>
-            )}
-            {isToday && (
-              <QuickChips
-                date={day.data.date}
-                timeZone={timeZone}
-                now={now}
-                onFood={(food, from) => {
-                  opener.current = from
-                  setAdding({ food })
-                }}
-              />
-            )}
+            {/* Beside the way to add on a desktop's table, under the card
+                on a phone, and under the empty state. */}
+            {isToday && (!desktop || day.data.meals.length === 0) && quickChips}
           </section>
         </div>
         <div className="space-y-4 lg:col-span-5 xl:col-span-4">
