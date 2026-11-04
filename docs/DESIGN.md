@@ -1543,11 +1543,32 @@ the first spec.
     at first. What a plan rests on of the user's (the profile, the
     limits, the notes for a coach) is a list of pages too, under the
     plan. The keyboard has shortcuts (`?` lists
-    them): N logs a meal, / finds a food, ⌘Z or Ctrl+Z outside a field
+    them), none of which fires in a field, a sheet or a dialog: ⌘K or
+    Ctrl+K opens the command palette, N logs a meal, W a weigh-in (today's,
+    in a sheet), R repeats yesterday's meal of the hour (Yesterday's
+    breakfast), / finds a food, ⌘Z or Ctrl+Z
     takes back the latest change (made anywhere, which its toast says),
     G and a letter goes to a section (D, F, P, L, S, which the sidebar
     shows as the pointer or the focus is on one), and ← → to the day
-    before or after;
+    before or after. The command palette (a Base UI dialog, from any
+    screen; the sidebar's Search… too) is a field over rows, each with its
+    icon, its name and its key: with nothing typed the actions (log a
+    meal, a weigh-in, yesterday's meal again, undo, the shortcuts) and the
+    sections; typed, those its words start, the user's foods and recipes
+    the server finds (each to its page), the last week's days or a date
+    typed (YYYY-MM-DD), and the settings' pages. It is the ARIA combobox
+    of a listbox: the focus stays in the field, ↑ ↓ move the active row
+    (`aria-activedescendant`), Enter runs it, Escape gives the focus back
+    where it was, a live region says how many rows there are, and the
+    dialog keeps the focus in it; a command runs once it has closed, so a
+    sheet it opens gives the focus back where the palette found it. On a
+    day's page, a letter (of any alphabet) or a digit typed outside a
+    field, with no key held but Shift and outside an IME's composition,
+    opens the palette with it, unless a page mounted takes it as a
+    shortcut (N, G, R, W, the plan's A and X) or it ends a sequence (G,
+    then D); Space, Enter, the arrows, Delete and punctuation stay the
+    page's. A phone has no way to the palette: its foods' search is the
+    Foods tab's, and Log a meal the bar's middle;
     the first stop of Tab skips the sections to the page. On a desktop, the
     day's meals are one stop of Tab (a roving tabindex): ↑ ↓ Home End move
     between the rows, and on a row Enter opens its editor (a click or Space

@@ -62,6 +62,9 @@ export const hr: Messages = {
     toasts: 'Obavijesti',
     close: 'Zatvori',
     undo: 'Poništi zadnju promjenu',
+    palette: 'Traženje i naredbe',
+    weighIn: 'Upiši vaganje',
+    repeatYesterday: 'Ponovi jučerašnji obrok ovog doba dana',
     andThen: 'pa',
     sections: {
       today: 'Danas',
@@ -543,6 +546,34 @@ export const hr: Messages = {
     },
     cancel: 'Odustani',
     refused: (detail: string) => `Server nije prihvatio ovaj obrok: ${detail}`,
+  },
+  palette: {
+    title: 'Traženje i naredbe',
+    field: 'Traži namirnice, dane i postavke, ili naredbu',
+    placeholder: 'Traži ili upiši naredbu…',
+    actions: 'Radnje',
+    goTo: 'Idi na',
+    foods: 'Hrana',
+    days: 'Dani',
+    settings: 'Postavke',
+    logMeal: 'Upiši obrok',
+    weighIn: 'Upiši vaganje',
+    repeat: (what: string) => `Ponovi ${what.charAt(0).toLowerCase()}${what.slice(1)}`,
+    undo: 'Poništi zadnju promjenu',
+    shortcuts: 'Prečaci tipkovnice',
+    recipe: 'Recept',
+    words: {
+      logMeal: 'dodaj hrana jelo doručak ručak večera užina',
+      weighIn: 'kilaža vaga kg',
+      repeat: 'opet isto',
+      undo: 'vrati natrag',
+      shortcuts: 'tipke tipkovnica pomoć',
+    },
+    results: (n: number) =>
+      n === 0
+        ? 'Nema rezultata'
+        : `${String(n)} ${plural('hr', n, { one: 'rezultat', few: 'rezultata', other: 'rezultata' })}`,
+    none: 'Ništa nije pronađeno.',
   },
   quick: {
     title: 'Brzo dodaj',

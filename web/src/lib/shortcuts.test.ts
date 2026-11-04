@@ -48,3 +48,43 @@ test('after G, Tab and Enter are left to the page', async () => {
   press('g')
   expect(press('Enter')).toBe(false)
 })
+
+// Typing on a page (typed) takes a letter or a digit no page takes as a
+// shortcut, nor as a sequence's second key, with no key held but Shift.
+test('typed takes a letter or a digit that is no shortcut, outside a field', async () => {
+  const typed = vi.fn<(key: string) => void>()
+  const n = vi.fn<() => void>()
+  const a = vi.fn<() => void>()
+  renderHook(() => {
+    useShortcuts({ n, 'g d': vi.fn<() => void>() }, typed)
+  })
+  // A page's own key, mounted apart, is no text either, in either case.
+  renderHook(() => {
+    useShortcuts({ a })
+  })
+
+  expect(press('o')).toBe(true)
+  expect(press('Č')).toBe(true)
+  expect(press('7')).toBe(true)
+  expect(typed.mock.calls).toEqual([['o'], ['Č'], ['7']])
+  typed.mockClear()
+
+  press('n')
+  press('A')
+  press('g')
+  press('d')
+  press(' ')
+  press('Enter')
+  fireEvent.keyDown(document.body, { key: 'o', ctrlKey: true })
+  fireEvent.keyDown(document.body, { key: 'o', metaKey: true })
+  fireEvent.keyDown(document.body, { key: 'o', altKey: true })
+  fireEvent.keyDown(document.body, { key: 'o', isComposing: true })
+  fireEvent.keyDown(document.body, { key: 'Process' })
+  const field = document.createElement('input')
+  document.body.append(field)
+  fireEvent.keyDown(field, { key: 'o' })
+  field.remove()
+  await tick()
+  expect(n).toHaveBeenCalledOnce()
+  expect(typed).not.toHaveBeenCalled()
+})
