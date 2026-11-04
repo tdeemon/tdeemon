@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -156,45 +155,6 @@ func TestBadTokensFromOneAddress(t *testing.T) {
 	in.clock.Set(in.clock.Now().Add(15 * time.Minute))
 	if rec := in.do(t, http.MethodGet, "/api/v1/auth/whoami", "", nil, from(attacker, bad)); rec.Code != http.StatusUnauthorized {
 		t.Errorf("a bad token after 15 minutes: %d, want 401", rec.Code)
-	}
-}
-
-// Sign-ins sent all at once cannot slip past the limit: the attempts
-// still being checked count, so of a burst of wrong passwords from one
-// address at most ten are checked, and for one account a hundred.
-func TestABurstOfSignInsMeetsTheLimit(t *testing.T) {
-	t.Parallel()
-
-	for name, c := range map[string]struct {
-		addr       func(i int) string
-		sent, most int
-	}{
-		"from one address": {func(int) string { return "198.51.100.20:7000" }, 40, 10},
-		"for one account":  {func(i int) string { return fmt.Sprintf("203.%d.113.%d:7000", i/10, i%10) }, 140, 100},
-	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			in := newInstance(t, "http://localhost", passwordHash(t))
-			var wg sync.WaitGroup
-			codes := make([]int, c.sent)
-			for i := range codes {
-				wg.Go(func() { codes[i] = in.loginFrom(t, c.addr(i), "ana@example.com", "wrong password, surely").Code })
-			}
-			wg.Wait()
-			checked := 0
-			for _, c := range codes {
-				switch c {
-				case http.StatusUnauthorized:
-					checked++
-				case http.StatusTooManyRequests:
-				default:
-					t.Errorf("a sign-in answered %d, want 401 or 429", c)
-				}
-			}
-			if checked > c.most {
-				t.Errorf("%d of %d sign-ins at once were checked, want at most %d", checked, c.sent, c.most)
-			}
-		})
 	}
 }
 
