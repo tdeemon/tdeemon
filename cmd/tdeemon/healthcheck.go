@@ -25,12 +25,12 @@ func healthcheck(ctx context.Context, args []string, lookup config.LookupFunc) e
 	if len(args) > 0 {
 		return fmt.Errorf("%w: healthcheck takes no arguments", errUsage)
 	}
+	ctx, cancel := context.WithTimeout(ctx, healthcheckTimeout)
+	defer cancel()
 	url, err := healthzURL(ctx, lookup)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(ctx, healthcheckTimeout)
-	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("health check: %w", err)
