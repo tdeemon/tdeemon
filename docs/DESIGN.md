@@ -3,7 +3,10 @@
 > Name: TDEE + daemon. Successor to the author's personal setup
 > (an Obsidian vault + a small Go service + an AI agent on Telegram),
 > rebuilt as a self-hostable, multi-user, open-source app (AGPL-3.0-only).
-> Status: design phase, 2026-10. Nothing here is built yet.
+> Status: written in the design phase (2026-10) and kept as the
+> design's record. Most of it is built: v1.0 was the first release, and
+> [§11](#11-phases) says what of each phase is in, and what is not yet.
+> What the app does today is in [features.md](features.md).
 
 ## 1. Why
 
@@ -1911,8 +1914,8 @@ Done at the cut-over, on 2026-10-29.
 
 | phase | scope |
 | --- | --- |
-| **P0 — replace the predecessor** | schema + migrations, foods/meals/days/metrics/phases/targets, tool registry, MCP (token auth), REST, HAE ingest, calibration v2, **proposals + coaching tools + guardrails**, a one-off import of the history, minimal web UI (day view, food DB, pending proposals, login), sign-in with a password or OIDC (Authentik), **deterministic morning summary + watchdog via Telegram**; training days from Strong's export; the agent on MCP; cut-over |
-| **P1 — v0.1 open source** | multi-user + invites, built-in chat with BYO key (`fast`/`smart` slots) and photos, **autopilot weekly check-in**, MCP coaching prompts, PWA, morning summary + watchdog, recipes, i18n (en/hr), docker compose, docs, CI |
+| **P0 — replace the predecessor** | schema + migrations, foods/meals/days/metrics/phases/targets, tool registry, MCP (token auth), REST, HAE ingest, calibration v2, **proposals + coaching tools + guardrails**, a one-off import of the history, minimal web UI (day view, food DB, pending proposals, login), sign-in with a password or OIDC (Authentik), **deterministic morning summary + watchdog via Telegram**; training days from Strong's export (until v1.2, Apple Health's since); the agent on MCP; cut-over |
+| **P1 — v0.1 open source** (released as v1.0, without the built-in chat) | multi-user + invites, built-in chat with BYO key (`fast`/`smart` slots) and photos (not yet), **autopilot weekly check-in**, MCP coaching prompts, PWA, morning summary + watchdog, recipes, i18n (en/hr), docker compose, docs, CI |
 | **P2** | Telegram adapter, OAuth for Claude/ChatGPT connectors, shopping list, generic CSV history import, barcode → Open Food Facts lookup |
 | **P3 — training module** | dropped (2026-11-04): training belongs to an app of its own, such as openGym; tdeemon reads the days of strength workouts from Apple Health |
 | **P4** | native app with HealthKit (replaces HAE) |
