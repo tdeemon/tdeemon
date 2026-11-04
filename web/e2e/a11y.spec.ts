@@ -952,6 +952,7 @@ for (const size of sizes.filter((s) => s.name === 'phone' || s.name === 'desktop
             const problems = [
               ...(await serious(page)),
               ...(size.hasTouch ? await smallTargets(page) : await unfocused(page)),
+              ...(locale === 'hr' ? await english(page) : []),
             ]
             await photograph(page, testInfo, name)
             return problems
