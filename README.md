@@ -78,6 +78,10 @@ A binary with the app inside:
 go build -tags webui ./cmd/tdeemon
 ```
 
+The build also writes a Brotli and a gzip copy of each script and
+stylesheet, and the server sends the copy a browser accepts, so an
+instance without a compressing proxy sends about a quarter of the bytes.
+
 ### API contract
 
 The JSON API under `/api/v1` is described by an OpenAPI 3.1 document that
