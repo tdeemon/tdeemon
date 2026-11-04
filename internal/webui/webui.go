@@ -111,7 +111,8 @@ func Handler(fsys fs.FS) (http.Handler, error) {
 // if there is one, and reports whether it did. An asset with a copy varies
 // by Accept-Encoding, whichever answer it gets.
 func serveEncoded(w http.ResponseWriter, r *http.Request, fsys fs.FS, name string) bool {
-	accept := r.Header.Get("Accept-Encoding")
+	// One list, however many fields it came in (RFC 9110, 5.3).
+	accept := strings.Join(r.Header.Values("Accept-Encoding"), ",")
 	varies := false
 	for _, enc := range encodings {
 		if _, err := fs.Stat(fsys, name+enc.ext); err != nil {

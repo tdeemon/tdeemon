@@ -148,27 +148,32 @@ func TestNoApp(t *testing.T) {
 // An asset with precompressed copies goes as the one the client accepts,
 // Brotli first, with the original's type; without one it goes as it is.
 // Either way it varies by Accept-Encoding.
+// encodedJS is a script of encodedApp with both copies.
+const encodedJS = "assets/index-B7Vj6WSe.js"
+
+// encodedApp has assets with and without precompressed copies.
+var encodedApp = fstest.MapFS{
+	"index.html":                   {Data: []byte("<!doctype html>")},
+	encodedJS:                      {Data: []byte("console.log(1)")},
+	encodedJS + ".br":              {Data: []byte("brotli bytes")},
+	encodedJS + ".gz":              {Data: []byte("gzip bytes")},
+	"assets/index-CMUHlmXG.css":    {Data: []byte("body{}")},
+	"assets/index-CMUHlmXG.css.gz": {Data: []byte("gzip css")},
+	"assets/plain-D1.svg":          {Data: []byte("<svg/>")},
+	"sw.js":                        {Data: []byte("self.skipWaiting()")},
+	"sw.js.br":                     {Data: []byte("not served")},
+	"assets/app.webmanifest":       {Data: []byte("{}")},
+	"assets/app.webmanifest.gz":    {Data: []byte("gzip manifest")},
+}
+
 func TestEncodedAssets(t *testing.T) {
 	t.Parallel()
 
-	const js = "assets/index-B7Vj6WSe.js"
-	fsys := fstest.MapFS{
-		"index.html":                   {Data: []byte("<!doctype html>")},
-		js:                             {Data: []byte("console.log(1)")},
-		js + ".br":                     {Data: []byte("brotli bytes")},
-		js + ".gz":                     {Data: []byte("gzip bytes")},
-		"assets/index-CMUHlmXG.css":    {Data: []byte("body{}")},
-		"assets/index-CMUHlmXG.css.gz": {Data: []byte("gzip css")},
-		"assets/plain-D1.svg":          {Data: []byte("<svg/>")},
-		"sw.js":                        {Data: []byte("self.skipWaiting()")},
-		"sw.js.br":                     {Data: []byte("not served")},
-		"assets/app.webmanifest":       {Data: []byte("{}")},
-		"assets/app.webmanifest.gz":    {Data: []byte("gzip manifest")},
-	}
-	h, err := Handler(fsys)
+	h, err := Handler(encodedApp)
 	if err != nil {
 		t.Fatalf("Handler: %v", err)
 	}
+	const js = encodedJS
 
 	for _, tc := range []struct {
 		name, path, accept         string
@@ -206,8 +211,28 @@ func TestEncodedAssets(t *testing.T) {
 			t.Errorf("%s: Cache-Control %q, want the immutable cache", tc.name, got)
 		}
 	}
+}
 
-	// HEAD and a range work on the copy as on any file.
+// Repeated fields, HEAD and a range work on a copy as on any file.
+func TestEncodedAssetRequests(t *testing.T) {
+	t.Parallel()
+
+	h, err := Handler(encodedApp)
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+	const js = encodedJS
+
+	// Fields repeated are one list: a refusal in the second holds.
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/"+js, nil)
+	req.Header.Add("Accept-Encoding", "*")
+	req.Header.Add("Accept-Encoding", "br;q=0, gzip")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if got := rec.Header().Get("Content-Encoding"); got != "gzip" {
+		t.Errorf("repeated fields refusing br: Content-Encoding %q, want gzip", got)
+	}
+
 	if rec := get(t, h, http.MethodHead, "/"+js, "Accept-Encoding", "br"); rec.Code != http.StatusOK || rec.Header().Get("Content-Encoding") != "br" || rec.Body.Len() != 0 {
 		t.Errorf("HEAD: %d %q, encoding %q", rec.Code, rec.Body.String(), rec.Header().Get("Content-Encoding"))
 	}
