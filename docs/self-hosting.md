@@ -60,12 +60,13 @@ Every invalid or missing variable is reported at startup in one go.
 volume. In a directory of its own, with its files:
 
 ```sh
-# Once: the settings, readable by you only, with a new secret key. Keep
-# the key. set -C refuses to replace an existing .env, so running this
-# again keeps it.
-(umask 077 && set -C && sed "s|^TDEEMON_SECRET_KEY=\$|TDEEMON_SECRET_KEY=$(openssl rand -base64 32)|" \
-  .env.example > .env)
-# Set TDEEMON_BASE_URL in .env to the instance's public URL, then:
+# The address it will have, such as https://tdeemon.example.com;
+# http://localhost:8080 to try it on this machine.
+url=http://localhost:8080
+# The settings, readable by you only, with a new secret key. Keep the key.
+# set -C refuses to replace an existing .env, so running this again keeps it.
+(umask 077 && set -C && sed -e "s|^TDEEMON_SECRET_KEY=\$|TDEEMON_SECRET_KEY=$(openssl rand -base64 32)|" \
+  -e "s|^TDEEMON_BASE_URL=.*|TDEEMON_BASE_URL=$url|" .env.example > .env)
 docker compose up -d --wait
 ```
 
@@ -84,6 +85,11 @@ docker compose up -d --wait
   `/healthz` at `TDEEMON_LISTEN` and never opens the database.
 - What follows for `docker run` holds for Compose too: the volume at
   `/data`, the read-only container, 20 seconds to stop.
+- `compose.yaml` names its project `tdeemon`, whatever the directory: a
+  second instance on the same host (a test beside the real one) needs a
+  name of its own (`docker compose -p tdeemon-test …`, or `name:`
+  changed), or it takes over the first one's container and volume, and
+  its `down -v` deletes the first one's data.
 
 ## Docker
 
@@ -121,10 +127,10 @@ docker run --read-only --stop-timeout 20 -v tdeemon-data:/data \
   `--stop-timeout 20` waits for that, where the default of 10 would kill
   the process first.
 - `--build-arg VERSION=v1.2.3` sets the version the server reports
-  (default `dev`). Without arguments the binary runs the server,
-  `user create` adds a user ([Users](#users)), and `healthcheck` is the
-  image's health check; anything else prints the usage and exits
-  without touching the database.
+  (default `dev`). Without arguments the binary runs the server, the
+  `user` commands manage users ([Users](#users)), `healthcheck` is the
+  image's health check, and `help` lists them all; anything else prints
+  the usage and exits without touching the database.
 - The build runs `go vet` and the tests against the web app it embeds.
   Podman builds the same file.
 
@@ -218,11 +224,18 @@ kubectl exec deploy/tdeemon -- /tdeemon user create --admin --email you@example.
   they refuse a database the server has not migrated to their version.
 
 Signing in goes through the web app's sign-in page (`/login`), with a
-password or the OpenID Connect provider, or straight through the API
-(`POST /api/v1/auth/login`); either sets an HttpOnly session cookie for
-30 days. Cross-origin browser requests that change something are
-refused (Go's `http.CrossOriginProtection`), and over HTTPS the cookie is
-a `__Host-` cookie.
+password or the OpenID Connect provider, or straight through the API;
+either sets an HttpOnly session cookie for 30 days:
+
+```sh
+curl -c cookies.txt -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"…"}' https://tdeemon.example.com/api/v1/auth/login
+```
+
+The whole API is described at `/api/v1/openapi.json` (OpenAPI 3.1).
+Cross-origin browser requests that change something are refused (Go's
+`http.CrossOriginProtection`), and over HTTPS the cookie is a `__Host-`
+cookie.
 
 Against guessing and floods:
 
@@ -431,7 +444,8 @@ the phone), `tools` (the tools: read, log and change, through MCP) and
 `read` (the tools that only read).
 
 ```sh
-# Signed in (the session cookie in cookies.txt), create one; the token is
+# Signed in (the session cookie in cookies.txt, from the sign-in under
+# Users), create one; the token is
 # shown only in this answer, tdeemon keeps only its hash.
 curl -b cookies.txt -H 'Content-Type: application/json' \
   -d '{"name":"iPhone","scopes":["ingest"]}' https://tdeemon.example.com/api/v1/tokens
@@ -528,6 +542,20 @@ the commands for Claude Code and Claude Desktop. For a few clients:
   Hermes finds a server's tools by searching them and does not pass the
   server's instructions to its model: its own skill names the tools it
   should use, `get_coaching_guide` for a coaching session among them.
+
+To check a token and the address before a client, ask the server what
+it is (MCP's `initialize`; the server keeps no session between
+requests):
+
+```sh
+curl -H 'Authorization: Bearer tdm_…' -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}' \
+  https://tdeemon.example.com/mcp
+```
+
+It answers with `serverInfo` (`tdeemon` and its version) and the
+instructions; a bad token, 401.
 
 ChatGPT's and claude.ai's connectors sign in with OAuth rather than a
 header, which tdeemon does not offer; whether they would work, on a
@@ -683,10 +711,12 @@ and the image `ghcr.io/zarnautovic/tdeemon:X.Y.Z`, also tagged `X.Y` and
    With a version pinned in `compose.yaml`, change it first. Behind
    Caddy, `COMPOSE_FILE` in `.env` keeps both files in these commands
    ([Docker Compose](#docker-compose)).
-3. At startup tdeemon migrates the database, after a snapshot of it
-   ([Data](#data)); the health check waits for that. The logs say
-   `database schema migrated`, from and to which version, or `database
-   schema is up to date`.
+3. When a newer image came, Compose starts it, and at startup tdeemon
+   migrates the database, after a snapshot of it ([Data](#data)); the
+   health check waits for that. Its logs (`docker compose logs
+   tdeemon`) say `database schema migrated`, from and to which version,
+   or `database schema is up to date`. When the pull found nothing
+   newer, nothing restarts and nothing is logged.
 
 To go back to an older release after a migration, restore the snapshot
 taken before it ([Data](#data)): a release refuses a database whose
