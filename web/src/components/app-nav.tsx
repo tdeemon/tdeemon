@@ -18,6 +18,7 @@ import { BrandMark } from '@/components/brand-mark'
 import { UserMark } from '@/components/settings-avatar'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useMessages } from '@/i18n/messages'
+import { apple } from '@/lib/shortcuts'
 import { cn } from '@/lib/utils'
 
 // A section's link: on a phone a tab of the bar, and in a tablet's rail
@@ -105,10 +106,12 @@ const logFab =
 // left, which scrolls if it must: Log a meal first, the sections, and the
 // settings and the user at its foot. From 1280 px it is a sidebar of
 // 240 px: the brand, the way to
-// search, Log a meal with its key, the sections with theirs, and at its
+// search (the command palette, ⌘K or Ctrl+K), Log a meal with its key, the sections with theirs, and at its
 // foot the settings, the user and the theme. Each hides what is the
 // others'. Log a meal is no section: it asks onLog for the meal to log
-// over the page, from the button tapped; search asks onSearch. The
+// over the page, from the button tapped; search asks onSearch, from its
+// button. A phone has no way to the palette: its foods' search is the
+// Foods tab's, Log a meal the bar's middle. The
 // plan's section has a dot while a proposal waits there for the user's
 // answer. The bar steps aside for a sheet, which slides up over it, and
 // is none on a form's page (bar false), whose own buttons end it.
@@ -118,7 +121,7 @@ export function AppNav({
   bar = true,
 }: {
   onLog: (from: HTMLElement) => void
-  onSearch: () => void
+  onSearch: (from: HTMLElement) => void
   bar?: boolean
 }) {
   const t = useMessages()
@@ -147,10 +150,11 @@ export function AppNav({
       <div className="hidden flex-col gap-3 tablet:flex">
         <button
           type="button"
-          // The foods' search for now, as / is.
-          aria-keyshortcuts="/"
+          aria-keyshortcuts={apple() ? 'Meta+K' : 'Control+K'}
           className="hidden h-9 items-center gap-2 rounded-md border border-control-border bg-card px-2.5 text-small text-muted-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring sidebar:flex"
-          onClick={onSearch}
+          onClick={(e) => {
+            onSearch(e.currentTarget)
+          }}
         >
           <Search aria-hidden className="size-4" />
           {t.nav.search}
@@ -158,7 +162,7 @@ export function AppNav({
             aria-hidden
             className="ml-auto rounded-[5px] border border-control-border px-1.5 font-mono text-caption"
           >
-            /
+            {apple() ? '⌘K' : 'Ctrl K'}
           </kbd>
         </button>
         <button

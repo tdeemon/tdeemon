@@ -517,6 +517,20 @@ const screens: Screen[] = [
       await settled(page)
     },
   },
+  // The command palette (Ctrl+K), of what "oat" finds: the food, the
+  // recipe, marked, each a row.
+  {
+    name: 'palette',
+    open: async (page) => {
+      await page.goto('/foods')
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+      await page.keyboard.press('Control+k')
+      await expect(page.getByRole('combobox')).toBeFocused()
+      await page.keyboard.type('oat')
+      await expect(page.getByRole('option', { name: /^Oat bake/ }).first()).toBeVisible()
+      await settled(page)
+    },
+  },
   // An AI coach's access key just made, with the steps to connect it.
   {
     name: 'connect',
@@ -855,22 +869,19 @@ for (const size of sizes) {
             (size.name === 'desktop' && locale === 'en')
 
           const found: Record<string, string[]> = {}
-          await inTurn(
-            screens.filter((s) => s.name.startsWith('plan')),
-            async (screen) => {
-              await screen.open(page, made)
-              const problems = [
-                ...(await serious(page)),
-                ...(size.hasTouch ? await smallTargets(page) : await unfocused(page)),
-              ]
-              if (problems.length > 0) {
-                found[screen.name] = problems
-              }
-              if (photographed) {
-                await photograph(page, testInfo, screen.name)
-              }
-            },
-          )
+          await inTurn(screens, async (screen) => {
+            await screen.open(page, made)
+            const problems = [
+              ...(await serious(page)),
+              ...(size.hasTouch ? await smallTargets(page) : await unfocused(page)),
+            ]
+            if (problems.length > 0) {
+              found[screen.name] = problems
+            }
+            if (photographed) {
+              await photograph(page, testInfo, screen.name)
+            }
+          })
           expect(found).toEqual({})
         })
       })
@@ -981,7 +992,7 @@ async function motions(page: Page): Promise<string[]> {
 test.describe('with less motion asked for', () => {
   test.use({ reducedMotion: 'reduce' })
 
-  test('the day and a sheet only fade', async ({ page }) => {
+  test('the day, a sheet and the palette only fade', async ({ page }) => {
     await signIn(page)
     await make(page, 'motion')
     // The ring and the bars fill, a meal's chevron turns, a sheet slides
@@ -991,6 +1002,12 @@ test.describe('with less motion asked for', () => {
     expect(await motions(page)).toEqual([])
     await page.goto('/?log=true')
     await expect(page.getByRole('dialog')).toBeVisible()
+    expect(await motions(page)).toEqual([])
+    // The command palette fades in, as it always does.
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await page.keyboard.press('Control+k')
+    await expect(page.getByRole('combobox')).toBeFocused()
     expect(await motions(page)).toEqual([])
   })
 

@@ -1,16 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
+import { Keyboard, Plus, Repeat2, Scale, Undo2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 
 import { pushDeviceQuery } from '@/api/push'
 import { AppNav } from '@/components/app-nav'
+import { CommandPalette, type Command } from '@/components/command-palette'
 import { LogToday } from '@/components/day/log-today'
+import { useRepeatYesterday } from '@/components/day/repeat-yesterday'
+import { WeighInSheet } from '@/components/day/weigh-in-sheet'
 import { ShortcutsDialog } from '@/components/shortcuts-dialog'
 import { StaleBar } from '@/components/stale-bar'
 import { useMessages } from '@/i18n/messages'
 import { formPage } from '@/lib/form-page'
 import { LogHereContext, type LogHere } from '@/lib/log-here'
-import { useShortcuts } from '@/lib/shortcuts'
+import { apple, useShortcuts } from '@/lib/shortcuts'
 import { useUndoLatest } from '@/lib/undo'
 import { cn } from '@/lib/utils'
 
@@ -23,9 +27,14 @@ import { cn } from '@/lib/utils'
 // The keyboard's first stop skips the sections to the page. Log a meal
 // opens the meal to log on today over the page, which stays as it was;
 // today's page logs it itself (LogHere).
-// The keyboard has a shortcut to log a meal (N), to find a food (/), to
-// undo the latest change (⌘Z or Ctrl+Z, which a toast says), to each
-// section (G, then its letter), and to the list of them (?).
+// The keyboard has a shortcut to the command palette (⌘K or Ctrl+K), to
+// log a meal (N), a weigh-in (W), to find a food (/), to undo the latest
+// change (⌘Z or Ctrl+Z, which a toast says), to each section (G, then its
+// letter), and to the list of them (?). On a day's page, a letter or a
+// digit typed outside a field, and none of those keys, opens the palette
+// with it (useShortcuts' typed). The palette's actions are these, each
+// with its key; yesterday's meal again has none, as no one key writes a
+// meal from anywhere.
 export function AppLayout() {
   const t = useMessages()
   const navigate = useNavigate()
@@ -53,6 +62,29 @@ export function AppLayout() {
     opener.current = from
     setLogging(true)
   }
+  // The command palette, open, with what it starts with, and what had the
+  // focus before it, which a sheet it opens gives the focus back to.
+  const [palette, setPalette] = useState<{ open: boolean; initial: string }>({
+    open: false,
+    initial: '',
+  })
+  const paletteFrom = useRef<HTMLElement | null>(null)
+  const openPalette = (initial: string, from?: HTMLElement) => {
+    const focused = globalThis.document.activeElement
+    paletteFrom.current =
+      from ??
+      (focused instanceof HTMLElement && focused !== globalThis.document.body ? focused : null)
+    setPalette({ open: true, initial })
+  }
+  // Today's weigh-in, open, and what opened it.
+  const [weighing, setWeighing] = useState(false)
+  const weighFrom = useRef<HTMLElement | null>(null)
+  const weigh = (from: HTMLElement | null) => {
+    weighFrom.current = from
+    setWeighing(true)
+  }
+  const repeat = useRepeatYesterday(palette.open)
+  const onDay = useRouterState({ select: (state) => state.location.pathname === '/' })
   // find takes the foods' search, there already or once there.
   const find = () => {
     const field = globalThis.document.querySelector<HTMLElement>('[data-find]')
@@ -62,35 +94,113 @@ export function AppLayout() {
       void navigate({ to: '/foods', state: { find: true } })
     }
   }
-  useShortcuts({
-    n: () => {
-      log(null)
+  useShortcuts(
+    {
+      'Mod+k': () => {
+        openPalette('')
+      },
+      n: () => {
+        log(null)
+      },
+      w: () => {
+        weigh(null)
+      },
+      '/': find,
+      'Mod+z': () => {
+        latest.undo()
+      },
+      // The sections, by the key after G: D for the day, F the foods, P the
+      // progress, L the plan, S the settings.
+      'g d': () => {
+        void navigate({ to: '/' })
+      },
+      'g f': () => {
+        void navigate({ to: '/foods' })
+      },
+      'g p': () => {
+        void navigate({ to: '/progress' })
+      },
+      'g l': () => {
+        void navigate({ to: '/plan' })
+      },
+      'g s': () => {
+        void navigate({ to: '/settings' })
+      },
+      '?': () => {
+        setShortcuts(true)
+      },
     },
-    '/': find,
-    'Mod+z': () => {
-      latest.undo()
-    },
-    // The sections, by the key after G: D for the day, F the foods, P the
-    // progress, L the plan, S the settings.
-    'g d': () => {
-      void navigate({ to: '/' })
-    },
-    'g f': () => {
-      void navigate({ to: '/foods' })
-    },
-    'g p': () => {
-      void navigate({ to: '/progress' })
-    },
-    'g l': () => {
-      void navigate({ to: '/plan' })
-    },
-    'g s': () => {
-      void navigate({ to: '/settings' })
-    },
-    '?': () => {
-      setShortcuts(true)
-    },
-  })
+    onDay
+      ? (key) => {
+          openPalette(key)
+        }
+      : undefined,
+  )
+  const k = t.palette.words
+  // The palette's actions, as it opens (now, whose meal of the day
+  // yesterday's is of).
+  const actions = (now: number): Command[] => {
+    const repeatLabel = repeat.label(now)
+    return [
+      {
+        id: 'log',
+        icon: Plus,
+        label: t.palette.logMeal,
+        words: k.logMeal,
+        keys: 'N',
+        aria: 'N',
+        run: () => {
+          log(paletteFrom.current)
+        },
+      },
+      {
+        id: 'weigh',
+        icon: Scale,
+        label: t.palette.weighIn,
+        words: k.weighIn,
+        keys: 'W',
+        aria: 'W',
+        run: () => {
+          weigh(paletteFrom.current)
+        },
+      },
+      ...(repeatLabel === undefined
+        ? []
+        : [
+            {
+              id: 'repeat',
+              icon: Repeat2,
+              label: repeatLabel,
+              words: k.repeat,
+              run: () => {
+                void repeat.run()
+              },
+            },
+          ]),
+      {
+        id: 'undo',
+        icon: Undo2,
+        label: t.palette.undo,
+        words: k.undo,
+        keys: apple() ? '⌘Z' : 'Ctrl+Z',
+        aria: apple() ? 'Meta+Z' : 'Control+Z',
+        run: () => {
+          latest.undo()
+        },
+      },
+      {
+        id: 'shortcuts',
+        icon: Keyboard,
+        label: t.palette.shortcuts,
+        words: k.shortcuts,
+        keys: '?',
+        aria: '?',
+        run: () => {
+          setShortcuts(true)
+        },
+      },
+    ]
+  }
 
   return (
     <>
@@ -107,7 +217,13 @@ export function AppLayout() {
       >
         {t.nav.skip}
       </a>
-      <AppNav onLog={log} onSearch={find} bar={!form} />
+      <AppNav
+        onLog={log}
+        onSearch={(from) => {
+          openPalette('', from)
+        }}
+        bar={!form}
+      />
       <main
         id="content"
         ref={main}
@@ -125,6 +241,16 @@ export function AppLayout() {
         </div>
       </main>
       <LogToday open={logging} onOpenChange={setLogging} opener={opener} />
+      <WeighInSheet open={weighing} onOpenChange={setWeighing} opener={weighFrom} />
+      <CommandPalette
+        open={palette.open}
+        onOpenChange={(open) => {
+          setPalette((p) => ({ ...p, open }))
+        }}
+        initial={palette.initial}
+        actions={actions}
+        opener={paletteFrom}
+      />
       <ShortcutsDialog open={shortcuts} onOpenChange={setShortcuts} />
     </>
   )

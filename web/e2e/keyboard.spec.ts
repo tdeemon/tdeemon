@@ -71,6 +71,30 @@ test('G, then a letter, goes to each section, as the shortcuts list', async ({ p
   const list = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
   await expect(list.getByText('Undo the latest change')).toBeVisible()
   await expect(list.getByText('Repeat the meal today')).toBeVisible()
+  await expect(list.getByText('Search and commands')).toBeVisible()
+  await expect(list.getByText('Log a weigh-in')).toBeVisible()
+})
+
+test("W opens today's weigh-in from any screen, and Escape gives the focus back", async ({
+  page,
+}) => {
+  await signIn(page)
+  await page.goto('/plan')
+  await expect(page.getByRole('heading', { name: 'Plan', level: 1 })).toBeVisible()
+  const plan = page
+    .getByRole('navigation', { name: 'Sections' })
+    .getByRole('link', { name: 'Plan' })
+  await plan.focus()
+
+  await page.keyboard.press('w')
+  const sheet = page.getByRole('dialog', { name: 'Log a weigh-in' })
+  await expect(sheet.getByLabel('Weight')).toBeFocused()
+  // A key in its field is the field's: no section, no palette.
+  await page.keyboard.press('g')
+  await expect(sheet.getByLabel('Weight')).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  await expect(plan).toBeFocused()
 })
 
 test('Ctrl+Z takes back the latest change, and says which', async ({ page }) => {

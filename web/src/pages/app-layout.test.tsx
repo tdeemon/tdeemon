@@ -205,7 +205,8 @@ test('an address the app has no page of leads home, and a signed-in user to the 
   expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Page not found')
 })
 
-test("the sidebar's search finds a food, as / does", async () => {
+// The sidebar's Search… is the command palette's (command-palette.test).
+test('/ finds a food, on the foods', async () => {
   fakeServer({
     ...signedIn(),
     'GET /api/v1/foods': () => Response.json({ foods: [] }),
@@ -213,7 +214,7 @@ test("the sidebar's search finds a food, as / does", async () => {
   const router = renderAt('/')
   await screen.findByRole('heading', { name: 'Today' })
 
-  fireEvent.click(within(await nav()).getByRole('button', { name: 'Search…' }))
+  fireEvent.keyDown(document.body, { key: '/' })
 
   const search = await screen.findByRole('searchbox', { name: 'Search the foods' })
   await waitFor(() => {

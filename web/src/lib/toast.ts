@@ -59,6 +59,13 @@ export function sayUndone(said: Omit<Said, 'undo'>) {
   toasts.add({ id: changeToast, title: said.title, timeout: 6000, data: said })
 }
 
+// sayFailed says a change asked for from no form of its own (the command
+// palette) was not made, and why, in a toast of its own: the change
+// before keeps its toast, and its Undo.
+export function sayFailed(title: string) {
+  toasts.add({ id: 'failed', title, timeout: 6000, data: { title } })
+}
+
 // sayUpdate says a new version of the app is ready, in a toast of its own
 // apart from the changes', which stays until the user takes it (action)
 // or closes it.

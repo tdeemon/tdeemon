@@ -30,7 +30,7 @@ export const en = {
     settings: 'Settings',
     // The user's mark in a phone's header, which leads to the settings.
     account: 'Settings and account',
-    // The sidebar's way to search, the foods' for now.
+    // The sidebar's way to the command palette.
     search: 'Search…',
     logMeal: 'Log a meal',
     darkTheme: 'Dark theme',
@@ -76,6 +76,8 @@ export const en = {
     toasts: 'The notifications',
     close: 'Close',
     undo: 'Undo the latest change',
+    palette: 'Search and commands',
+    weighIn: 'Log a weigh-in',
     // A section, a key after G: "G then D".
     andThen: 'then',
     sections: {
@@ -636,6 +638,41 @@ export const en = {
     },
     cancel: 'Cancel',
     refused: (detail: string) => `The server did not take this meal: ${detail}`,
+  },
+  // The command palette (⌘K or Ctrl+K): a field, then what it finds and
+  // does, in groups, each row with its key.
+  palette: {
+    title: 'Search and commands',
+    field: 'Search foods, days and settings, or a command',
+    placeholder: 'Search or type a command…',
+    actions: 'Actions',
+    goTo: 'Go to',
+    foods: 'Foods',
+    days: 'Days',
+    settings: 'Settings',
+    logMeal: 'Log a meal',
+    weighIn: 'Log a weigh-in',
+    // "Repeat yesterday's breakfast", of the quick add's chip's words.
+    repeat: (what: string) => `Repeat ${what.charAt(0).toLowerCase()}${what.slice(1)}`,
+    undo: 'Undo the latest change',
+    shortcuts: 'Keyboard shortcuts',
+    recipe: 'Recipe',
+    // Other words each action is found by, beside its name.
+    words: {
+      logMeal: 'add food eat breakfast lunch dinner snack',
+      weighIn: 'weight scale kg',
+      repeat: 'again same',
+      undo: 'revert back',
+      shortcuts: 'keys keyboard help',
+    },
+    // What the field found, said to a screen reader as it changes.
+    results: (n: number) =>
+      n === 0
+        ? 'No results'
+        : `${String(n)} ${plural('en', n, { one: 'result', other: 'results' })}`,
+    none: 'Nothing found.',
+    // R, or the palette, when yesterday had no meal at this time of day.
+    nothingToRepeat: 'Yesterday has no meal of this time of day to repeat.',
   },
   quick: {
     title: 'Quick add',

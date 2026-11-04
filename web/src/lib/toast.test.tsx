@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import { Toasts } from '@/components/toasts'
-import { sayChange, toasts } from '@/lib/toast'
+import { sayChange, sayFailed, toasts } from '@/lib/toast'
 
 afterEach(() => {
   cleanup()
@@ -56,4 +56,14 @@ test('a toast stays while the pointer is over the toasts, and goes in its time a
     vi.runAllTimers()
   })
   expect(screen.queryByText('Check-in saved')).toBeNull()
+})
+
+// A refusal is a toast of its own: the change before keeps its toast,
+// and its Undo, which one of the same id would take the place of.
+test('a refusal is a toast of its own, beside the change before', () => {
+  const add = vi.spyOn(toasts, 'add')
+  sayChange({ title: 'Logged' }, { last: { action: 'meal.create', entity: 'a' }, date })
+  sayFailed('Not logged')
+  const [change, failed] = add.mock.calls.map(([toast]) => toast.id)
+  expect(failed).not.toBe(change)
 })

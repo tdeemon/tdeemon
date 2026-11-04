@@ -3,7 +3,7 @@ import { Fragment } from 'react'
 
 import { buttonVariants } from '@/components/ui/button'
 import { useMessages } from '@/i18n/messages'
-import { apple } from '@/lib/shortcuts'
+import { mod } from '@/lib/shortcuts'
 
 const kbdClass =
   'inline-flex min-w-7 items-center justify-center rounded-sm border bg-surface-2 px-1.5 font-mono text-small text-foreground'
@@ -22,7 +22,7 @@ function go(letter: string, what: string): Shortcut {
 }
 
 // ShortcutsDialog lists the keyboard's shortcuts (?), each with its keys:
-// those of anywhere, the sections' (G, then a letter), a day's, its
+// those of anywhere (the command palette first), the sections' (G, then a letter), a day's, its
 // meals' among them, Log a meal's, and the plan's, of a proposal that
 // waits. Escape closes it, and the focus goes back where it
 // was.
@@ -39,9 +39,11 @@ export function ShortcutsDialog({
     {
       title: s.anywhere,
       shortcuts: [
+        { keys: [mod(), 'K'], join: '+', what: s.palette },
         { keys: ['N'], what: s.logMeal },
+        { keys: ['W'], what: s.weighIn },
         { keys: ['/'], what: s.find },
-        { keys: [apple() ? '⌘' : 'Ctrl', 'Z'], join: '+', what: s.undo },
+        { keys: [mod(), 'Z'], join: '+', what: s.undo },
         // Base UI's key, which reaches them from a sheet too, as Tab does not.
         { keys: ['F6'], what: s.toasts },
         { keys: ['?'], what: s.list },
@@ -69,7 +71,7 @@ export function ShortcutsDialog({
     },
     {
       title: s.inLog,
-      shortcuts: [{ keys: [apple() ? '⌘' : 'Ctrl', 'Enter'], join: '+', what: s.logIt }],
+      shortcuts: [{ keys: [mod(), 'Enter'], join: '+', what: s.logIt }],
     },
     {
       title: s.onPlan,
