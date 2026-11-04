@@ -278,7 +278,8 @@ func TestGetDay(t *testing.T) {
 	}
 
 	// The day before: excluded, a rest day by the plan but a training day
-	// by Strong's workout, before the first target, with nothing logged.
+	// by a workout from Apple Health, before the first target, with nothing
+	// logged.
 	rec := in.do(t, http.MethodGet, "/api/v1/days/"+today.AddDays(-1).String(), "", session, nil)
 	checkJSON(t, rec.Body.Bytes(), fmt.Sprintf(`{
 		"date": %q, "status": "excluded", "excluded_reason": "Ana's birthday dinner", "type": "training",

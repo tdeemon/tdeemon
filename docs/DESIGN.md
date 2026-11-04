@@ -47,7 +47,9 @@ LLM only decides *what* was eaten and *how much*. Code does the rest.**
 ### Non-goals (v1)
 
 - Training and strength. This becomes an optional module in v2 (§11).
-- Logging workouts in the app (replacing Strong). Far future.
+- Logging workouts, programs and strength statistics: not tdeemon's.
+  A training app (such as openGym) keeps them; tdeemon reads only the
+  days of strength workouts from Apple Health.
 - A native mobile app. A PWA comes first; native comes later, mainly for
   HealthKit.
 - A commercial or hosted SaaS, Postgres, or Obsidian sync.
@@ -1045,7 +1047,7 @@ The replacement:
   is the plan's, which the coach changes (§8).
 - **The day's type** comes from the plan's training weekdays, so a day's
   target is known in the morning. A workout read from a source
-  (Health Auto Export's workouts, or Strong's export) or the check-in's
+  (Health Auto Export's workouts) or the check-in's
   toggle corrects it
   afterwards, the toggle having the last word, and calibration uses the
   corrected type. The weekly average weighs the day types by the number
@@ -1374,14 +1376,14 @@ the first spec.
 
 - **Ingest:**
   - `POST /api/v1/ingest/hae` is the Health Auto Export payload; `POST
-    /api/v1/ingest/metrics` takes `{date, metrics}`; `POST
-    /api/v1/ingest/strong` takes Strong's CSV export, the whole history,
-    as the body or a form's part `file`, and keeps its days of workouts
-    (`workout_days`), each workout on the logical day it starts in, as a
-    meal (`internal/ingest`). The HAE route takes the automation of
-    Workouts too: its strength workouts are days of workouts of their
-    own source, only ever added, as a payload cannot tell that it holds
-    every workout of a day; the check-in's toggle undoes one.
+    /api/v1/ingest/metrics` takes `{date, metrics}`. The HAE route
+    takes the automation of Workouts too: its strength workouts
+    (Strong's and a watch's, in Apple Health) are days of workouts
+    (`workout_days`), each on the logical day it starts in, as a meal,
+    only ever added, as a payload cannot tell that it holds every
+    workout of a day; the check-in's toggle undoes one. Strong's CSV
+    export was a source until v1.2, when Apple Health made it one too
+    many.
   - All use a per-user `ingest` token, not a web session. tdeemon keeps
     the values it reads, not the bodies: health data outside the
     database would escape a user's export and deletion.
@@ -1912,12 +1914,12 @@ Done at the cut-over, on 2026-10-29.
 | **P0 — replace the predecessor** | schema + migrations, foods/meals/days/metrics/phases/targets, tool registry, MCP (token auth), REST, HAE ingest, calibration v2, **proposals + coaching tools + guardrails**, a one-off import of the history, minimal web UI (day view, food DB, pending proposals, login), sign-in with a password or OIDC (Authentik), **deterministic morning summary + watchdog via Telegram**; training days from Strong's export; the agent on MCP; cut-over |
 | **P1 — v0.1 open source** | multi-user + invites, built-in chat with BYO key (`fast`/`smart` slots) and photos, **autopilot weekly check-in**, MCP coaching prompts, PWA, morning summary + watchdog, recipes, i18n (en/hr), docker compose, docs, CI |
 | **P2** | Telegram adapter, OAuth for Claude/ChatGPT connectors, shopping list, generic CSV history import, barcode → Open Food Facts lookup |
-| **P3 — training module** | generic workout data (exercise, sets, reps, weight, RPE, duration, distance) + import adapters (Strong, others); **programs as declarative specs** over a library of progression rules, created by the coach through proposals (§8); the RTS program is the first spec; `training_day` derived from any workout source |
-| **P4** | in-app workout logging (replaces Strong); native app with HealthKit (replaces HAE) |
+| **P3 — training module** | dropped (2026-11-04): training belongs to an app of its own, such as openGym; tdeemon reads the days of strength workouts from Apple Health |
+| **P4** | native app with HealthKit (replaces HAE) |
 
 A training day for split targets comes from the plan's training
-weekdays, corrected by a strength workout from Health Auto Export or in
-Strong's export, or by the manual toggle (`checkin.training_day`).
+weekdays, corrected by a strength workout from Health Auto Export, or by
+the manual toggle (`checkin.training_day`).
 
 ## 12. Open questions
 

@@ -97,7 +97,7 @@ for the author and the reviewer.
   `checkAnswer` catches a nil slice or map in the answers the tests get.
 - **Imports:** payloads of the shapes a source sends, with made-up
   values, in `internal/ingest/testdata/` (Health Auto Export's in
-  `hae/`, Strong's in `strong/`). Real ones stay outside git:
+  `hae/`). Real ones stay outside git:
   `TestRealPayloads` reads the directory `TDEEMON_HAE_PAYLOADS` names,
   such as bodies saved from Health Auto Export, `.json` and
   `.json.gz`. It fails

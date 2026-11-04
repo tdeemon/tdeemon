@@ -442,7 +442,7 @@ func TestGetSummaryDayTypes(t *testing.T) {
 	if err := in.db.SetTrainingDay(ctx, in.user.ID, isolationActor, restDays[0], new(true), now); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := in.db.SetWorkoutDays(ctx, in.user.ID, isolationActor, store.Strong, []day.Date{restDays[1]}, now); err != nil {
+	if _, err := in.db.AddWorkoutDays(ctx, in.user.ID, isolationActor, store.HAE, []day.Date{restDays[1]}, now); err != nil {
 		t.Fatal(err)
 	}
 	b := summaryOf(t, in)

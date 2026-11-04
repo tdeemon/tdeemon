@@ -580,26 +580,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/ingest/strong": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Import the days of workouts from a Strong export
-         * @description Strong's CSV export, the whole history, as the body or as the part file of a form: an API token with the ingest scope, not a web session. The day each workout starts in, by the user's day start hour, becomes a day with a workout, which makes it a training day unless the check-in's toggle says otherwise; the days of an earlier export that this one lacks are no longer. A workout on a day after the user's today is left out, its day in the answer's future. An export without a workout up to today is refused. tdeemon keeps the days it reads, not the export.
-         */
-        post: operations["ingest-strong"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/invites": {
         parameters: {
             query?: never;
@@ -3385,24 +3365,6 @@ export interface components {
              * @description The address of the user of the instance to share the recipe with.
              */
             email: string;
-        };
-        StrongBody: {
-            /** @description The days that became days with a workout. */
-            added: string[];
-            /**
-             * Format: int64
-             * @description The days with a workout, all of them now.
-             */
-            days: number;
-            /** @description The days after the user's today that the export has workouts on, left out with their workouts: a clock set wrong, or a time zone. */
-            future: string[];
-            /** @description The days that no longer are: their workouts are gone from Strong. */
-            removed: string[];
-            /**
-             * Format: int64
-             * @description The workouts in the export.
-             */
-            workouts: number;
         };
         SummaryBody: {
             /**
@@ -6627,102 +6589,6 @@ export interface operations {
             };
             /** @description Unsupported Media Type */
             415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-            /** @description Too Many Requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "ingest-strong": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "text/csv": string;
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StrongBody"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-            /** @description Request Timeout */
-            408: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-            /** @description Request Entity Too Large */
-            413: {
                 headers: {
                     [name: string]: unknown;
                 };

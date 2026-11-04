@@ -588,8 +588,8 @@ func toggleOn(toggles map[day.Date]bool, d day.Date) *bool {
 
 // dayType returns the type of the user's day d, the plan's training
 // weekdays and the check-in's toggle of the day's type, if there is one.
-// A workout a source recorded on d (Strong's export) makes it a training
-// day unless the toggle says otherwise.
+// A workout recorded on d (Health Auto Export's) makes it a training day
+// unless the toggle says otherwise.
 func (s *sessions) dayType(ctx context.Context, userID uuid.UUID, d day.Date) (plan.DayType, plan.Weekdays, *bool, error) {
 	weekdays, err := s.db.TrainingWeekdays(ctx, userID)
 	if err != nil {

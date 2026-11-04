@@ -1,13 +1,9 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"mime"
-	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -78,65 +74,6 @@ type ingestOutput struct {
 	Body ingestBody
 }
 
-type ingestStrongInput struct {
-	RawBody []byte `contentType:"text/csv"`
-	// contentType tells a form, as the predecessor's Shortcut sends, from
-	// the file itself.
-	contentType string
-}
-
-// Resolve keeps the request's content type, which the document need not
-// name: the body is the export, or a form with it.
-func (in *ingestStrongInput) Resolve(ctx huma.Context) []error {
-	in.contentType = ctx.Header("Content-Type")
-	return nil
-}
-
-// isForm reports whether contentType is a form's; one that does not read
-// is no form either.
-func isForm(contentType string) (bool, string) {
-	media, params, _ := mime.ParseMediaType(contentType)
-	return media == "multipart/form-data", params["boundary"]
-}
-
-// strongCSV returns the export in body: the part named file of a form,
-// or else body itself.
-func strongCSV(contentType string, body []byte) ([]byte, error) {
-	form, boundary := isForm(contentType)
-	if !form {
-		return body, nil
-	}
-	r := multipart.NewReader(bytes.NewReader(body), boundary)
-	for {
-		part, err := r.NextPart()
-		if errors.Is(err, io.EOF) {
-			return nil, errors.New("a form without a part named file: send the export as the part file, or as the body")
-		}
-		if err != nil {
-			return nil, fmt.Errorf("the form does not read: %w", err)
-		}
-		if part.FormName() == "file" {
-			b, err := io.ReadAll(part)
-			if err != nil {
-				return nil, fmt.Errorf("the form does not read: %w", err)
-			}
-			return b, nil
-		}
-	}
-}
-
-type strongBody struct {
-	Workouts int      `json:"workouts" doc:"The workouts in the export."`
-	Days     int      `json:"days" doc:"The days with a workout, all of them now."`
-	Added    []string `json:"added" nullable:"false" doc:"The days that became days with a workout."`
-	Removed  []string `json:"removed" nullable:"false" doc:"The days that no longer are: their workouts are gone from Strong."`
-	Future   []string `json:"future" nullable:"false" doc:"The days after the user's today that the export has workouts on, left out with their workouts: a clock set wrong, or a time zone."`
-}
-
-type strongOutput struct {
-	Body strongBody
-}
-
 // haePayloadSchema describes the body of ingest-hae for the document: huma
 // gives a raw body a string's schema, and ParseHAE, not huma, reads it.
 var haePayloadSchema = &huma.Schema{
@@ -201,61 +138,6 @@ func (s *sessions) registerIngest(a huma.API) {
 		Errors:       []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusRequestEntityTooLarge, http.StatusUnprocessableEntity},
 		Metadata:     openToTokens(auth.ScopeIngest),
 	}, s.ingestMetrics)
-	huma.Register(a, huma.Operation{
-		OperationID: "ingest-strong",
-		Method:      http.MethodPost,
-		Path:        Prefix + "/ingest/strong",
-		Summary:     "Import the days of workouts from a Strong export",
-		Description: "Strong's CSV export, the whole history, as the body or as the part file of a form: an API token with the ingest scope, not a web session. " +
-			"The day each workout starts in, by the user's day start hour, becomes a day with a workout, which makes it a training day unless the check-in's toggle says otherwise; " +
-			"the days of an earlier export that this one lacks are no longer. A workout on a day after the user's today is left out, its day in the answer's future. " +
-			"An export without a workout up to today is refused. tdeemon keeps the days it reads, not the export.",
-		Tags:            []string{"ingest"},
-		MaxBodyBytes:    maxIngestBytes,
-		BodyReadTimeout: ingestReadTimeout,
-		// A CSV or a form of any content type, as a Shortcut sends it,
-		// which strongCSV and ParseStrong read: huma checks nothing of it.
-		SkipValidateBody: true,
-		Errors:           []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusRequestEntityTooLarge, http.StatusUnprocessableEntity},
-		Metadata:         openToTokens(auth.ScopeIngest),
-	}, s.ingestStrong)
-}
-
-func (s *sessions) ingestStrong(ctx context.Context, in *ingestStrongInput) (*strongOutput, error) {
-	p, err := requireToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-	export, err := strongCSV(in.contentType, in.RawBody)
-	if err != nil {
-		return nil, huma.Error422UnprocessableEntity(err.Error())
-	}
-	cal, err := day.NewCalendar(p.User.TimeZone, p.User.DayStartHour)
-	if err != nil {
-		return nil, internalError("importing the workouts failed", fmt.Errorf("the user's calendar: %w", err))
-	}
-	w, err := ingest.ParseStrong(bytes.NewReader(export), cal)
-	if err != nil {
-		return nil, huma.Error422UnprocessableEntity(err.Error())
-	}
-	// The days after the user's today are left out, as a measurement's
-	// are (store).
-	w = w.UpTo(cal.DayOf(s.now()))
-	// An export holds the whole history: one without a workout would
-	// wipe the days, and is more likely a wrong file than a fresh start.
-	if w.Count == 0 {
-		return nil, huma.Error422UnprocessableEntity("the export has no workout up to today")
-	}
-	added, removed, err := s.db.SetWorkoutDays(ctx, p.User.ID, event.Actor{Kind: event.Import, Client: "strong"}, store.Strong, w.Days, s.now())
-	if err != nil {
-		return nil, internalError("importing the workouts failed", err)
-	}
-	s.logger.InfoContext(ctx, "imported workouts", "user_id", p.User.ID.String(), "workouts", w.Count, "days", len(w.Days),
-		"added", len(added), "removed", len(removed), "future", len(w.Future))
-	return &strongOutput{Body: strongBody{
-		Workouts: w.Count, Days: len(w.Days),
-		Added: dateStrings(added), Removed: dateStrings(removed), Future: dateStrings(w.Future),
-	}}, nil
 }
 
 func dateStrings(ds []day.Date) []string {

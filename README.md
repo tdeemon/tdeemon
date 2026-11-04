@@ -39,9 +39,9 @@ The screenshots show `tdeemon user demo`, three months of made-up data.
   or asks.
 - **An AI coach over MCP:** the tools, the coaching sessions and the
   methodology, for any MCP client and model.
-- **Devices:** Apple Health through Health Auto Export, workouts from
-  Strong, a morning summary and alarms on Telegram or as push
-  notifications.
+- **Devices:** Apple Health through Health Auto Export, its workouts
+  making the training days, and a morning summary and alarms on
+  Telegram or as push notifications.
 - **For a household:** several users on one instance, a shared kitchen
   of foods and recipes, each person's meals, weight and plan their own.
 - **One container, one SQLite file**, an installable web app (PWA), in

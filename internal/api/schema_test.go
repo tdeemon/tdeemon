@@ -154,19 +154,18 @@ func answerCases() map[string]answerCase {
 		"get-autopilot":    get("/api/v1/autopilot"),
 		"ingest-hae": func(t *testing.T, in *instance, _ *http.Cookie) {
 			t.Helper()
-			in.do(t, http.MethodPost, "/api/v1/ingest/hae", haeBody, nil, ingestToken(t, in, `"ingest"`))
+			tok := ingestToken(t, in, `"ingest"`)
+			in.do(t, http.MethodPost, "/api/v1/ingest/hae", haeBody, nil, tok)
+			// Workouts, with one skipped and one to come.
+			in.do(t, http.MethodPost, "/api/v1/ingest/hae", `{"data": {"workouts": [
+				{"name": "Traditional Strength Training", "start": "2026-10-20 18:00:00 +0200"},
+				{"name": "Walking", "start": "2026-10-20 08:00:00 +0200"},
+				{"name": "Traditional Strength Training", "start": "2026-10-25 18:00:00 +0200"}
+			]}}`, nil, tok)
 		},
 		"ingest-metrics": func(t *testing.T, in *instance, _ *http.Cookie) {
 			t.Helper()
 			in.do(t, http.MethodPost, "/api/v1/ingest/metrics", `{"date":"2026-10-21","metrics":{"weight":77.7,"sleep_h":30,"typo":1}}`, nil, ingestToken(t, in, `"ingest"`))
-		},
-		// The export, then a newer one that takes a day away.
-		"ingest-strong": func(t *testing.T, in *instance, _ *http.Cookie) {
-			t.Helper()
-			tok := ingestToken(t, in, `"ingest"`)
-			in.do(t, http.MethodPost, "/api/v1/ingest/strong", strongExport(t), nil, tok)
-			in.do(t, http.MethodPost, "/api/v1/ingest/strong",
-				"Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Seconds\n2026-10-21 06:55:30,Day B,58m,Deadlift,1,120,3,0\n", nil, tok)
 		},
 		"get-summary": func(t *testing.T, in *instance, session *http.Cookie) {
 			t.Helper()
