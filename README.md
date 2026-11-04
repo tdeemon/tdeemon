@@ -55,11 +55,13 @@ mkdir tdeemon && cd tdeemon
 base=https://raw.githubusercontent.com/zarnautovic/tdeemon/main/deploy/compose
 curl -fsSLO "$base/compose.yaml" -O "$base/compose.caddy.yaml" -O "$base/Caddyfile" -O "$base/.env.example"
 
+# The address it will have, such as https://tdeemon.example.com;
+# http://localhost:8080 to try it on this machine.
+url=http://localhost:8080
 # The settings, readable by you only, with a new secret key. Keep the key.
-(umask 077 && set -C && sed "s|^TDEEMON_SECRET_KEY=\$|TDEEMON_SECRET_KEY=$(openssl rand -base64 32)|" \
-  .env.example > .env)
-# In .env, set TDEEMON_BASE_URL to the address it will have, such as
-# https://tdeemon.example.com, or http://localhost:8080 to try it here.
+# set -C refuses to replace an existing .env, so running this again keeps it.
+(umask 077 && set -C && sed -e "s|^TDEEMON_SECRET_KEY=\$|TDEEMON_SECRET_KEY=$(openssl rand -base64 32)|" \
+  -e "s|^TDEEMON_BASE_URL=.*|TDEEMON_BASE_URL=$url|" .env.example > .env)
 
 docker compose up -d --wait
 docker compose exec tdeemon /tdeemon user create --admin --email you@example.com

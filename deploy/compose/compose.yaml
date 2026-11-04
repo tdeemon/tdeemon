@@ -1,7 +1,7 @@
 # tdeemon with Docker Compose: one service, one volume. The README's
 # quick start and docs/self-hosting.md ("Docker Compose") have the steps:
 #
-#   cp .env.example .env && chmod 600 .env   # then fill it in
+#   .env from .env.example, with a new secret key: the README's recipe
 #   docker compose up -d --wait
 #
 # It serves on http://127.0.0.1:8080 only. In front of it put a reverse
