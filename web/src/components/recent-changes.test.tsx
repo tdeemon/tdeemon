@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 import type { components } from '@/api/schema'
@@ -105,6 +105,27 @@ test('the settings lead to the recent changes, each said with when and by whom',
   // Undo is the next's alone, named by what it takes back.
   expect(sheet.getAllByRole('button', { name: /^Undo/ })).toHaveLength(1)
   expect(sheet.getByRole('button', { name: 'Undo: Deleted: Skyr bowl' })).toBeDefined()
+})
+
+// A page of them left open past midnight gives yesterday's changes their
+// day, once it is shown again.
+test("a list left open past midnight says the day of yesterday's changes", async () => {
+  serve(
+    () => [deletion],
+    () => problem(500),
+  )
+  renderAt('/settings/changes')
+
+  const row = await within(await screen.findByRole('main')).findByRole('listitem')
+  expect(row.textContent).toBe('Deleted: Skyr bowl1:14 PM · youUndo')
+  // One in the morning in Los Angeles, the day after.
+  vi.setSystemTime(new Date('2026-10-24T08:00:00Z'))
+  act(() => {
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await waitFor(() => {
+    expect(row.textContent).toBe('Deleted: Skyr bowlOct 23, 1:14 PM · youUndo')
+  })
 })
 
 test('the next change is taken back from the list, after its toast is gone, and the list follows', async () => {

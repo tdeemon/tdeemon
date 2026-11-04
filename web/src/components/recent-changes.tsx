@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { History, Undo2 } from 'lucide-react'
-import { useState, type RefObject } from 'react'
+import type { RefObject } from 'react'
 
 import { $api } from '@/api/client'
 import type { components } from '@/api/schema'
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import type { Messages } from '@/i18n/en'
 import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
+import { useNow } from '@/lib/now'
 import { useUndoLatest } from '@/lib/undo'
 
 type Change = components['schemas']['ChangeBody']
@@ -112,8 +113,10 @@ export function RecentChangesList() {
   const changes = $api.useQuery('get', '/api/v1/changes', {
     params: { query: { limit: listed } },
   })
-  // When the list opened, which a change of today is told by.
-  const [now] = useState(() => new Date().toISOString())
+  // The time now, which a change of today is told by: asked again each
+  // minute and as the page is shown again, so a list left open past
+  // midnight gives yesterday's changes their day.
+  const now = new Date(useNow()).toISOString()
 
   if (changes.isPending) {
     return <output className="block text-muted-foreground">{t.loading}</output>
