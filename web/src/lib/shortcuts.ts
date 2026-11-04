@@ -70,6 +70,9 @@ export function useShortcuts(actions: Readonly<Record<string, () => void>>) {
         action()
         return
       }
+      // A letter no listener's sequence knows is left to the browser:
+      // preventing it here would hide it from a listener later in turn
+      // whose sequence it ends.
       if (before === undefined && Object.keys(now).some((name) => name.startsWith(`${key} `))) {
         event.preventDefault()
         begun = { key, at: Date.now(), event }
@@ -89,7 +92,6 @@ let begun: { key: string; at: number; event: KeyboardEvent } | undefined
 // sequenceBefore is the first key of the sequence event is the second key
 // of, if one was begun within sequenceMs before it; the sequence ends
 // once every listener has seen it.
-
 function sequenceBefore(event: KeyboardEvent): string | undefined {
   const b = begun
   if (b === undefined || b.event === event) {

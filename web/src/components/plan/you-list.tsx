@@ -107,7 +107,7 @@ export function YouList({ history = false }: { history?: boolean }) {
           title={t.plan.revisions.title}
           to="/plan/history"
           summary={[
-            // The plan holds its latest ten.
+            // The plan holds its latest ten (planRevisions, internal/api/coach.go).
             revisions.length >= 10
               ? t.plan.revisions.all(revisions.length)
               : t.plan.revisions.count(revisions.length),

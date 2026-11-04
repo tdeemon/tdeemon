@@ -242,7 +242,7 @@ export function HistoryCard({ plan }: { plan: Plan }) {
             "relative text-small font-semibold text-primary after:absolute after:-inset-3 after:content-['']",
           )}
         >
-          {/* The plan holds its latest ten. */}
+          {/* The plan holds its latest ten (planRevisions, internal/api/coach.go). */}
           {plan.revisions.length >= 10
             ? r.all(plan.revisions.length)
             : r.count(plan.revisions.length)}
