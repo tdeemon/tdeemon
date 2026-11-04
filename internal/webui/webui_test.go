@@ -144,3 +144,99 @@ func TestNoApp(t *testing.T) {
 		t.Errorf("GET /day/today = %d, want 404", rec.Code)
 	}
 }
+
+// An asset with precompressed copies goes as the one the client accepts,
+// Brotli first, with the original's type; without one it goes as it is.
+// Either way it varies by Accept-Encoding.
+// encodedJS is a script of encodedApp with both copies.
+const encodedJS = "assets/index-B7Vj6WSe.js"
+
+// encodedApp has assets with and without precompressed copies.
+var encodedApp = fstest.MapFS{
+	"index.html":                   {Data: []byte("<!doctype html>")},
+	encodedJS:                      {Data: []byte("console.log(1)")},
+	encodedJS + ".br":              {Data: []byte("brotli bytes")},
+	encodedJS + ".gz":              {Data: []byte("gzip bytes")},
+	"assets/index-CMUHlmXG.css":    {Data: []byte("body{}")},
+	"assets/index-CMUHlmXG.css.gz": {Data: []byte("gzip css")},
+	"assets/plain-D1.svg":          {Data: []byte("<svg/>")},
+	"sw.js":                        {Data: []byte("self.skipWaiting()")},
+	"sw.js.br":                     {Data: []byte("not served")},
+	"assets/app.webmanifest":       {Data: []byte("{}")},
+	"assets/app.webmanifest.gz":    {Data: []byte("gzip manifest")},
+}
+
+func TestEncodedAssets(t *testing.T) {
+	t.Parallel()
+
+	h, err := Handler(encodedApp)
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+	const js = encodedJS
+
+	for _, tc := range []struct {
+		name, path, accept         string
+		wantBody, wantEnc, wantTyp string
+		wantVary                   bool
+	}{
+		{"brotli first", "/" + js, "gzip, deflate, br, zstd", "brotli bytes", "br", "text/javascript; charset=utf-8", true},
+		{"gzip", "/" + js, "gzip", "gzip bytes", "gzip", "text/javascript; charset=utf-8", true},
+		{"brotli refused", "/" + js, "br;q=0, gzip;q=0.5", "gzip bytes", "gzip", "text/javascript; charset=utf-8", true},
+		{"any", "/" + js, "*", "brotli bytes", "br", "text/javascript; charset=utf-8", true},
+		{"any but brotli", "/" + js, "br;q=0, *", "gzip bytes", "gzip", "text/javascript; charset=utf-8", true},
+		{"case and spaces", "/" + js, " GZip ; Q=1 ", "gzip bytes", "gzip", "text/javascript; charset=utf-8", true},
+		{"none accepted", "/" + js, "identity", "console.log(1)", "", "text/javascript; charset=utf-8", true},
+		{"no header", "/" + js, "", "console.log(1)", "", "text/javascript; charset=utf-8", true},
+		{"a bad q", "/" + js, "br;q=x, gzip;q=", "console.log(1)", "", "text/javascript; charset=utf-8", true},
+		{"gzip only on disk", "/assets/index-CMUHlmXG.css", "br, gzip", "gzip css", "gzip", "text/css; charset=utf-8", true},
+		{"a type of our own", "/assets/app.webmanifest", "gzip", "gzip manifest", "gzip", "application/manifest+json", true},
+		{"no copy", "/assets/plain-D1.svg", "br, gzip", "<svg/>", "", "image/svg+xml", false},
+		{"outside assets", "/sw.js", "br", "self.skipWaiting()", "", "text/javascript; charset=utf-8", false},
+	} {
+		rec := get(t, h, http.MethodGet, tc.path, "Accept-Encoding", tc.accept)
+		if rec.Code != http.StatusOK || rec.Body.String() != tc.wantBody {
+			t.Errorf("%s: %d %q, want 200 %q", tc.name, rec.Code, rec.Body.String(), tc.wantBody)
+		}
+		if got := rec.Header().Get("Content-Encoding"); got != tc.wantEnc {
+			t.Errorf("%s: Content-Encoding %q, want %q", tc.name, got, tc.wantEnc)
+		}
+		if got := rec.Header().Get("Content-Type"); got != tc.wantTyp {
+			t.Errorf("%s: Content-Type %q, want %q", tc.name, got, tc.wantTyp)
+		}
+		if got := rec.Header().Get("Vary") == "Accept-Encoding"; got != tc.wantVary {
+			t.Errorf("%s: Vary %q, want Accept-Encoding %v", tc.name, rec.Header().Get("Vary"), tc.wantVary)
+		}
+		if got := rec.Header().Get("Cache-Control"); strings.HasPrefix(tc.path, "/assets/") && got != "public, max-age=31536000, immutable" {
+			t.Errorf("%s: Cache-Control %q, want the immutable cache", tc.name, got)
+		}
+	}
+}
+
+// Repeated fields, HEAD and a range work on a copy as on any file.
+func TestEncodedAssetRequests(t *testing.T) {
+	t.Parallel()
+
+	h, err := Handler(encodedApp)
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+	const js = encodedJS
+
+	// Fields repeated are one list: a refusal in the second holds.
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/"+js, nil)
+	req.Header.Add("Accept-Encoding", "*")
+	req.Header.Add("Accept-Encoding", "br;q=0, gzip")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if got := rec.Header().Get("Content-Encoding"); got != "gzip" {
+		t.Errorf("repeated fields refusing br: Content-Encoding %q, want gzip", got)
+	}
+
+	if rec := get(t, h, http.MethodHead, "/"+js, "Accept-Encoding", "br"); rec.Code != http.StatusOK || rec.Header().Get("Content-Encoding") != "br" || rec.Body.Len() != 0 {
+		t.Errorf("HEAD: %d %q, encoding %q", rec.Code, rec.Body.String(), rec.Header().Get("Content-Encoding"))
+	}
+	if rec := get(t, h, http.MethodGet, "/"+js, "Accept-Encoding", "br", "Range", "bytes=0-5"); rec.Code != http.StatusPartialContent || rec.Body.String() != "brotli" {
+		t.Errorf("range: %d %q, want 206 %q", rec.Code, rec.Body.String(), "brotli")
+	}
+}
