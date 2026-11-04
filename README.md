@@ -9,6 +9,14 @@ real energy expenditure from what you eat and how your weight moves,
 and lets an AI coach adjust your plan (cut, maintenance, bulk or recomp)
 only through proposals you accept, within limits enforced in code.
 
+![The day on a desktop: what is left of the target, the macros, the week,
+an AI coach's proposal and the meals](docs/screenshots/desktop-day.png)
+
+![Progress: the measured TDEE, the verdict on the phase, the TDEE
+against the intake and the weight's trend](docs/screenshots/desktop-progress.png)
+
+The screenshots show `tdeemon user demo`, three months of made-up data.
+
 > **Status: early.** tdeemon runs every day for its author, and this is
 > its first release for other self-hosters. Expect changes between
 > releases, each said in its notes.
