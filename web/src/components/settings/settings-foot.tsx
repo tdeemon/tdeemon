@@ -10,15 +10,16 @@ export function SettingsFoot() {
 
   return (
     <p className="text-center text-caption text-muted-foreground">
-      {info.isPending && t.connecting}
-      {info.isError && t.unreachable}
+      {/* Without the server's word, what is said of it stands alone. */}
+      {info.isPending && <span className="block">{t.connecting}</span>}
+      {info.isError && <span className="block">{t.unreachable}</span>}
       {info.data && (
         <>
           <span data-testid="server-name">{info.data.name}</span>{' '}
           <span data-testid="server-version">{info.data.version}</span>
+          {' · '}
         </>
       )}
-      {' · '}
       {t.settings.yourData}
       {' · '}
       <a

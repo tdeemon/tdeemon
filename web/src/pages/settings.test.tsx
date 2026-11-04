@@ -218,16 +218,20 @@ test('on a desktop the list stays beside the page open of it, the first open at 
   settingsServer()
   const router = renderAt('/settings')
 
-  // The settings' title, the list, and the first's page beside it.
-  expect(await screen.findByRole('heading', { name: 'Settings', level: 1 })).toBeDefined()
-  expect(await screen.findByRole('heading', { name: 'Appearance', level: 2 })).toBeDefined()
+  // The settings' name, the list, and the first's page beside it, whose
+  // title is the page's heading.
+  expect(await screen.findByRole('heading', { name: 'Appearance', level: 1 })).toBeDefined()
+  expect(screen.queryByRole('heading', { name: 'Settings' })).toBeNull()
+  expect(within(screen.getByRole('main')).getByText('Settings')).toBeDefined()
+  // The account's card is a phone's; the list's foot is here too.
+  expect(screen.queryByText('your server')).toBeNull()
   expect(router.state.location.pathname).toBe('/settings/appearance')
   expect(screen.getByRole('link', { name: 'Appearance' }).getAttribute('aria-current')).toBe('page')
   // Another row opens its page there; the list stays, and the page has
   // no way back to it.
   fireEvent.click(screen.getByRole('link', { name: 'Devices and AI coaches' }))
   expect(
-    await screen.findByRole('heading', { name: 'Devices and AI coaches', level: 2 }),
+    await screen.findByRole('heading', { name: 'Devices and AI coaches', level: 1 }),
   ).toBeDefined()
   expect(router.state.location.pathname).toBe('/settings/devices')
   expect(
@@ -237,6 +241,10 @@ test('on a desktop the list stays beside the page open of it, the first open at 
   expect(within(screen.getByRole('main')).queryByRole('link', { name: 'Settings' })).toBeNull()
   expect(screen.getByRole('button', { name: 'Sign out' })).toBeDefined()
   expect((await screen.findByTestId('server-version')).textContent).toBe('v0.9.0')
+  // The recent changes open beside it too.
+  fireEvent.click(screen.getByRole('link', { name: 'Recent changes' }))
+  expect(await screen.findByRole('heading', { name: 'Recent changes', level: 1 })).toBeDefined()
+  expect(router.state.location.pathname).toBe('/settings/changes')
 })
 
 test("the user's name, language, time zone and day's start are changed, and the app follows", async () => {

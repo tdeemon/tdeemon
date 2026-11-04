@@ -27,9 +27,11 @@ export function SettingsPage() {
   }
   return (
     <section aria-labelledby={id} className="space-y-6">
-      <h1 id={id} className="text-title">
+      {/* The page open beside the list has the heading of the first
+          level, so its sections are of the second, as on a phone. */}
+      <p id={id} className="text-title">
         {t.settings.title}
-      </h1>
+      </p>
       <div className="grid grid-cols-[minmax(0,22rem)_minmax(0,1fr)] items-start gap-8">
         {/* The list stays in sight as the page beside it scrolls. */}
         <div className="sticky top-8 space-y-4">

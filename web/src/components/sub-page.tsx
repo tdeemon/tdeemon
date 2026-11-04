@@ -11,8 +11,8 @@ import { useDesktop } from '@/lib/media'
 // SubPage is a page of the plan's list or the settings': the way back to
 // the list, its title (titleId names it, for a form it holds) and what it
 // holds. A desktop's settings have their list beside the page, under
-// their title: the page has no way back, and its title is the second
-// level.
+// their name: the page has no way back, and its title is the page's
+// heading (the first level, over its sections' second).
 export function SubPage({
   title,
   titleId,
@@ -30,7 +30,6 @@ export function SubPage({
   const form = useRouterState({ select: (state) => formPage(state.location) })
   const back = buttonVariants({ variant: 'ghost', className: '-ml-3' })
   const beside = useDesktop() && from === 'settings'
-  const Title = beside ? 'h2' : 'h1'
 
   return (
     <section className="max-w-2xl space-y-4">
@@ -46,9 +45,9 @@ export function SubPage({
         </div>
       )}
       <header className="space-y-1">
-        <Title id={titleId} className="text-title">
+        <h1 id={titleId} className="text-title">
           {title}
-        </Title>
+        </h1>
         {hint !== undefined && <p className="text-small text-muted-foreground">{hint}</p>}
       </header>
       {children}

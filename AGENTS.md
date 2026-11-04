@@ -60,7 +60,7 @@ shortcuts (a skip to the content, G and a letter to a section, ⌘Z or
 Ctrl+Z to undo the latest change), a light and a dark theme,
 each change said in a toast whose Undo takes it back, clear of a
 sheet's buttons, a delete's for 10 s, and after it the recent changes
-in a sheet (from the settings, or the undo's toast), by whom, with
+(a page of the settings, or a sheet from the undo's toast), by whom, with
 Undo on the next, each number of
 calibration's an ⓘ away from what it is, a page that loads a skeleton
 of its shape under its header, one that did not load saying so there
