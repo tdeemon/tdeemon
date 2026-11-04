@@ -79,6 +79,20 @@ function serveDay() {
   })
 }
 
+// On a desktop the way to add a meal is the table's foot, under its
+// total.
+test("a desktop's way to log a meal is the meals' table's foot", async () => {
+  desktop()
+  serveDay()
+  renderAt('/')
+
+  const meals = await screen.findByRole('region', { name: 'Meals' })
+  const meal = await within(meals).findByRole('article', { name: 'Oats with a banana' })
+  const add = within(meals).getByRole('button', { name: /^Add (breakfast|lunch|a snack|dinner)/ })
+  const table = meal.closest('ul')?.parentElement
+  expect(table?.lastElementChild?.contains(add)).toBe(true)
+})
+
 test("a desktop's day: the meals a table with their total, the week, the body and the check-in beside it", async () => {
   desktop()
   serveDay()

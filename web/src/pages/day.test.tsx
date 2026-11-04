@@ -331,6 +331,23 @@ test("today's way to log a meal names the meal of the hour and what is left", as
   ).toBeDefined()
 })
 
+// On a phone the meals are rows of one card, and the way to add one is
+// its last row.
+test("the way to log a meal is the meals' card's last row", async () => {
+  fakeServer({
+    ...signedIn(),
+    'GET /api/v1/days/today': () => Response.json(day({ meals: [breakfast] })),
+  })
+  renderAt('/')
+
+  const meal = await screen.findByRole('article', { name: 'Oats with a banana' })
+  const add = screen.getByRole('button', { name: /^Add (breakfast|lunch|a snack|dinner)/ })
+  // The card of the meals, not the section that has their heading too.
+  const card = meal.closest('ul')?.parentElement
+  expect(card?.contains(screen.getByRole('heading', { name: 'Meals' }))).toBe(false)
+  expect(card?.lastElementChild?.contains(add)).toBe(true)
+})
+
 test('an item of a named serving says it as it was given, with its weight', async () => {
   const [oats] = breakfast.items
   if (!oats) {

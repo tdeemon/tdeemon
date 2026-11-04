@@ -231,10 +231,7 @@ export function MealCard({
   )
 
   return (
-    <article
-      aria-labelledby={`${id}-name`}
-      className={columns ? undefined : 'rounded-lg border bg-card'}
-    >
+    <article aria-labelledby={`${id}-name`}>
       <h3>
         <button
           ref={row}

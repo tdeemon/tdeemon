@@ -119,18 +119,18 @@ function Hero() {
   )
 }
 
-// MealCards are a phone's meals: cards of a row each, the time, the name
+// MealCards are a phone's meals: rows of one card, the time, the name
 // and the kcal, the macros under them.
 function MealCards() {
   const f = useFormat()
 
   return (
-    <div className="space-y-2">
+    <div className="divide-y rounded-lg border bg-card">
       {meals.map((m) => (
         <div
           key={m}
           className={cn(
-            'grid items-center gap-x-2.5 gap-y-1.5 rounded-lg border bg-card px-4 py-3.5',
+            'grid items-center gap-x-2.5 gap-y-1.5 px-4 py-3.5',
             f.hour12
               ? 'grid-cols-[3.75rem_minmax(0,1fr)_auto]'
               : 'grid-cols-[2.5rem_minmax(0,1fr)_auto]',

@@ -93,7 +93,8 @@ width, and their average against the target, whose sheet
 says what the days left can eat; one that did not load keeping its
 header and its week; the morning summary
 in a sheet (its notification's tap, or today's header), the meals as
-rows that open to their items, on a desktop a table with its total
+rows of one card that open to their items, its last row the way to add
+one, on a desktop a table with its total and that way at its foot
 beside the
 week, which the arrows move through, Enter opening a meal's editor, R
 repeating it and Delete deleting it, a meal logged or repeated taking

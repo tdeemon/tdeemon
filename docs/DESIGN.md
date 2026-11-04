@@ -1668,16 +1668,20 @@ the first spec.
     its target, by the plan's targets of the days to come; below the
     plan's kcal floor, the day's target is said instead. A phone has
     the week under the hero, both on its first screen at 390 px, then
-    the meals, the body and the check-in, a row that opens; a tablet
+    the meals (rows of one card, whose last row adds one: "Add a snack ·
+    845 kcal left", the meal of the hour), the body and the check-in, a
+    row that opens; a tablet
     the hero and the week across, the body and the check-in beside the
     meals. A desktop
     has the day in 8 of 12 columns, the macros beside the ring and the
-    meals a table of their kcal and macros with the day's total, and
-    beside it the week, the body and the check-in, open. A check-in's
-    scale is five steps, each a number named with its word, the step
-    chosen said under it in a word. A body's tile without a value is a
+    meals a table of their kcal and macros with the day's total, its foot
+    the way to add a meal and today's chips, and beside it the week, the
+    body and the check-in, open. A check-in's scale is five steps, each
+    a number named with its word, the step chosen said under it in a
+    word. A body's tile without a value is a
     dash, said in words ("none yet today"); the chips that add to today
-    in a tap are under the meals, their row fading at a phone's edge.
+    in a tap are under the meals' card on a phone, their row fading at
+    its edge, and in the table's foot on a desktop.
     A day that does not come keeps its header and its week.
   - A new user's first steps take the place of the day's hero until
     there is a plan, or a proposal of one: a card of four, with how many

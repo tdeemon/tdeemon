@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 
 import type { Day } from '@/api/types'
 import { MealCard, type RowMove } from '@/components/day/meal-card'
@@ -10,9 +10,9 @@ import { cn } from '@/lib/utils'
 const macros = ['protein', 'carbs', 'fat'] as const
 
 // MealList is a day's meals, each a row that opens to its items
-// (MealCard): on a phone, cards one under the other; on a desktop
-// (columns), a table, whose heads name its columns and whose last row is
-// the day's total. Each row says its values to a screen reader with their
+// (MealCard): on a phone, rows of one card; on a desktop (columns), a
+// table, whose heads name its columns and whose last row is the day's
+// total. footer, the way to add a meal, is the card's last row. Each row says its values to a screen reader with their
 // names, so the heads are for the eye. The table is one stop of Tab, the
 // row the keyboard was on last (the first, at first), and the arrows,
 // Home and End move between its rows (a roving tabindex). A meal that
@@ -29,6 +29,7 @@ export function MealList({
   arrived,
   onArrived,
   onRepeated,
+  footer,
 }: {
   day: Day
   // The user's logical today, which a repeat is of.
@@ -40,6 +41,7 @@ export function MealList({
   arrived?: string | undefined
   onArrived?: ((row: HTMLElement) => void) | undefined
   onRepeated?: ((id: string) => void) | undefined
+  footer?: ReactNode
 }) {
   const t = useMessages()
   const f = useFormat()
@@ -101,9 +103,12 @@ export function MealList({
   ))
   if (!columns) {
     return (
-      <ul ref={list} className="space-y-2">
-        {rows}
-      </ul>
+      <div className="rounded-lg border bg-card">
+        <ul ref={list} className="divide-y">
+          {rows}
+        </ul>
+        {footer !== undefined && <div className="border-t">{footer}</div>}
+      </div>
     )
   }
   const grid = cn('grid items-baseline', mealColumns(f.hour12))
@@ -139,6 +144,7 @@ export function MealList({
           </span>
         ))}
       </p>
+      {footer !== undefined && <div className="border-t">{footer}</div>}
     </div>
   )
 }
