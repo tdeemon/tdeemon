@@ -121,3 +121,69 @@ func TestWorkoutDaysRefuses(t *testing.T) {
 }
 
 func second(_, _ []day.Date, err error) error { return err }
+
+var haeActor = event.Actor{Kind: event.Import, Client: "hae"}
+
+// An import of Health Auto Export's adds days and removes none, and
+// leaves Strong's days and another user's; a day of either source is a
+// day of a workout.
+func TestAddWorkoutDays(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	d := day.DateOf(t0)
+	add := func(userID uuid.UUID, ds ...day.Date) []day.Date {
+		t.Helper()
+		added, err := db.AddWorkoutDays(t.Context(), userID, haeActor, store.HAE, ds, t0)
+		if err != nil {
+			t.Fatalf("AddWorkoutDays: %v", err)
+		}
+		return added
+	}
+	setWorkouts(t, db, ana, d.AddDays(-20), d.AddDays(-9))
+	add(ivo, d.AddDays(-3))
+	if added := add(ana, d.AddDays(-12), d.AddDays(-9)); !reflect.DeepEqual(added, []day.Date{d.AddDays(-12), d.AddDays(-9)}) {
+		t.Errorf("the first import added %v", added)
+	}
+	if added := add(ana, d.AddDays(-2)); !reflect.DeepEqual(added, []day.Date{d.AddDays(-2)}) {
+		t.Errorf("the second import added %v", added)
+	}
+	got, err := db.WorkoutDays(t.Context(), ana, d.AddDays(-30), d)
+	want := map[day.Date]bool{d.AddDays(-20): true, d.AddDays(-12): true, d.AddDays(-9): true, d.AddDays(-2): true}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("days = %v, %v; want %v (Strong's and both imports')", got, err, want)
+	}
+	es, err := db.Events(t.Context(), ana, 1)
+	if err != nil || len(es) != 1 || es[0].Action != event.WorkoutsSet || es[0].Entity != "hae" || es[0].Actor != haeActor {
+		t.Errorf("the event = %+v, %v", es, err)
+	}
+	n := countRows(t, db, "events")
+	if added := add(ana, d.AddDays(-2), d.AddDays(-12)); added != nil || countRows(t, db, "events") != n {
+		t.Errorf("the same days again added %v", added)
+	}
+	if got, _ := db.WorkoutDays(t.Context(), ivo, d.AddDays(-30), d); !reflect.DeepEqual(got, map[day.Date]bool{d.AddDays(-3): true}) {
+		t.Errorf("Ivo's days = %v", got)
+	}
+}
+
+func TestAddWorkoutDaysRefuses(t *testing.T) {
+	t.Parallel()
+
+	db, ana, _ := withTwoUsers(t)
+	d := day.DateOf(t0)
+	for name, err := range map[string]error{
+		"no actor":         first(db.AddWorkoutDays(t.Context(), ana, event.Actor{}, store.HAE, []day.Date{d}, t0)),
+		"Strong's source":  first(db.AddWorkoutDays(t.Context(), ana, haeActor, store.Strong, []day.Date{d}, t0)),
+		"a zero day":       first(db.AddWorkoutDays(t.Context(), ana, haeActor, store.HAE, []day.Date{{}}, t0)),
+		"HAE as a history": second(db.SetWorkoutDays(t.Context(), ana, haeActor, store.HAE, nil, t0)),
+	} {
+		if err == nil {
+			t.Errorf("%s: succeeded", name)
+		}
+	}
+	if countRows(t, db, "workout_days") != 0 || countRows(t, db, "events") != 0 {
+		t.Error("a refused import wrote")
+	}
+}
+
+func first(_ []day.Date, err error) error { return err }

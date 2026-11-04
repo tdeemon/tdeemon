@@ -1045,7 +1045,8 @@ The replacement:
   is the plan's, which the coach changes (§8).
 - **The day's type** comes from the plan's training weekdays, so a day's
   target is known in the morning. A workout read from a source
-  (until P3, Strong's export) or the check-in's toggle corrects it
+  (Health Auto Export's workouts, or Strong's export) or the check-in's
+  toggle corrects it
   afterwards, the toggle having the last word, and calibration uses the
   corrected type. The weekly average weighs the day types by the number
   of training weekdays.
@@ -1377,7 +1378,10 @@ the first spec.
     /api/v1/ingest/strong` takes Strong's CSV export, the whole history,
     as the body or a form's part `file`, and keeps its days of workouts
     (`workout_days`), each workout on the logical day it starts in, as a
-    meal (`internal/ingest`).
+    meal (`internal/ingest`). The HAE route takes the automation of
+    Workouts too: its strength workouts are days of workouts of their
+    own source, only ever added, as a payload cannot tell that it holds
+    every workout of a day; the check-in's toggle undoes one.
   - All use a per-user `ingest` token, not a web session. tdeemon keeps
     the values it reads, not the bodies: health data outside the
     database would escape a user's export and deletion.
@@ -1911,9 +1915,9 @@ Done at the cut-over, on 2026-10-29.
 | **P3 — training module** | generic workout data (exercise, sets, reps, weight, RPE, duration, distance) + import adapters (Strong, others); **programs as declarative specs** over a library of progression rules, created by the coach through proposals (§8); the RTS program is the first spec; `training_day` derived from any workout source |
 | **P4** | in-app workout logging (replaces Strong); native app with HealthKit (replaces HAE) |
 
-Until P3, a training day for split targets comes from the plan's
-training weekdays, corrected by a workout in Strong's export or the
-manual toggle (`checkin.training_day`).
+A training day for split targets comes from the plan's training
+weekdays, corrected by a strength workout from Health Auto Export or in
+Strong's export, or by the manual toggle (`checkin.training_day`).
 
 ## 12. Open questions
 

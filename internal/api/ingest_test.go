@@ -258,7 +258,7 @@ func TestIngestRefuses(t *testing.T) {
 		cookies          []*http.Cookie
 		code             int
 	}{
-		{"not HAE's shape", hae, `{"data": {"workouts": []}}`, tok, nil, http.StatusUnprocessableEntity},
+		{"not HAE's shape", hae, `{"data": {"symptoms": []}}`, tok, nil, http.StatusUnprocessableEntity},
 		{"not JSON", hae, `steps=4000`, tok, nil, http.StatusUnprocessableEntity},
 		{"a token without the ingest scope", hae, haeBody, ingestToken(t, in, `"read","tools"`), nil, http.StatusForbidden},
 		{"a web session", hae, haeBody, nil, session, http.StatusForbidden},
@@ -669,5 +669,135 @@ func TestIngestStrongForm(t *testing.T) {
 		if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), c.want) {
 			t.Errorf("%s: %d %s", name, rec.Code, rec.Body.String())
 		}
+	}
+}
+
+type haeWorkoutsResponse struct {
+	ingestResponse
+	Workouts *struct {
+		Strength int      `json:"strength"`
+		Added    []string `json:"added"`
+		Future   []string `json:"future"`
+		Skipped  []string `json:"skipped"`
+	} `json:"workouts"`
+}
+
+// postHAE sends body to the HAE ingest and returns the answer, checked
+// against the document.
+func postHAE(t *testing.T, in *instance, tok map[string]string, body string) haeWorkoutsResponse {
+	t.Helper()
+	rec := in.do(t, http.MethodPost, "/api/v1/ingest/hae", body, nil, tok)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST = %d %s", rec.Code, rec.Body.String())
+	}
+	return decodeJSON[haeWorkoutsResponse](t, rec.Body.Bytes())
+}
+
+// workoutDaysOf returns the user's days of workouts in October 2026, in
+// order.
+func workoutDaysOf(t *testing.T, in *instance) []string {
+	t.Helper()
+	days, err := in.db.WorkoutDays(t.Context(), in.user.ID, day.Date{Year: 2026, Month: 10, Day: 1}, day.Date{Year: 2026, Month: 10, Day: 31})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := []string{}
+	for d := range days {
+		out = append(out, d.String())
+	}
+	slices.Sort(out)
+	return out
+}
+
+// haeWorkoutsBody is a payload of HAE's automation of Workouts.
+func haeWorkoutsBody(workouts ...string) string {
+	return `{"data": {"workouts": [` + strings.Join(workouts, ",") + `]}}`
+}
+
+func haeWorkout(name, start string) string {
+	return `{"id": "x", "name": "` + name + `", "start": "` + start + `", "end": "` + start + `", "duration": 3600}`
+}
+
+// HAE's automation of Workouts sends workouts alone: the strength ones
+// make their days training days, by the user's clock and day start hour,
+// the others are skipped, and a workout after today is left out. The
+// user's clock: 10:00 on 21 October in Zagreb, whose day starts at 04:00.
+func TestIngestHAEWorkouts(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	tok := ingestToken(t, in, `"ingest"`)
+	got := postHAE(t, in, tok, haeWorkoutsBody(
+		haeWorkout("Traditional Strength Training", "2026-10-17 18:00:00 +0200"),
+		haeWorkout("Walking", "2026-10-18 08:00:00 +0200"),
+		haeWorkout("Functional Strength Training", "2026-10-21 03:00:00 +0200"),
+		haeWorkout("Traditional Strength Training", "2026-10-23 18:00:00 +0200"),
+	))
+	w := got.Workouts
+	if w == nil {
+		t.Fatalf("no workouts in the answer: %+v", got)
+	}
+	if w.Strength != 2 || !slices.Equal(w.Added, []string{"2026-10-17", "2026-10-20"}) ||
+		!slices.Equal(w.Future, []string{"2026-10-23"}) || !slices.Equal(w.Skipped, []string{"Walking"}) || len(got.Days) != 0 {
+		t.Errorf("answer = %+v, workouts %+v", got, w)
+	}
+	if days := workoutDaysOf(t, in); !slices.Equal(days, []string{"2026-10-17", "2026-10-20"}) {
+		t.Errorf("the workout days = %v", days)
+	}
+	es, err := in.db.Events(t.Context(), in.user.ID, 1)
+	if err != nil || len(es) != 1 || es[0].Entity != "hae" || es[0].Actor != (event.Actor{Kind: event.Import, Client: "hae"}) {
+		t.Errorf("events = %+v, %v; want the import's", es, err)
+	}
+}
+
+// A later sync adds its days and removes none, whatever it lacks: an
+// automation may send part of a day, or some kinds of workouts, so a day
+// it lacks may still have one in Apple Health. Here: one of the 21st's
+// calendar day, whose walk at 01:00 falls on the 20th by the user's day
+// start hour, and which does not hold the 20th's strength workout.
+func TestIngestHAEWorkoutsAddsOnly(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	tok := ingestToken(t, in, `"ingest"`)
+	postHAE(t, in, tok, haeWorkoutsBody(
+		haeWorkout("Traditional Strength Training", "2026-10-17 18:00:00 +0200"),
+		haeWorkout("Traditional Strength Training", "2026-10-20 18:00:00 +0200"),
+	))
+	again := postHAE(t, in, tok, `{"data": {"metrics": [], "workouts": [`+
+		haeWorkout("Functional Strength Training", "2026-10-19 18:00:00 +0200")+","+
+		haeWorkout("Walking", "2026-10-21 01:00:00 +0200")+`]}}`)
+	if a := again.Workouts; a == nil || !slices.Equal(a.Added, []string{"2026-10-19"}) {
+		t.Errorf("the later sync = %+v", again.Workouts)
+	}
+	if days := workoutDaysOf(t, in); !slices.Equal(days, []string{"2026-10-17", "2026-10-19", "2026-10-20"}) {
+		t.Errorf("the workout days after the later sync = %v, want all three", days)
+	}
+}
+
+// A payload of metrics alone says nothing of workouts; one of neither is
+// refused, and so is one with a workout whose start does not read.
+func TestIngestHAEWorkoutsEdges(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	tok := ingestToken(t, in, `"ingest"`)
+	if got := postHAE(t, in, tok, haeBody); got.Workouts != nil {
+		t.Errorf("a payload of metrics answered workouts %+v", got.Workouts)
+	}
+	if got := postHAE(t, in, tok, `{"data": {"workouts": []}}`); got.Workouts == nil || got.Workouts.Strength != 0 || len(got.Workouts.Added) != 0 {
+		t.Errorf("an empty list of workouts = %+v", got.Workouts)
+	}
+	for name, body := range map[string]string{
+		"neither":         `{"data": {}}`,
+		"a start unread":  `{"data": {"workouts": [{"name": "Traditional Strength Training", "start": "soon"}]}}`,
+		"workouts as one": `{"data": {"workouts": {"name": "Walking"}}}`,
+	} {
+		if rec := in.do(t, http.MethodPost, "/api/v1/ingest/hae", body, nil, tok); rec.Code != http.StatusUnprocessableEntity {
+			t.Errorf("%s: %d %s, want 422", name, rec.Code, rec.Body.String())
+		}
+	}
+	if days := workoutDaysOf(t, in); len(days) != 0 {
+		t.Errorf("workout days = %v; want none", days)
 	}
 }

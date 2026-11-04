@@ -588,7 +588,7 @@ metrics to tdeemon:
 - **metrics:** step count, active energy, basal energy burned, Apple
   exercise time, sleep analysis, weight, body fat percentage, lean body
   mass, resting heart rate, heart rate variability and VO2 max. Others
-  are skipped, and the answer names them; workouts are not imported;
+  are skipped, and the answer names them;
 - **Summarize Data:** on, with the time grouping by day, and a date
   range that starts at midnight (such as today, or since the last sync
   from a whole day): a day's total is then whole, and only grows from
@@ -597,6 +597,24 @@ metrics to tdeemon:
 
 The app's Connect, for an iPhone, makes the token and gives this as a
 checklist, with the URL and the header's value to copy.
+
+**Workouts**, for the training days: an automation sends one data type,
+so a second REST API automation with **Data Type: Workouts** goes to
+the same URL with the same header. Its version 2 will do; tdeemon reads
+each workout's kind and start alone, so Include Workout Metrics and
+Include Route Data can stay off, which keeps the body small. A strength
+workout (Traditional or Functional Strength Training, which Strong
+writes to Apple Health with its Apple Health integration on, as a watch
+does) makes the day it starts in, by your day start hour, a training
+day, for the targets that differ by the type of day, unless you set the
+day's type in the check-in yourself. Other kinds (a walk, a run) make
+none, and the answer names them under `skipped`. A sync only adds days,
+never removes them: it cannot tell that it holds every workout of a day
+(an automation may send part of a day, or some kinds of workouts), so a
+workout deleted in Apple Health keeps its day as a training day until
+you set the day's type in the check-in. A workout after today is left
+out, and named under `future`. With this, the Strong
+export below is not needed; the days of either count.
 
 A value belongs to the calendar date of its point, the parts of a day's
 total add up, the longest sleep is the night, and the day keeps its
@@ -627,12 +645,13 @@ bodies.
 ### Import from Strong
 
 The Strong app's CSV export (Settings, Export Strong Data) holds the
-whole history of workouts. tdeemon keeps the days they were on, each
-workout on the day it starts in, by your day start hour, as a meal is:
-a day with a workout counts as a training day, for the targets that
-differ by the type of day, unless you set the day's type in the
-check-in yourself. The sets themselves wait for the training module,
-which reads them from the latest export tdeemon keeps.
+whole history of workouts, for someone who does not send Apple Health's
+workouts through Health Auto Export (above). tdeemon keeps the days
+they were on, each workout on the day it starts in, by your day start
+hour, as a meal is: a day with a workout counts as a training day, for
+the targets that differ by the type of day, unless you set the day's
+type in the check-in yourself. It reads the days alone, not the sets,
+and keeps none of the export.
 
 Send the export as it comes, with a token with the `ingest` scope, from
 an iOS Shortcut for instance (Get Contents of URL, method POST, request

@@ -1,0 +1,58 @@
+{
+  "data": {
+    "metrics": [],
+    "workouts": [
+      {
+        "id": "8C2F1B7E-0000-4000-8000-000000000001",
+        "name": "Traditional Strength Training",
+        "start": "2026-10-12 17:05:10 +0200",
+        "end": "2026-10-12 18:20:41 +0200",
+        "duration": 4531.2,
+        "location": "Indoor",
+        "isIndoor": true,
+        "source": {"name": "Strong", "identifier": "io.strongapp.strong"},
+        "activeEnergyBurned": {"qty": 1350.5, "units": "kJ"},
+        "heartRateData": [
+          {"date": "2026-10-12 17:06:00 +0200", "Min": 92, "Avg": 104, "Max": 118, "units": "count/min", "source": "Watch"}
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "8C2F1B7E-0000-4000-8000-000000000002",
+        "name": "Walking",
+        "start": "2026-10-13 07:40:00 +0200",
+        "end": "2026-10-13 08:10:00 +0200",
+        "duration": 1800,
+        "location": "Outdoor"
+      },
+      {
+        "id": "8C2F1B7E-0000-4000-8000-000000000003",
+        "name": "Functional Strength Training",
+        "start": "2026-10-15 01:30:00 +0200",
+        "end": "2026-10-15 02:20:00 +0200",
+        "duration": 3000
+      },
+      {
+        "id": "8C2F1B7E-0000-4000-8000-000000000004",
+        "name": "Traditional Strength Training",
+        "start": "2026-10-16 18:00:00 +0200",
+        "end": "2026-10-16 19:10:00 +0200",
+        "duration": 4200
+      },
+      {
+        "id": "8C2F1B7E-0000-4000-8000-000000000005",
+        "name": "Traditional Strength Training",
+        "start": "2026-10-16 20:00:00 +0200",
+        "end": "2026-10-16 20:30:00 +0200",
+        "duration": 1800
+      },
+      {
+        "id": "8C2F1B7E-0000-4000-8000-000000000006",
+        "name": "Running",
+        "start": "2026-10-18 09:00:00 +0200",
+        "end": "2026-10-18 09:40:00 +0200",
+        "duration": 2400
+      }
+    ]
+  }
+}

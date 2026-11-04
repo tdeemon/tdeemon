@@ -1540,6 +1540,44 @@
         ],
         "type": "object"
       },
+      "HaeWorkoutsBody": {
+        "additionalProperties": false,
+        "properties": {
+          "added": {
+            "description": "The days that became days with a workout. A day keeps its workout once added: a workout deleted in Apple Health is the check-in's toggle to undo.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "future": {
+            "description": "The days after the user's today with a strength workout, left out: a clock set wrong, or a time zone.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "skipped": {
+            "description": "The names of the other kinds of workouts in the payload, which make no training day.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "strength": {
+            "description": "The strength workouts in the payload up to today, which make their days training days.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "strength",
+          "added",
+          "future",
+          "skipped"
+        ],
+        "type": "object"
+      },
       "HistoryBody": {
         "additionalProperties": false,
         "properties": {
@@ -1835,6 +1873,10 @@
               "$ref": "#/components/schemas/IngestRejected"
             },
             "type": "array"
+          },
+          "workouts": {
+            "$ref": "#/components/schemas/HaeWorkoutsBody",
+            "description": "What a Health Auto Export payload's workouts did; absent when it had no list of them."
           }
         },
         "required": [
@@ -9067,7 +9109,7 @@
     },
     "/api/v1/ingest/hae": {
       "post": {
-        "description": "For the REST API automation of Health Auto Export: an API token with the ingest scope, not a web session. Each value belongs to the calendar date of its point; the merge keeps a manual value, the day's first weighing and the larger of a running total (DESIGN.md §4). The body is archived as it came; a user's days older than 30 go with their next body.",
+        "description": "For the REST API automations of Health Auto Export, of Health Metrics and of Workouts: an API token with the ingest scope, not a web session. Each value belongs to the calendar date of its point; the merge keeps a manual value, the day's first weighing and the larger of a running total (DESIGN.md §4). A strength workout (Functional Strength Training, Traditional Strength Training) makes the day it starts in, by the user's day start hour, a training day unless the check-in's toggle says otherwise; days of workouts from Health Auto Export are only added, never removed, as a payload cannot tell that it holds every workout of a day. tdeemon keeps the values it reads, not the body.",
         "operationId": "ingest-hae",
         "requestBody": {
           "content": {
@@ -9076,6 +9118,7 @@
                 "description": "Health Auto Export's REST API payload, as the app sends it.",
                 "properties": {
                   "data": {
+                    "description": "The metrics, the workouts, or both: an automation of Health Auto Export sends one data type.",
                     "properties": {
                       "metrics": {
                         "items": {
@@ -9104,11 +9147,25 @@
                           "type": "object"
                         },
                         "type": "array"
+                      },
+                      "workouts": {
+                        "description": "Workouts (v2): the strength ones make their days training days.",
+                        "items": {
+                          "properties": {
+                            "name": {
+                              "description": "The kind of workout, such as Traditional Strength Training.",
+                              "type": "string"
+                            },
+                            "start": {
+                              "description": "When it started, as 2006-01-02 15:04:05 -0700.",
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "type": "array"
                       }
                     },
-                    "required": [
-                      "metrics"
-                    ],
                     "type": "object"
                   }
                 },
@@ -9343,7 +9400,7 @@
     },
     "/api/v1/ingest/strong": {
       "post": {
-        "description": "Strong's CSV export, the whole history, as the body or as the part file of a form: an API token with the ingest scope, not a web session. The day each workout starts in, by the user's day start hour, becomes a day with a workout, which makes it a training day unless the check-in's toggle says otherwise; the days of an earlier export that this one lacks are no longer. A workout on a day after the user's today is left out, its day in the answer's future. An export without a workout up to today is refused. The body is archived as it came, and the latest export that read is kept for the training module.",
+        "description": "Strong's CSV export, the whole history, as the body or as the part file of a form: an API token with the ingest scope, not a web session. The day each workout starts in, by the user's day start hour, becomes a day with a workout, which makes it a training day unless the check-in's toggle says otherwise; the days of an earlier export that this one lacks are no longer. A workout on a day after the user's today is left out, its day in the answer's future. An export without a workout up to today is refused. tdeemon keeps the days it reads, not the export.",
         "operationId": "ingest-strong",
         "requestBody": {
           "content": {

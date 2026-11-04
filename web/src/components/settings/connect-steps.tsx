@@ -116,6 +116,7 @@ function Steps({ kind, made, base }: { kind: ConnectKind; made: CreatedKey; base
           <Check>{c.hae.metrics}</Check>
           <Check>{c.hae.summarize}</Check>
         </ul>
+        <p className="text-small text-muted-foreground">{c.hae.workouts}</p>
       </div>
     )
   }
