@@ -9,13 +9,16 @@
 package webui
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/fs"
+	"mime"
 	"net/http"
 	"path"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // assetsDir holds Vite's output files, whose names carry a content hash
@@ -26,6 +29,10 @@ const assetsDir = "assets/"
 // standard library does not know and a minimal image has no mime.types
 // for: the installed app's manifest.
 var contentTypes = map[string]string{".webmanifest": "application/manifest+json"}
+
+// encodings are the precompressed copies of an asset the build writes next
+// to it (web/build/precompress.ts), the smallest first.
+var encodings = []struct{ coding, ext string }{{"br", ".br"}, {"gzip", ".gz"}}
 
 // New returns the handler for the paths the API does not own, and whether
 // the web app is compiled in.
@@ -46,7 +53,9 @@ func New() (http.Handler, bool, error) {
 
 // Handler serves the built web app in fsys:
 //   - files under assets/ with a year-long immutable cache, because a new
-//     build gives every changed file a new name;
+//     build gives every changed file a new name, and of those with a
+//     precompressed copy, the one the client accepts (Brotli, else gzip),
+//     with its Content-Encoding and the original's Content-Type;
 //   - other files (the icons, the manifest and the service worker of the
 //     installed app) with revalidation on every use, so a new service
 //     worker is found at once;
@@ -71,6 +80,9 @@ func Handler(fsys fs.FS) (http.Handler, error) {
 		if name != "" && name != "index.html" {
 			if info, err := fs.Stat(fsys, name); err == nil && !info.IsDir() {
 				w.Header().Set("Cache-Control", cacheControl(name))
+				if strings.HasPrefix(name, assetsDir) && serveEncoded(w, r, fsys, name) {
+					return
+				}
 				if ct, ok := contentTypes[path.Ext(name)]; ok {
 					w.Header().Set("Content-Type", ct)
 				}
@@ -93,6 +105,75 @@ func Handler(fsys fs.FS) (http.Handler, error) {
 		w.Header().Set("Content-Length", strconv.Itoa(len(index)))
 		_, _ = w.Write(index)
 	}), nil
+}
+
+// serveEncoded answers with the precompressed copy of name that r accepts,
+// if there is one, and reports whether it did. An asset with a copy varies
+// by Accept-Encoding, whichever answer it gets.
+func serveEncoded(w http.ResponseWriter, r *http.Request, fsys fs.FS, name string) bool {
+	// One list, however many fields it came in (RFC 9110, 5.3).
+	accept := strings.Join(r.Header.Values("Accept-Encoding"), ",")
+	varies := false
+	for _, enc := range encodings {
+		if _, err := fs.Stat(fsys, name+enc.ext); err != nil {
+			continue
+		}
+		if !varies {
+			w.Header().Add("Vary", "Accept-Encoding")
+			varies = true
+		}
+		if !accepts(accept, enc.coding) {
+			continue
+		}
+		data, err := fs.ReadFile(fsys, name+enc.ext)
+		if err != nil {
+			continue
+		}
+		ctype, ok := contentTypes[path.Ext(name)]
+		if !ok {
+			ctype = mime.TypeByExtension(path.Ext(name))
+		}
+		if ctype == "" {
+			ctype = "application/octet-stream"
+		}
+		w.Header().Set("Content-Type", ctype)
+		w.Header().Set("Content-Encoding", enc.coding)
+		http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(data))
+		return true
+	}
+	return false
+}
+
+// accepts reports whether an Accept-Encoding header takes coding: named
+// with a q above 0, or not named and * is (RFC 9110, 12.5.3).
+func accepts(header, coding string) bool {
+	star := false
+	for part := range strings.SplitSeq(header, ",") {
+		token, params, _ := strings.Cut(part, ";")
+		token = strings.TrimSpace(token)
+		ok := qualityAboveZero(params)
+		switch {
+		case strings.EqualFold(token, coding):
+			return ok
+		case token == "*":
+			star = ok
+		}
+	}
+	return star
+}
+
+// qualityAboveZero reads the q of an Accept-Encoding entry's parameters:
+// 1 when there is none, and 0 for one that does not parse.
+func qualityAboveZero(params string) bool {
+	for param := range strings.SplitSeq(params, ";") {
+		key, value, _ := strings.Cut(strings.TrimSpace(param), "=")
+		if !strings.EqualFold(strings.TrimSpace(key), "q") {
+			continue
+		}
+		q, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		return err == nil && q > 0
+	}
+	return true
 }
 
 // isNavigation reports whether r loads a page, as opposed to a script,

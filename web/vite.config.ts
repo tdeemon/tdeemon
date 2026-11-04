@@ -5,6 +5,8 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vitest/config'
 
+import { precompress } from './build/precompress.ts'
+
 // The Go server in development (go run ./cmd/tdeemon); the dev server
 // forwards API calls to it, so the app always talks to its own origin.
 const server = process.env.TDEEMON_DEV_SERVER ?? 'http://localhost:8080'
@@ -57,6 +59,9 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
       },
     }),
+    // name.br and name.gz next to each asset, for internal/webui to send a
+    // browser that takes them (build/precompress.ts).
+    precompress(),
   ],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
@@ -75,7 +80,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     // The end-to-end tests in e2e/ are Playwright's (npm run e2e).
-    include: ['src/**/*.test.{ts,tsx}'],
+    include: ['src/**/*.test.{ts,tsx}', 'build/**/*.test.ts'],
     setupFiles: ['src/test/setup.ts'],
     coverage: {
       provider: 'v8',
