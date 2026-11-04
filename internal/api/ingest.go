@@ -9,6 +9,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -63,6 +64,17 @@ type ingestBody struct {
 	Days     []ingestDay      `json:"days" nullable:"false"`
 	Rejected []ingestRejected `json:"rejected" nullable:"false" doc:"Values out of their bounds, or of a date after today in your time zone, left out; the others are stored."`
 	Ignored  []string         `json:"ignored" nullable:"false" doc:"Metric names tdeemon does not read."`
+	Workouts *haeWorkoutsBody `json:"workouts,omitempty" doc:"What a Health Auto Export payload's workouts did; absent when it had no list of them."`
+}
+
+type haeWorkoutsBody struct {
+	Strength int      `json:"strength" doc:"The strength workouts in the payload up to today, which make their days training days."`
+	From     string   `json:"from,omitempty" doc:"The first day the payload's workouts cover; with to, the span whose days of workouts it replaced."`
+	To       string   `json:"to,omitempty" doc:"The last day the payload's workouts cover, today at the latest."`
+	Added    []string `json:"added" nullable:"false" doc:"The days that became days with a workout."`
+	Removed  []string `json:"removed" nullable:"false" doc:"The days within the span that no longer are: their workouts are gone from Apple Health."`
+	Future   []string `json:"future" nullable:"false" doc:"The days after the user's today with a strength workout, left out: a clock set wrong, or a time zone."`
+	Skipped  []string `json:"skipped" nullable:"false" doc:"The names of the other kinds of workouts in the payload, which make no training day."`
 }
 
 type ingestOutput struct {
@@ -136,9 +148,16 @@ var haePayloadSchema = &huma.Schema{
 	Required:    []string{"data"},
 	Properties: map[string]*huma.Schema{
 		"data": {
-			Type:     "object",
-			Required: []string{"metrics"},
+			Type:        "object",
+			Description: "The metrics, the workouts, or both: an automation of Health Auto Export sends one data type.",
 			Properties: map[string]*huma.Schema{
+				"workouts": {Type: "array", Description: "Workouts (v2): the strength ones make their days training days.", Items: &huma.Schema{
+					Type: "object",
+					Properties: map[string]*huma.Schema{
+						"name":  {Type: "string", Description: "The kind of workout, such as Traditional Strength Training."},
+						"start": {Type: "string", Description: "When it started, as 2006-01-02 15:04:05 -0700."},
+					},
+				}},
 				"metrics": {Type: "array", Items: &huma.Schema{
 					Type: "object",
 					Properties: map[string]*huma.Schema{
@@ -160,8 +179,10 @@ func (s *sessions) registerIngest(a huma.API) {
 		Method:      http.MethodPost,
 		Path:        Prefix + "/ingest/hae",
 		Summary:     "Import a Health Auto Export payload",
-		Description: "For the REST API automation of Health Auto Export: an API token with the ingest scope, not a web session. Each value belongs to the calendar date of its point; " +
-			"the merge keeps a manual value, the day's first weighing and the larger of a running total (DESIGN.md §4). The body is archived as it came; a user's days older than 30 go with their next body.",
+		Description: "For the REST API automations of Health Auto Export, of Health Metrics and of Workouts: an API token with the ingest scope, not a web session. Each value belongs to the calendar date of its point; " +
+			"the merge keeps a manual value, the day's first weighing and the larger of a running total (DESIGN.md §4). " +
+			"A strength workout (" + strings.Join(ingest.HAEStrength(), ", ") + ") makes the day it starts in, by the user's day start hour, a training day unless the check-in's toggle says otherwise; " +
+			"the payload replaces the days of workouts from Health Auto Export within the span of days its workouts cover, up to today. tdeemon keeps the values it reads, not the body.",
 		Tags:            []string{"ingest"},
 		MaxBodyBytes:    maxIngestBytes,
 		BodyReadTimeout: ingestReadTimeout,
@@ -191,8 +212,7 @@ func (s *sessions) registerIngest(a huma.API) {
 		Description: "Strong's CSV export, the whole history, as the body or as the part file of a form: an API token with the ingest scope, not a web session. " +
 			"The day each workout starts in, by the user's day start hour, becomes a day with a workout, which makes it a training day unless the check-in's toggle says otherwise; " +
 			"the days of an earlier export that this one lacks are no longer. A workout on a day after the user's today is left out, its day in the answer's future. " +
-			"An export without a workout up to today is refused. " +
-			"The body is archived as it came, and the latest export that read is kept for the training module.",
+			"An export without a workout up to today is refused. tdeemon keeps the days it reads, not the export.",
 		Tags:            []string{"ingest"},
 		MaxBodyBytes:    maxIngestBytes,
 		BodyReadTimeout: ingestReadTimeout,
@@ -254,13 +274,57 @@ func (s *sessions) ingestHAE(ctx context.Context, in *ingestHAEInput) (*ingestOu
 	if err != nil {
 		return nil, err
 	}
-	r, err := ingest.ParseHAE(in.RawBody)
-	if errors.Is(err, ingest.ErrNotHAE) {
+	cal, err := day.NewCalendar(p.User.TimeZone, p.User.DayStartHour)
+	if err != nil {
+		return nil, internalError("importing the payload failed", fmt.Errorf("the user's calendar: %w", err))
+	}
+	w, err := ingest.ParseHAEWorkouts(in.RawBody, cal)
+	if err != nil {
 		return nil, huma.Error422UnprocessableEntity(err.Error())
-	} else if err != nil {
+	}
+	r, err := ingest.ParseHAE(in.RawBody)
+	switch {
+	case errors.Is(err, ingest.ErrNotHAE) && w.Sent:
+		// Workouts alone: the automation of Workouts.
+		r = ingest.Result{}
+	case errors.Is(err, ingest.ErrNotHAE):
+		return nil, huma.Error422UnprocessableEntity(err.Error())
+	case err != nil:
 		return nil, huma.Error422UnprocessableEntity("the body does not read as a Health Auto Export payload")
 	}
-	return s.store(ctx, p, "hae", r)
+	out, err := s.store(ctx, p, "hae", r)
+	if err != nil || !w.Sent {
+		return out, err
+	}
+	if out.Body.Workouts, err = s.storeHAEWorkouts(ctx, p, w, cal.DayOf(s.now())); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// storeHAEWorkouts makes the days of w's strength workouts up to today the
+// user's days of workouts from Health Auto Export, within the span its
+// workouts cover, and says what changed.
+func (s *sessions) storeHAEWorkouts(ctx context.Context, p auth.Principal, w ingest.HAEWorkouts, today day.Date) (*haeWorkoutsBody, error) {
+	strength := w.Strength.UpTo(today)
+	out := &haeWorkoutsBody{Strength: strength.Count, Added: []string{}, Removed: []string{}, Future: dateStrings(strength.Future), Skipped: w.Skipped}
+	from, to := w.From, w.To
+	if today.Before(to) {
+		to = today
+	}
+	if from.IsZero() || to.Before(from) {
+		// No workout, or none up to today: a span of no days.
+		return out, nil
+	}
+	out.From, out.To = from.String(), to.String()
+	added, removed, err := s.db.SetWorkoutDaysBetween(ctx, p.User.ID, event.Actor{Kind: event.Import, Client: "hae"}, store.HAE, from, to, strength.Days, s.now())
+	if err != nil {
+		return nil, internalError("importing the workouts failed", err)
+	}
+	out.Added, out.Removed = dateStrings(added), dateStrings(removed)
+	s.logger.InfoContext(ctx, "imported workouts from health auto export", "user_id", p.User.ID.String(), "strength", strength.Count,
+		"from", out.From, "to", out.To, "added", len(added), "removed", len(removed), "skipped", len(w.Skipped))
+	return out, nil
 }
 
 func (s *sessions) ingestMetrics(ctx context.Context, in *ingestMetricsInput) (*ingestOutput, error) {

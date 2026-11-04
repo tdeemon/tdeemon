@@ -1586,6 +1586,8 @@ export const en = {
       metrics:
         'Metrics: step count, active energy, basal energy burned, Apple exercise time, sleep analysis, weight, body fat percentage, lean body mass, resting heart rate, heart rate variability and VO2 max',
       summarize: 'Summarize Data: on, with the time grouping by day',
+      workouts:
+        'For the training days, a second automation with Data Type Workouts, to the same URL with the same header.',
     },
     // An access key of the user's own scopes: how it is sent.
     header: 'It goes in each request, in the header Authorization: Bearer and the key.',

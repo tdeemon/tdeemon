@@ -14,13 +14,14 @@ import (
 	"github.com/tdeemon/tdeemon/internal/domain/metric"
 )
 
-// ErrNotHAE reports a body that is no Health Auto Export payload: no
-// "data" object with a "metrics" list.
-var ErrNotHAE = errors.New("not a Health Auto Export payload: want {\"data\": {\"metrics\": [...]}}")
+// ErrNotHAE reports a body that is no Health Auto Export payload of
+// metrics: no "data" object with a "metrics" list. A payload of workouts
+// alone is one too (ParseHAEWorkouts).
+var ErrNotHAE = errors.New("not a Health Auto Export payload: want {\"data\": {\"metrics\": [...]}} or {\"data\": {\"workouts\": [...]}}")
 
 // haeKinds maps Health Auto Export's metric names to kinds. HAE's
-// workouts are not imported: training days come from elsewhere (DESIGN.md
-// §7), and the exercise minutes are a metric of their own.
+// workouts are read apart (ParseHAEWorkouts), for the training days; the
+// exercise minutes are a metric of their own.
 var haeKinds = map[string]metric.Kind{
 	"step_count":             metric.Steps,
 	"active_energy":          metric.ActiveKcal,

@@ -699,9 +699,9 @@ CHECK (birth_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'), height_cm 
 
 CREATE UNIQUE INDEX users_email ON users (email);
 
-CREATE TABLE workout_days (
+CREATE TABLE "workout_days" (
     user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    source TEXT NOT NULL CHECK (source IN ('strong')),
+    source TEXT NOT NULL CHECK (source IN ('strong', 'hae')),
     day TEXT NOT NULL CHECK (day GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'),
     PRIMARY KEY (user_id, source, day)
 ) STRICT;

@@ -131,6 +131,11 @@ test("a phone's steps are Health Auto Export's checklist, with its address and h
   expect(valueOf('Header Authorization, with this value')).toBe('Bearer tdm_made_up')
   expect(sheet.getByText(/^Metrics: step count, active energy/)).toBeDefined()
   expect(sheet.getByText('Summarize Data: on, with the time grouping by day')).toBeDefined()
+  expect(
+    sheet.getByText(
+      'For the training days, a second automation with Data Type Workouts, to the same URL with the same header.',
+    ),
+  ).toBeDefined()
   expect(sheet.getByText('Waiting for the first call…')).toBeDefined()
   expect(server.sent).toEqual([{ name: 'iPhone', scopes: ['ingest'] }])
 })

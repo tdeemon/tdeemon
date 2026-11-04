@@ -18,8 +18,11 @@ type WorkoutSource string
 
 // Workout sources.
 const (
-	// Strong is the Strong app's export, until the training module (P3).
+	// Strong is the Strong app's export, its whole history each time.
 	Strong WorkoutSource = "strong"
+	// HAE is Health Auto Export's workouts, Apple Health's: a span of
+	// days each time.
+	HAE WorkoutSource = "hae"
 )
 
 // workoutDaysState is the state of a source's days of workouts.
@@ -36,11 +39,42 @@ type workoutDaysState struct {
 func (db *DB) SetWorkoutDays(ctx context.Context, userID uuid.UUID, a event.Actor, source WorkoutSource, ds []day.Date,
 	now time.Time,
 ) (added, removed []day.Date, err error) {
-	if err := a.Validate(); err != nil {
-		return nil, nil, fmt.Errorf("invalid actor: %w", err)
-	}
 	if source != Strong {
 		return nil, nil, fmt.Errorf("invalid workout source %q: want %q", source, Strong)
+	}
+	return db.setWorkoutDays(ctx, userID, a, source, ds, func(day.Date) bool { return true }, now)
+}
+
+// SetWorkoutDaysBetween replaces the days source recorded a workout on
+// from from to to, both included, with ds, as an import of that span:
+// source's days outside it stay. It returns the days it added and
+// removed, in order, as SetWorkoutDays does; a day of ds outside the span
+// fails it.
+func (db *DB) SetWorkoutDaysBetween(ctx context.Context, userID uuid.UUID, a event.Actor, source WorkoutSource,
+	from, to day.Date, ds []day.Date, now time.Time,
+) (added, removed []day.Date, err error) {
+	if source != HAE {
+		return nil, nil, fmt.Errorf("invalid workout source %q: want %q", source, HAE)
+	}
+	if to.Before(from) {
+		return nil, nil, fmt.Errorf("set workout days: the span %s to %s ends before it starts", from, to)
+	}
+	in := func(d day.Date) bool { return !d.Before(from) && !to.Before(d) }
+	for _, d := range ds {
+		if !in(d) {
+			return nil, nil, fmt.Errorf("set workout days: %s is outside %s to %s", d, from, to)
+		}
+	}
+	return db.setWorkoutDays(ctx, userID, a, source, ds, in, now)
+}
+
+// setWorkoutDays makes source's days that in holds the days of ds, and
+// records the change of all source's days.
+func (db *DB) setWorkoutDays(ctx context.Context, userID uuid.UUID, a event.Actor, source WorkoutSource, ds []day.Date,
+	in func(day.Date) bool, now time.Time,
+) (added, removed []day.Date, err error) {
+	if err := a.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("invalid actor: %w", err)
 	}
 	want := map[day.Date]bool{}
 	for _, d := range ds {
@@ -50,6 +84,12 @@ func (db *DB) SetWorkoutDays(ctx context.Context, userID uuid.UUID, a event.Acto
 		have, err := workoutDaysOf(ctx, tx, userID, source)
 		if err != nil {
 			return err
+		}
+		// The days outside the span stay as they are.
+		for _, d := range have {
+			if !in(d) {
+				want[d] = true
+			}
 		}
 		added, removed = diffDays(have, want)
 		if err := putWorkoutDays(ctx, tx, userID, source, added, removed); err != nil {

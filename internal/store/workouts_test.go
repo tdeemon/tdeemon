@@ -121,3 +121,88 @@ func TestWorkoutDaysRefuses(t *testing.T) {
 }
 
 func second(_, _ []day.Date, err error) error { return err }
+
+var haeActor = event.Actor{Kind: event.Import, Client: "hae"}
+
+// An import of a span replaces the source's days within it and leaves
+// those outside it, and the other source's; a day of either is a day of
+// a workout.
+func TestWorkoutDaysBetween(t *testing.T) {
+	t.Parallel()
+
+	db, ana, ivo := withTwoUsers(t)
+	d := day.DateOf(t0)
+	between := func(userID uuid.UUID, from, to day.Date, ds ...day.Date) ([]day.Date, []day.Date) {
+		t.Helper()
+		added, removed, err := db.SetWorkoutDaysBetween(t.Context(), userID, haeActor, store.HAE, from, to, ds, t0)
+		if err != nil {
+			t.Fatalf("SetWorkoutDaysBetween: %v", err)
+		}
+		return added, removed
+	}
+	setWorkouts(t, db, ana, d.AddDays(-20))
+	between(ivo, d.AddDays(-30), d, d.AddDays(-3))
+	if added, removed := between(ana, d.AddDays(-14), d.AddDays(-7), d.AddDays(-12), d.AddDays(-9)); !reflect.DeepEqual(added, []day.Date{d.AddDays(-12), d.AddDays(-9)}) || removed != nil {
+		t.Errorf("the first span added %v, removed %v", added, removed)
+	}
+	// A later span that overlaps: the days within it are its own, the
+	// day before it stays.
+	added, removed := between(ana, d.AddDays(-10), d, d.AddDays(-2))
+	if !reflect.DeepEqual(added, []day.Date{d.AddDays(-2)}) || !reflect.DeepEqual(removed, []day.Date{d.AddDays(-9)}) {
+		t.Errorf("the overlapping span added %v, removed %v", added, removed)
+	}
+	got, err := db.WorkoutDays(t.Context(), ana, d.AddDays(-30), d)
+	want := map[day.Date]bool{d.AddDays(-20): true, d.AddDays(-12): true, d.AddDays(-2): true}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("days = %v, %v; want %v (Strong's day, the first span's day before the second, the second's)", got, err, want)
+	}
+	es, err := db.Events(t.Context(), ana, 1)
+	if err != nil || len(es) != 1 || es[0].Action != event.WorkoutsSet || es[0].Entity != "hae" || es[0].Actor != haeActor {
+		t.Errorf("the event = %+v, %v", es, err)
+	}
+	if got, _ := db.WorkoutDays(t.Context(), ivo, d.AddDays(-30), d); !reflect.DeepEqual(got, map[day.Date]bool{d.AddDays(-3): true}) {
+		t.Errorf("Ivo's days = %v", got)
+	}
+}
+
+// A span without workouts removes the source's days within it; the same
+// again records nothing.
+func TestWorkoutDaysBetweenEmpty(t *testing.T) {
+	t.Parallel()
+
+	db, ana, _ := withTwoUsers(t)
+	d := day.DateOf(t0)
+	if _, _, err := db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-3), d, []day.Date{d.AddDays(-2)}, t0); err != nil {
+		t.Fatal(err)
+	}
+	_, removed, err := db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-3), d, nil, t0)
+	if err != nil || !reflect.DeepEqual(removed, []day.Date{d.AddDays(-2)}) {
+		t.Errorf("the empty span removed %v, %v", removed, err)
+	}
+	n := countRows(t, db, "events")
+	added, removed, err := db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-3), d, nil, t0)
+	if err != nil || added != nil || removed != nil || countRows(t, db, "events") != n {
+		t.Errorf("the same span again added %v, removed %v, %v", added, removed, err)
+	}
+}
+
+func TestWorkoutDaysBetweenRefuses(t *testing.T) {
+	t.Parallel()
+
+	db, ana, _ := withTwoUsers(t)
+	d := day.DateOf(t0)
+	for name, err := range map[string]error{
+		"no actor":         second(db.SetWorkoutDaysBetween(t.Context(), ana, event.Actor{}, store.HAE, d, d, nil, t0)),
+		"Strong's source":  second(db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.Strong, d, d, nil, t0)),
+		"a span backwards": second(db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d, d.AddDays(-1), nil, t0)),
+		"a day outside":    second(db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-3), d.AddDays(-1), []day.Date{d}, t0)),
+		"HAE as a history": second(db.SetWorkoutDays(t.Context(), ana, haeActor, store.HAE, nil, t0)),
+	} {
+		if err == nil {
+			t.Errorf("%s: succeeded", name)
+		}
+	}
+	if countRows(t, db, "workout_days") != 0 || countRows(t, db, "events") != 0 {
+		t.Error("a refused import wrote")
+	}
+}

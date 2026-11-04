@@ -1389,6 +1389,8 @@ export const hr: Messages = {
       metrics:
         'Metrike: broj koraka, aktivna energija, bazalna energija, vrijeme vježbanja, analiza sna, kilaža, postotak masnog tkiva, nemasna masa, puls u mirovanju, varijabilnost pulsa i VO2 max',
       summarize: 'Summarize Data: uključeno, s grupiranjem po danu',
+      workouts:
+        'Za dane treninga druga automatizacija s Data Type Workouts, na isti URL i s istim zaglavljem.',
     },
     header: 'Šalje se u svakom zahtjevu, u zaglavlju Authorization: Bearer i ključ.',
     waiting: 'Čeka prvi poziv…',
