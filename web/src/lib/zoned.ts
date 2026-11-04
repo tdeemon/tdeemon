@@ -79,6 +79,11 @@ export function clockAt(instant: number, timeZone: string): string {
   return `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`
 }
 
+// hourAt is an instant's hour on a time zone's clock, 0 to 23.
+export function hourAt(instant: number, timeZone: string): number {
+  return Number(clockAt(instant, timeZone).slice(0, 2))
+}
+
 // dateAt is the date (YYYY-MM-DD) timeZone's clock shows at instant.
 export function dateAt(instant: number, timeZone: string): string {
   const p = partsAt(instant, timeZone)

@@ -8,7 +8,7 @@ import { usePreviousWeight } from '@/components/day/previous-weight'
 import { WeighIn } from '@/components/day/weigh-in'
 import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
-import { clockAt } from '@/lib/zoned'
+import { hourAt } from '@/lib/zoned'
 
 // noon ends the morning, on the user's clock.
 const noon = 12
@@ -16,11 +16,11 @@ const noon = 12
 // morning tells whether an instant is in the morning on the user's clock:
 // from the hour their day starts at to noon.
 function morning(instant: number, timeZone: string, startHour: number): boolean {
-  const hour = Number(clockAt(instant, timeZone).slice(0, 2))
+  const hour = hourAt(instant, timeZone)
   return hour >= startHour && hour < noon
 }
 
-// MorningWeighIn asks for the morning's weigh-in in a line of today's
+// MorningWeighIn asks for the morning's weigh-in in a card under today's
 // hero, a field and ✓: in the morning, while today has none, hinting with
 // the day before's. A weigh-in, typed here or sent by a device, takes it
 // away. A user whose weight a device sends, the day before's an import,
@@ -47,7 +47,7 @@ export function MorningWeighIn({ day }: { day: Day }) {
       date={day.date}
       label={t.day.weighIn.morning}
       placeholder={before.weight === undefined ? undefined : f.field(before.weight.value, 1)}
-      className="rounded-md bg-surface-2 px-3 py-2"
+      className="rounded-lg border bg-card px-4 py-3"
     />
   )
 }

@@ -49,7 +49,7 @@ export function useUndoLatest() {
   const shown = useShownDay()
   const run = useUndo(shown ?? 'today')
 
-  async function send(last: Change | undefined, id: string | undefined) {
+  async function send(last: Change | undefined, id: string | undefined, changes: boolean) {
     let answer
     try {
       answer = await run.mutateAsync({
@@ -57,7 +57,7 @@ export function useUndoLatest() {
       })
     } catch (error) {
       if (statusOf(error) === 422 && id !== undefined) {
-        await send(last, undefined)
+        await send(last, undefined, changes)
         return
       }
       sayUndone({ title: undoRefused(t, error) })
@@ -67,12 +67,15 @@ export function useUndoLatest() {
     sayUndone({
       title: t.undo.done(t.undo.actions[undone.action] ?? t.undo.change),
       to: undone.days.find((d) => d !== shown),
+      changes,
     })
   }
 
   return {
-    undo: (last?: Change) => {
-      void send(last, uuidv7())
+    // changes: the toast leads to the recent changes, but from their
+    // own list.
+    undo: (last?: Change, { changes = true }: { changes?: boolean } = {}) => {
+      void send(last, uuidv7(), changes)
     },
     pending: run.isPending,
   }

@@ -154,7 +154,10 @@ test('a user who measured before has the tiles, though today has none', async ()
   renderAt('/')
 
   const region = within(await screen.findByRole('region', { name: 'Body today' }))
-  expect(await region.findByRole('button', { name: /^Weight—trend 80\.1 kg/ })).toBeDefined()
+  // A dash to the eye, and in words what it means.
+  expect(
+    await region.findByRole('button', { name: /^Weightnone yet todaytrend 80\.1 kg/ }),
+  ).toBeDefined()
   expect(region.queryByRole('button', { name: 'Add a weigh-in' })).toBeNull()
 })
 

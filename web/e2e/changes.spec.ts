@@ -26,8 +26,9 @@ test('a meal deleted comes back from the recent changes, after its toast is gone
   await toasts.getByLabel('Close').click()
   await expect(toasts.getByRole('button', { name: 'Undo' })).toHaveCount(0)
 
-  // The recent changes, from the day's header: the delete, by you, and
-  // its Undo, the latest's alone.
+  // The recent changes, from the settings: the delete, by you, and its
+  // Undo, the latest's alone.
+  await toSettings(page)
   await page.getByRole('button', { name: 'Recent changes' }).click()
   const sheet = page.getByRole('dialog', { name: 'Recent changes' })
   const rows = sheet.getByRole('listitem')
@@ -42,13 +43,28 @@ test('a meal deleted comes back from the recent changes, after its toast is gone
   // The list follows: the meal's log is the next to take back.
   await expect(sheet.getByRole('button', { name: `Undo: Logged: ${name}` })).toBeVisible()
   await page.keyboard.press('Escape')
+  await page.goto('/')
   await expect(meal).toHaveCount(1)
 })
 
-test('the settings lead to the recent changes too', async ({ page }) => {
+test("an undo's toast leads to the recent changes", async ({ page }) => {
   await signIn(page)
-  await toSettings(page)
-  await page.getByRole('button', { name: 'Recent changes' }).click()
+  const name = `Miso broth ${String(Date.now())}`
+  const logged = await page.request.post('/api/v1/meals', {
+    data: {
+      description: name,
+      items: [{ name, nutrients: { kcal: 320, protein: 18, carbs: 40, fat: 8 } }],
+    },
+  })
+  expect(logged.ok()).toBe(true)
+  await page.goto('/')
+  const meal = page.getByRole('article', { name })
+  await openMeal(meal)
+  await meal.getByRole('button', { name: `Delete: ${name}` }).click()
+  const toasts = page.getByRole('region', { name: 'Notifications' })
+  await toasts.getByRole('button', { name: 'Undo' }).click()
+  await expect(toasts).toContainText('Undone: a meal deleted.')
+  await toasts.getByRole('button', { name: 'Recent changes' }).click()
   const sheet = page.getByRole('dialog', { name: 'Recent changes' })
-  await expect(sheet.getByRole('listitem').first()).toBeVisible()
+  await expect(sheet.getByRole('listitem').first()).toContainText(`Deleted: ${name}`)
 })

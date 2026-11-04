@@ -16,7 +16,8 @@ const fills: Record<Macro, string> = {
 // fills to a new value (not with less motion asked for). Past the target
 // nothing is an error: protein's target is a floor, which the day has
 // reached, said in the brand's colour with how far past it; carbs and fat
-// say how far past theirs, plainly. The words say what the bar shows.
+// say how far past theirs, plainly. The words say what the bar shows; on
+// a desktop, in three columns, the values under the name.
 export function MacroBar({
   macro,
   eaten,
@@ -46,7 +47,7 @@ export function MacroBar({
 
   return (
     <div className="space-y-1.5">
-      <p className="flex flex-wrap justify-between gap-x-2 text-small">
+      <p className="flex flex-wrap justify-between gap-x-2 text-small lg:flex-col lg:gap-0.5">
         <span className="font-semibold">{t.day[macro]}</span>
         <span className="text-muted-foreground">
           <b className="font-semibold text-foreground">{f.grams(eaten)}</b>{' '}

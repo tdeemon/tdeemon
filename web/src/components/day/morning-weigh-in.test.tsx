@@ -33,29 +33,29 @@ function yesterday(source: 'manual' | 'import' = 'manual') {
   }
 }
 
+// hero is the day's hero, which has the weigh-in under it, not in it.
 function hero() {
   return within(screen.getByRole('region', { name: 'Energy and macros' }))
 }
 
-test('in the morning, the hero asks for the weigh-in, hinting with yesterday’s, and saves it', async () => {
+test('in the morning, a card under the hero asks for the weigh-in, hinting with yesterday’s, and saves it', async () => {
   at(8)
   const server = dayServer()
   fakeServer({ ...signedIn(), ...server.routes, ...yesterday() })
   renderAt('/')
 
-  const field = await within(
-    await screen.findByRole('region', { name: 'Energy and macros' }),
-  ).findByLabelText('Morning weigh-in?')
+  const field = await screen.findByLabelText('Morning weigh-in?')
+  expect(hero().queryByLabelText('Morning weigh-in?')).toBeNull()
   expect(field.getAttribute('placeholder')).toBe('82.5')
   expect(field.getAttribute('inputmode')).toBe('decimal')
   fireEvent.change(field, { target: { value: '82.3' } })
-  fireEvent.click(hero().getByRole('button', { name: 'Save the weigh-in' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Save the weigh-in' }))
 
   expect(await screen.findByText('Saved: Weight')).toBeDefined()
   expect(server.sent.map((s) => s.body)).toEqual([{ value: 82.3 }])
   // Weighed, the line goes, and the body has it.
   await waitFor(() => {
-    expect(hero().queryByLabelText('Morning weigh-in?')).toBeNull()
+    expect(screen.queryByLabelText('Morning weigh-in?')).toBeNull()
   })
   expect(
     within(screen.getByRole('region', { name: 'Body today' })).getByRole('button', {
@@ -69,9 +69,7 @@ test('the line says its hint in the language', async () => {
   fakeServer({ ...signedIn('hr'), ...dayServer().routes, ...yesterday() })
   renderAt('/')
 
-  const field = await within(
-    await screen.findByRole('region', { name: 'Energija i makroi' }),
-  ).findByLabelText('Jutarnje vaganje?')
+  const field = await screen.findByLabelText('Jutarnje vaganje?')
   expect(field.getAttribute('placeholder')).toBe('82,5')
 })
 

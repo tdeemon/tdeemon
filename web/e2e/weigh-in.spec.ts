@@ -62,7 +62,7 @@ test("the weight is a tap from today's body, and saved with Enter", async ({ pag
   await noWeight(page, yesterday)
 })
 
-test("in the morning, today's hero asks for the weigh-in, and the line goes once given", async ({
+test('in the morning, a card under the hero asks for the weigh-in, and goes once given', async ({
   page,
 }) => {
   await signIn(page)
@@ -97,10 +97,23 @@ test("in the morning, today's hero asks for the weigh-in, and the line goes once
   await page.clock.setFixedTime(new Date(`${today}T06:30:00Z`))
   await page.goto('/')
   const hero = page.getByRole('region', { name: 'Energy and macros' })
-  const field = hero.getByLabel('Morning weigh-in?')
+  const field = page.getByLabel('Morning weigh-in?')
+  // The day's type's chip in the hero is a finger's whole target: the
+  // phase's link under it reaches none of it.
+  const chip = hero.getByRole('button', { name: /^Type of day: / })
+  await expect(hero.getByRole('link', { name: /^Cut · / })).toBeVisible()
+  const box = await chip.boundingBox()
+  const hit = await page.evaluate(
+    ([x, y]) => document.elementFromPoint(x, y)?.closest('button')?.getAttribute('aria-label'),
+    [(box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) + 4] as const,
+  )
+  expect(hit).toMatch(/^Type of day: /)
   await expect(field).toHaveAttribute('placeholder', '85.2')
+  // Under the hero, not in it.
+  const [card, under] = await Promise.all([hero.boundingBox(), field.boundingBox()])
+  expect(under?.y ?? 0).toBeGreaterThan((card?.y ?? 0) + (card?.height ?? 0))
   await field.fill('84.6')
-  await hero.getByRole('button', { name: 'Save the weigh-in' }).click()
+  await page.getByRole('button', { name: 'Save the weigh-in' }).click()
   await expect(page.getByText('Saved: Weight')).toBeVisible()
   await expect(field).toBeHidden()
   await expect(

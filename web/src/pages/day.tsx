@@ -8,13 +8,11 @@ import { sessionQuery } from '@/api/session'
 import type { Food } from '@/api/types'
 import { AutopilotLine } from '@/components/autopilot/autopilot-line'
 import { BodyToday } from '@/components/day/body-today'
-import { ChangesButton } from '@/components/day/changes-button'
 import { CheckIn } from '@/components/day/check-in'
-import { DayPhase } from '@/components/day/day-phase'
+import { DayNow } from '@/components/day/day-now'
 import { useDayReady } from '@/components/day/day-ready'
 import { DaySkeleton } from '@/components/day/day-skeleton'
 import { DaySummary } from '@/components/day/day-summary'
-import { DayTypeChip } from '@/components/day/day-type-chip'
 import { FirstSteps } from '@/components/day/first-steps'
 import { kcalLeft } from '@/components/day/left'
 import { MealList } from '@/components/day/meal-list'
@@ -23,11 +21,8 @@ import { MorningLine, MorningSummary } from '@/components/day/morning-summary'
 import { QuickAdd } from '@/components/day/quick-add'
 import { QuickChips } from '@/components/day/quick-chips'
 import { WeekCard } from '@/components/day/week-card'
-import { WeekLine } from '@/components/day/week-line'
-import { WeekStrip } from '@/components/day/week-strip'
 import { HouseholdNudge } from '@/components/household/household-nudge'
 import { LoadError } from '@/components/load-error'
-import { ProposalNudge } from '@/components/plan/proposal-nudge'
 import { Skeleton } from '@/components/progress/skeleton'
 import { SettingsAvatar } from '@/components/settings-avatar'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -67,11 +62,13 @@ function DayKeys({
 }
 
 // DayPage is a day of the user's: today at /, another at /?date=YYYY-MM-DD.
-// It shows the week's days and their average, what was eaten against the
-// target, the meals, the check-in and the measurements (on a desktop in
-// two columns, the meals a table), takes the day's type, the check-in
-// and the measurements, logs a meal (QuickAdd), and moves a day back or
-// ahead, up to today. /?log=true opens the meal to log on today (the
+// Under a header of one row (‹ the title ›, the way back to today, the
+// user's mark) it shows what was eaten against the target (the hero,
+// with the day's type), the week's days and their average, what the
+// hour asks of today (DayNow), the meals, the body and the check-in (on
+// a desktop in two columns, the meals a table), takes the day's type,
+// the check-in and the measurements, logs a meal (QuickAdd), and moves a
+// day back or ahead, up to today. /?log=true opens the meal to log on today (the
 // app's Log a meal); /?summary=YYYY-MM-DD that morning's summary, which
 // the morning's notification opens, and today's header a tap away.
 export function DayPage() {
@@ -206,93 +203,49 @@ export function DayPage() {
     ) : (
       noArrow
     )
-  // Of the day shown, not of the one before while it comes; its place
-  // kept while the day comes. Beside it the recent changes, whose Undo
-  // reaches past a toast.
-  let dayType
-  if (day.data !== undefined) {
-    dayType = (
-      <div inert={waiting} className="flex items-center gap-1">
-        <DayTypeChip key={`type ${day.data.date}`} day={day.data} />
-        <ChangesButton />
-      </div>
-    )
-  } else if (day.isPending) {
-    dayType = <Skeleton className="h-9 w-28 rounded-full" />
-  }
   // The day's date, its place kept while it is not known.
   const dated = shown === undefined ? <Skeleton className="h-4.5 w-36" /> : f.date(shown, todayDate)
 
-  const toToday = (
-    <Link
-      to="/"
-      activeOptions={{ exact: true }}
-      className="relative flex h-9 shrink-0 items-center rounded-full bg-primary-soft px-4 text-small font-semibold text-primary outline-none after:absolute after:inset-x-0 after:-inset-y-1 after:content-[''] hover:bg-primary-soft/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-    >
-      {t.day.toToday}
-    </Link>
-  )
-  let header
-  if (isToday) {
-    // Today's: the day's type beside the title, and the date under both
-    // on a line of its own, which a phone's width keeps whole. A phone
-    // has the user's mark beside the title, and the day's type on a line
-    // under the date.
-    header = (
-      <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2">
-        <div className="row-span-2 flex shrink-0 items-center">
-          {previous}
-          {next}
-        </div>
-        <h1 className="text-title">{t.day.today}</h1>
-        {shown === undefined ? (
-          <div className="col-span-2 col-start-2 row-start-2">{dated}</div>
+  // The header, one row at every width: the arrows either side of the
+  // title (today's with its date under it, another day's its date), the
+  // way back to today when it is another, and the user's mark.
+  const header = (
+    <header className="flex min-h-14 items-center gap-1">
+      {previous}
+      <div className="min-w-0">
+        {isToday ? (
+          <>
+            <h1 className="text-title">{t.day.today}</h1>
+            {shown === undefined ? (
+              dated
+            ) : (
+              <p className="truncate text-small text-muted-foreground">{dated}</p>
+            )}
+          </>
         ) : (
-          <p className="col-span-2 col-start-2 row-start-2 text-small text-muted-foreground">
-            {dated}
-          </p>
+          <h1 className="text-h3 text-balance lg:text-title">{dated}</h1>
         )}
-        <SettingsAvatar className="col-start-3 row-start-1" />
-        {dayType !== undefined && (
-          <div className="col-span-3 row-start-3 mt-2 justify-self-start tablet:col-span-1 tablet:col-start-3 tablet:row-start-1 tablet:mt-0">
-            {dayType}
-          </div>
-        )}
-      </header>
-    )
-  } else if (desktop) {
-    // Another day's on a desktop, as today's is: its date the title, and
-    // its type and the way back to today at the other end; the user's
-    // mark after them in a window too low for the rail or the sidebar.
-    header = (
-      <header className="flex items-center gap-2">
-        <div className="flex shrink-0 items-center">
-          {previous}
-          {next}
-        </div>
-        <h1 className="min-w-0 flex-1 text-title">{dated}</h1>
-        {dayType}
-        {toToday}
-        <SettingsAvatar />
-      </header>
-    )
-  } else {
-    // Another day's on a phone: its date between the arrows, on a line
-    // of its own, its type under it, and the way back to today right
-    // there; the user's mark at the end.
-    header = (
-      <header className="flex items-start gap-2">
-        {previous}
-        <div className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center">
-          <h1 className="flex min-h-11 items-center text-h3 text-balance">{dated}</h1>
-          {dayType}
-          {toToday}
-        </div>
-        {next}
-        <SettingsAvatar />
-      </header>
-    )
-  }
+      </div>
+      {next}
+      <div className="flex-1" />
+      {!isToday && (
+        <Link
+          to="/"
+          activeOptions={{ exact: true }}
+          aria-label={t.day.toToday}
+          className="relative flex h-8 shrink-0 items-center rounded-full bg-primary-soft px-3.5 text-small font-semibold text-primary outline-none after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] hover:bg-primary-soft/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          {t.day.todayPill}
+        </Link>
+      )}
+      <SettingsAvatar />
+    </header>
+  )
+  // The week, its cached days kept even when the day did not come.
+  const week =
+    shown !== undefined && todayDate !== undefined ? (
+      <WeekCard date={shown} today={todayDate} />
+    ) : undefined
   // The keys, and the morning summary asked for by the address, over
   // the day whether it came or not.
   const keys = (
@@ -318,11 +271,14 @@ export function DayPage() {
         {keys}
         {header}
         {day.isError ? (
-          <LoadError
-            title={isToday ? t.loadFailed.today : t.loadFailed.day}
-            error={day.error}
-            onRetry={() => void day.refetch()}
-          />
+          <>
+            <LoadError
+              title={isToday ? t.loadFailed.today : t.loadFailed.day}
+              error={day.error}
+              onRetry={() => void day.refetch()}
+            />
+            {week}
+          </>
         ) : (
           <DaySkeleton columns={desktop} />
         )}
@@ -338,7 +294,9 @@ export function DayPage() {
     day.data.target === undefined ? undefined : kcalLeft(day.data.total.kcal, day.data.target.kcal)
   // What the user says of the day, and what it measured: their fields
   // start again with each day.
-  const checkIn = <CheckIn key={`check-in ${day.data.date}`} day={day.data} future={future} />
+  const checkIn = (
+    <CheckIn key={`check-in ${day.data.date}`} day={day.data} future={future} row={!desktop} />
+  )
   const body = (
     <BodyToday
       key={`body ${day.data.date}`}
@@ -349,19 +307,18 @@ export function DayPage() {
     />
   )
 
+  // A new user's first steps, in place of the hero before a plan.
+  const hero = (
+    <FirstSteps day={day.data}>
+      <DaySummary day={day.data} />
+    </FirstSteps>
+  )
+
   return (
     <div className="max-w-3xl space-y-4 md:max-w-none">
       {keys}
       {header}
       {hide && <DaySkeleton columns={desktop} />}
-      {/* A phone's week, above the day, and a tablet's; a desktop's is
-          beside it. */}
-      {!desktop && shown !== undefined && todayDate !== undefined && (
-        <div hidden={hide} className="space-y-2">
-          <WeekStrip date={shown} today={todayDate} />
-          <WeekLine date={shown} today={todayDate} />
-        </div>
-      )}
       <div
         hidden={hide}
         aria-busy={waiting}
@@ -369,18 +326,24 @@ export function DayPage() {
         inert={waiting}
         className={`grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start lg:grid-cols-12 ${waiting ? 'opacity-60' : ''}`}
       >
-        {/* A desktop's columns: the day and its meals, a table, and
-            beside them the week, the body, the check-in and the phase. A
-            tablet's, from 768 px: the day and its meals, and beside them
-            the check-in and the body. A phone has them one after the
-            other, the phase in the day's hero. */}
+        {/* A desktop's columns: the hero, what the hour asks and the
+            meals, a table, and beside them the week, the body and the
+            check-in. A tablet's, from 768 px: the hero and the week
+            across both columns, then what the hour asks and the meals,
+            and beside them the body and the check-in. A phone has them
+            one after the other, the hero and the week first, on its
+            first screen. */}
+        {!desktop && (
+          <div className="space-y-4 md:col-span-2">
+            {hero}
+            {week}
+          </div>
+        )}
         <div className="space-y-4 lg:col-span-7 xl:col-span-8">
-          {/* A new user's first steps, in place of the hero before a plan. */}
-          <FirstSteps day={day.data}>
-            <DaySummary day={day.data} phase={!desktop} />
-          </FirstSteps>
-          {/* A proposal that waits, under the day's hero. */}
-          {isToday && <ProposalNudge />}
+          {desktop && hero}
+          {/* The morning's weigh-in, a proposal that waits, or the
+              evening's end of the day. */}
+          <DayNow day={day.data} />
           {/* An invite into a household that waits for an answer. */}
           {isToday && <HouseholdNudge />}
           {/* This morning's weekly review, on its day. */}
@@ -393,17 +356,6 @@ export function DayPage() {
               ref={morningOpener}
               onOpen={() => {
                 void navigate({ to: '/', search: { summary: dateAt(Date.now(), timeZone) } })
-              }}
-            />
-          )}
-          {isToday && (
-            <QuickChips
-              date={day.data.date}
-              timeZone={timeZone}
-              now={now}
-              onFood={(food, from) => {
-                opener.current = from
-                setAdding({ food })
               }}
             />
           )}
@@ -458,24 +410,23 @@ export function DayPage() {
                   : t.log.open}
               </Button>
             )}
+            {isToday && (
+              <QuickChips
+                date={day.data.date}
+                timeZone={timeZone}
+                now={now}
+                onFood={(food, from) => {
+                  opener.current = from
+                  setAdding({ food })
+                }}
+              />
+            )}
           </section>
         </div>
         <div className="space-y-4 lg:col-span-5 xl:col-span-4">
-          {desktop ? (
-            <>
-              {shown !== undefined && todayDate !== undefined && (
-                <WeekCard date={shown} today={todayDate} />
-              )}
-              {body}
-              {checkIn}
-              <DayPhase date={day.data.date} card />
-            </>
-          ) : (
-            <>
-              {checkIn}
-              {body}
-            </>
-          )}
+          {desktop && week}
+          {body}
+          {checkIn}
         </div>
       </div>
       {!future && (

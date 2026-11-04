@@ -1,8 +1,18 @@
-import { cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import { setLocale } from '@/i18n/locale'
-import { day, fakeServer, problem, renderAt, signedIn, today, type Handler } from '@/test/app'
+import { toasts } from '@/lib/toast'
+import {
+  day,
+  fakeServer,
+  openCheckIn,
+  problem,
+  renderAt,
+  signedIn,
+  today,
+  type Handler,
+} from '@/test/app'
 import { dayServer } from '@/test/day-server'
 
 afterEach(() => {
@@ -28,6 +38,7 @@ async function tapMood(undo: Handler) {
     },
   })
   renderAt('/')
+  await openCheckIn()
   const mood = within(await screen.findByRole('group', { name: 'Mood' }))
   fireEvent.click(mood.getByRole('button', { name: '4 good' }))
   expect(await screen.findByText('Check-in saved')).toBeDefined()
@@ -54,6 +65,30 @@ test('a change is taken back from its toast, and the toast says so', async () =>
   expect(screen.queryByRole('link', { name: /^See/ })).toBeNull()
   expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
   expect(undos).toEqual([{ id: expect.any(String) as unknown, last: checkIn }])
+
+  // The history of the changes is a tap from it, the day's header having
+  // none.
+  // Tapped, as a browser does it: the button takes the focus.
+  const open = screen.getByRole('button', { name: 'Recent changes' })
+  open.focus()
+  fireEvent.click(open)
+  const sheet = await screen.findByRole('dialog', { name: 'Recent changes' })
+  // The toast goes while the sheet is open.
+  act(() => {
+    toasts.close('change')
+  })
+  await waitFor(() => {
+    expect(screen.queryByText('Undone: a check-in.')).toBeNull()
+  })
+  // Closed, the focus goes to the page, its first control, as the toast
+  // that opened the sheet may be gone: never to the body.
+  fireEvent.keyDown(sheet, { key: 'Escape' })
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: 'Recent changes' })).toBeNull()
+  })
+  await waitFor(() => {
+    expect(document.getElementById('content')?.contains(document.activeElement)).toBe(true)
+  })
 })
 
 test.each([

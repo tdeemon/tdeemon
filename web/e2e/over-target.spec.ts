@@ -69,12 +69,16 @@ for (const size of sizes) {
         const summary = page.getByRole('region', { name: 'Energy and macros' })
         const number = summary.getByText('+1,210', { exact: true })
         await expect(number).toBeVisible()
+        // Over its target in a warm colour and a word, never an error's;
+        // the only number of what is left, or over, is the ring's.
         await expect(summary.getByText('over target', { exact: true })).toBeVisible()
-        await expect(summary.getByText('Over TDEE')).toBeVisible()
+        await expect(number).toHaveClass(/text-over/)
+        await expect(summary.getByText('Over TDEE')).toHaveCount(0)
+        await expect(summary.getByRole('link', { name: 'TDEE 2,409' })).toBeVisible()
 
         // The number within the ring's inner edge, at its height: the
         // circle of radius 56, less half its stroke of 12, in a box of
-        // 132.
+        // 132 (168 on a desktop, drawn to the same scale).
         const ring = await summary.locator('svg').first().boundingBox()
         const box = await number.boundingBox()
         expect(ring).not.toBeNull()
@@ -124,7 +128,7 @@ for (const size of sizes) {
           await page.goto('/')
           const tip = page
             .getByRole('region', { name: 'Energy and macros' })
-            .getByRole('button', { name: 'What left to TDEE is' })
+            .getByRole('button', { name: 'What TDEE is' })
           const reach = await tip.evaluate((el) => {
             const box = el.getBoundingClientRect()
             const after = getComputedStyle(el, '::after')
@@ -140,7 +144,7 @@ for (const size of sizes) {
           expect(reach.height).toBeGreaterThanOrEqual(43.5)
 
           await tip.tap()
-          const dialog = page.getByRole('dialog', { name: 'Left to TDEE' })
+          const dialog = page.getByRole('dialog', { name: 'TDEE' })
           await expect(dialog).toBeVisible()
           const box = await dialog.boundingBox()
           expect(box).not.toBeNull()

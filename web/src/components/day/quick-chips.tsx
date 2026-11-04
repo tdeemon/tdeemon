@@ -20,8 +20,9 @@ const chipFoods = 4
 // day it is now (Yesterday's lunch), logged again now, and the foods
 // logged most, those eaten at that meal of the day lately first, as the
 // quick add offers them (suggestFoods), each opening the meal to log with
-// it in it, in the amount it was eaten in last (onFood). Nothing to
-// offer, they are not there.
+// it in it, in the amount it was eaten in last (onFood), under the meals.
+// A phone's row fades at its edge, as it scrolls. Nothing to offer, they
+// are not there.
 export function QuickChips({
   date,
   timeZone,
@@ -71,10 +72,13 @@ export function QuickChips({
   }
   return (
     <section aria-labelledby="day-quick" className="space-y-2">
-      <h2 id="day-quick" className="text-small font-semibold text-muted-foreground">
+      <h2 id="day-quick" className="sr-only">
         {t.quick.title}
       </h2>
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:px-0">
+      {/* A phone's row scrolls past the screen's edge, where it fades, so
+          it shows there is more; its last chip scrolls clear of the
+          fade. */}
+      <div className="-mx-4 flex gap-2 overflow-x-auto mask-r-from-85% px-4 pr-12 pb-1 lg:mx-0 lg:flex-wrap lg:mask-none lg:px-0">
         {meal !== undefined && (
           <Button
             variant="outline"

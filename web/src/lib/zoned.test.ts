@@ -3,6 +3,7 @@ import { expect, test } from 'vitest'
 import {
   clockAt,
   dateAt,
+  hourAt,
   instantAt,
   mealInstant,
   nightAfter,
@@ -93,6 +94,8 @@ test("a time still to come, past a clock's few minutes ahead", () => {
 
 test("a clock's time at an instant", () => {
   expect(clockAt(Date.parse('2026-10-23T15:45:30Z'), 'America/Los_Angeles')).toBe('08:45')
+  expect(hourAt(Date.parse('2026-10-23T15:45:30Z'), 'America/Los_Angeles')).toBe(8)
+  expect(hourAt(Date.parse('2026-10-24T01:30:00Z'), 'America/Los_Angeles')).toBe(18)
 })
 
 test('what is no date or time is refused', () => {

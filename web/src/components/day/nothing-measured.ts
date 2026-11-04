@@ -21,7 +21,7 @@ function measured(d: HistoryDay): boolean {
 
 // useNothingMeasured tells, of today, whether the user has measured
 // nothing yet: today has no measurement, no day of the week up to it has
-// one (its history, the week strip's), no weigh-in came before (the
+// one (its history, the week's), no weigh-in came before (the
 // summary has no trend) and no night's sleep, resting heart rate or HRV
 // of the last days (recovery). A new user's day then shows no empty
 // measurements, only the way to the first. Another day than today, or

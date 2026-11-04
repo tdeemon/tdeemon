@@ -63,6 +63,19 @@ export function kcalShift(
   return 0
 }
 
+// useMaker says who proposed a change, short, as the day's line names
+// them: the maker of the model (Claude), the autopilot, or the AI coach.
+export function useMaker(): (by: Actor) => string {
+  const t = useMessages()
+  return (by) => {
+    if (by.client === 'autopilot') {
+      return t.plan.nudge.autopilot
+    }
+    const model = by.model ?? ''
+    return makers.find(([name]) => name.test(model))?.[1] ?? t.plan.nudge.coach
+  }
+}
+
 // useWho says who proposed or made a change of the plan: the maker of
 // the model that acted, with the model; the AI coach, for a model not
 // named; the autopilot, the server's own; or the user, in the app.
@@ -166,10 +179,9 @@ export function useWarningText(): (w: LimitWarning) => string {
   }
 }
 
-// useGist says the gist of a proposal in a line: its first change, short
-// (a target by its first value changed on each type of day, "rest days
-// 1,950 → 1,850 kcal"), and how many more it has.
-export function useGist(): (proposal: Proposal, targets: readonly Target[]) => string {
+// useGists says each change of a proposal in a line, short and in the
+// plan's words ("Rest days 1,950 → 1,850 kcal").
+export function useGists(): (proposal: Proposal, targets: readonly Target[]) => string[] {
   const t = useMessages()
   const date = useDate()
   const words = useChangeWords()
@@ -207,7 +219,6 @@ export function useGist(): (proposal: Proposal, targets: readonly Target[]) => s
           `${c.limit(limit.label(ch.name))}: ${c.to(limit.value(ch.name, ch.before), limit.value(ch.name, ch.after))}`,
       ),
     ]
-    const first = words.lower(gists[0] ?? '')
-    return gists.length > 1 ? `${first} (+${String(gists.length - 1)})` : first
+    return gists.map((gist) => words.upper(gist))
   }
 }

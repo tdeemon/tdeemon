@@ -60,28 +60,41 @@ shortcuts (a skip to the content, G and a letter to a section, ⌘Z or
 Ctrl+Z to undo the latest change), a light and a dark theme,
 each change said in a toast whose Undo takes it back, clear of a
 sheet's buttons, a delete's for 10 s, and after it the recent changes
-in a sheet, by whom, with Undo on the next, each number of
+in a sheet (from the settings, or the undo's toast), by whom, with
+Undo on the next, each number of
 calibration's an ⓘ away from what it is, a page that loads a skeleton
 of its shape under its header, one that did not load saying so there
 with a way to ask again, and what came kept, under a bar that says
 since when, when it cannot be asked again, in English and Croatian)
 with the day (shown at once, with what it shows above its meals, so
-nothing moves them after; a new user's first steps to a plan in place of its hero,
-ticked one by one; what was eaten against the target in a ring and the macros'
-bars, a day past it by more than 5 % in a warm colour, not an error's,
-with the TDEE, what is left of it (until there is one, calibration's
-counts toward it) and the phase, the morning's weigh-in asked for in a
-line, a day before the plan saying when it starts, the week's days,
-Monday to Sunday, and their average against the target, whose sheet
-says what the days left can eat, the day's type, the morning summary
+nothing moves them after; under a header of one row, ‹ the title ›, a
+Today pill on another day and the user's mark; a new user's first
+steps to a plan in place of its hero,
+ticked one by one; what is left of the target in a ring, the one
+number of what is left (the button that logs a meal repeats it), and
+the macros' bars,
+a day past it by more than 5 % in a warm colour and a word, not an error's,
+with the target's arithmetic, the TDEE less the deficit (until there is
+a TDEE, calibration's counts toward it), the day's type in a small
+picker and the phase; under it, by the hour, the morning's weigh-in, a
+proposal that waits in the coach's colour ("Claude proposes 2 plan
+changes") or the evening's end of the week; a day before the plan
+saying when it starts, the week's days, Monday to Sunday, as columns
+of what each ate with the target's tick and today outlined, at every
+width, and their average against the target, whose sheet
+says what the days left can eat; one that did not load keeping its
+header and its week; the morning summary
 in a sheet (its notification's tap, or today's header), the meals as
 rows that open to their items, on a desktop a table with its total
 beside the
 week, which the arrows move through, Enter opening a meal's editor, R
 repeating it and Delete deleting it, a meal logged or repeated taking
-the focus, the body, the check-in and the phase, the check-in with
-calibration as a switch, a line until the user has measured anything,
-the body's tiles each a tap from its measurement, and all the
+the focus, the body and the check-in, the check-in a row that opens on a
+phone (and until the user has measured anything), its scales five
+steps with the step's word under them, with
+calibration as a switch,
+the body's tiles each a tap from its measurement, a missing one said in
+words, and all the
 measurements in a sheet, sleep in hours and minutes, a meal's
 corrections in a sheet that
 says its total as it changes, an item's amount with its unit and its
@@ -96,8 +109,9 @@ camera's, or its digits typed) a step of its own with one button, or
 a weigh-in from its chip, a recipe found marked, in a portion, a share
 of it typed as a fraction (1/10) or chosen in its chips (½, ⅓, ¼, 1/…)
 or grams, ≈ on the grams of one not weighed, opened there on its amount
-from its page, and the chips that add
-yesterday's meal or a food in a tap; a share of a recipe said as a
+from its page, and the chips under the meals that add
+yesterday's meal or a food in a tap, their row fading at a phone's
+edge; a share of a recipe said as a
 fraction, ⅒ of the recipe, and its portions in the language's plural,
 wherever an item's amount is),
 the foods (their list by how often they are eaten, grouped by this
@@ -138,7 +152,7 @@ the phase; ECharts loaded with them, in the theme's tokens), the plan
 week, progress and the phases on a timeline, edited and the next one
 planned in a sheet, a proposal that waits, saying only what it changes,
 who made it, when it expires and what the data say beside it, marked
-on the plan's section and in a line on the day, the targets by type of
+on the plan's section and in a banner on the day, the targets by type of
 day and the deficit they plan, edited in a sheet, the history of its
 revisions with a revert, their rationales of the app's own as codes, a
 proposal of the limits accepted there alone, the autopilot's card (its

@@ -205,11 +205,6 @@ export const en = {
       title: 'Trend weight',
       text: 'Trend weight is your weight without the day-to-day swings of water and salt. Each weigh-in moves it a tenth of the way, so it follows the direction, not a single day. It lags the scale by about 9 days.',
     },
-    left: {
-      label: 'What left to TDEE is',
-      title: 'Left to TDEE',
-      text: 'TDEE less what was eaten that day: how much more you can eat without eating more than you burn. Past it, the day is a surplus. The plan works on the weekly average, so one day over changes little.',
-    },
     deficit: {
       label: 'What the planned deficit is',
       title: 'Planned deficit',
@@ -226,6 +221,8 @@ export const en = {
     previous: 'The day before',
     next: 'The day after',
     toToday: 'Back to today',
+    // The pill's visible words, named in full above.
+    todayPill: 'Today',
     // The morning summary, as its notification sends it.
     morning: {
       title: 'Morning summary',
@@ -253,11 +250,14 @@ export const en = {
       ringUnder: (kcal: string) => `${kcal} under target`,
       target: 'Target',
       tdee: 'TDEE',
-      // The TDEE less what was eaten: what is left of it today, how far a
-      // day before stayed under it, or how far either went over it.
-      leftToTdee: 'Left to TDEE',
-      underTdee: 'Under TDEE',
-      overTdee: 'Over TDEE',
+      // The target's arithmetic, under the numbers: "Target 2,150 = TDEE
+      // 2,679 − 529 deficit", its TDEE a link to the progress.
+      equation: {
+        target: (kcal: string) => `Target ${kcal}`,
+        tdee: (kcal: string) => `TDEE ${kcal}`,
+        deficit: (kcal: string) => `− ${kcal} deficit`,
+        surplus: (kcal: string) => `+ ${kcal} surplus`,
+      },
       // A day before that went over its target, said beside the TDEE.
       overUnderTdee: (over: string, under: string) =>
         `${over} over target, still ${under} under TDEE.`,
@@ -286,6 +286,7 @@ export const en = {
       label: 'The week',
       day: (date: string, said: string) => `${date}: ${said}`,
       eatenOf: (eaten: string, target: string) => `${eaten} of ${target} kcal`,
+      eatenOver: (eaten: string, target: string) => `${eaten} of ${target} kcal, over target`,
       eaten: (eaten: string) => `${eaten} kcal`,
       nothing: 'nothing logged',
       toCome: 'to come',
@@ -317,7 +318,18 @@ export const en = {
         `The week is ${kcal} over target. Stick to your daily target until Sunday.`,
       keepToday: (kcal: string) => `The week is ${kcal} over target. Stick to today's target.`,
       legendTarget: 'target',
-      legendAverage: 'average',
+      legendToday: 'today',
+    },
+    // The evening's card under the hero: the week as it ends if today
+    // ends here, counted as calibration counts it, today with it.
+    ending: {
+      title: 'How the day ends',
+      under: (kcal: string, under: string) =>
+        `If you stop here, the week averages ${kcal} kcal a day, ${under} under its target.`,
+      over: (kcal: string, over: string) =>
+        `If you stop here, the week averages ${kcal} kcal a day, ${over} over its target.`,
+      on: (kcal: string) =>
+        `If you stop here, the week averages ${kcal} kcal a day, on its target.`,
     },
     // A desktop's meals, in a table.
     columns: { time: 'Time', meal: 'Meal', kcal: 'kcal', total: 'Total' },
@@ -353,6 +365,15 @@ export const en = {
     checkInAsk: 'How was today?',
     checkInAdd: 'Add',
     checkInAddOf: 'Add a check-in',
+    // The check-in's row, closed: what it takes, or what was said.
+    checkInHint: 'Mood, hunger, a note · counts in calibration',
+    checkInChange: 'Change',
+    checkInChangeOf: 'Change the check-in',
+    said: (what: string, word: string) => `${what}: ${word}`,
+    withNote: 'a note',
+    // Under a scale: the step chosen and its word, or the scale's ends.
+    scaleChosen: (n: number, word: string) => `${String(n)} · ${word}`,
+    scaleEnds: (low: string, high: string) => `1 ${low} · 5 ${high}`,
     savedAsYouGo: 'saved as you go',
     addNote: 'Add a note',
     mood: 'Mood',
@@ -375,6 +396,9 @@ export const en = {
       all: 'All measurements',
       trend: (kg: string) => `trend ${kg} kg`,
       none: '—',
+      // Under the dash of a tile without a value.
+      noneToday: 'none yet today',
+      noneThatDay: 'none that day',
       // In place of the tiles, while the user has measured nothing yet.
       addWeight: 'Add a weigh-in',
     },
@@ -1718,9 +1742,14 @@ export const en = {
     byUser: 'you',
     // The line on the day that a proposal waits.
     nudge: {
-      coach: (what: string) => `Your AI coach suggests: ${what}`,
-      yours: (what: string) => `A change waits for your answer: ${what}`,
-      review: 'Review',
+      // Who proposes: the model's maker (Claude), else these.
+      coach: 'Your AI coach',
+      autopilot: 'The autopilot',
+      proposes: (who: string, n: number) =>
+        `${who} proposes ${String(n)} ${plural('en', n, { one: 'plan change', other: 'plan changes' })}`,
+      // A proposal of the user's own that waits.
+      yours: (n: number) =>
+        `Waiting for your answer: ${String(n)} ${plural('en', n, { one: 'plan change', other: 'plan changes' })}`,
     },
     edit: {
       phase: 'Edit phase',
@@ -1924,8 +1953,6 @@ export const en = {
     // The day's line on the review's day, and its link's word.
     line: (what: string) => `Autopilot: ${what}`,
     why: 'Why',
-    // The day's line of a proposal of its own that waits.
-    nudge: (what: string) => `The autopilot suggests: ${what}`,
     // What a review says, from its numbers: what it decided, a line of it
     // for the day, and why.
     say: {

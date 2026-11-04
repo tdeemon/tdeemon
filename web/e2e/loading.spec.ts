@@ -73,7 +73,7 @@ test('on a slow network today is a skeleton of its shape, then all at once: no m
   expect(new Set(tops)).toEqual(new Set([tops[0]]))
 })
 
-test('a day that does not come keeps its header and the navigation, and comes when asked again', async ({
+test('a day that does not come keeps its header, its week and the navigation, and comes when asked again', async ({
   page,
 }) => {
   await signIn(page)
@@ -91,6 +91,7 @@ test('a day that does not come keeps its header and the navigation, and comes wh
   await expect(alert).toContainText('The server failed to answer.')
   await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'The week' })).toBeVisible()
 
   await page.unroute('**/api/v1/days/**')
   await page.getByRole('button', { name: 'Try again' }).click()

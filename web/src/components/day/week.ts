@@ -18,7 +18,7 @@ export function weekDates(date: string): string[] {
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
 }
 
-// weekOf is the history a day's week asks for (WeekStrip): its calendar
+// weekOf is the history a day's week asks for (WeekBars): its calendar
 // week up to today, and from the first day a history is of (limits.json),
 // as no history goes further back. A week to come asks for none: its to
 // is before its from. The day's history is asked of it, once for every
@@ -61,6 +61,29 @@ export function weekAverage(days: readonly HistoryDay[]): WeekAverage {
   }
   const target = rounded(sum((day) => day.target?.kcal ?? 0) / counted.length)
   return { days: counted.length, kcal, target }
+}
+
+// weekEnding is the average of today's week as it ends if today ends
+// with what it ate (kcal) against its target: the days the week counts
+// so far (weekAverage), today counted with them as one that is over.
+// Today with no meal, or left out, is not counted.
+export function weekEnding(
+  days: readonly HistoryDay[],
+  today: string,
+  kcal: number,
+  target: number | undefined,
+): WeekAverage {
+  const before = days.filter((day) => day.date !== today)
+  const excluded = days.some((day) => day.date === today && day.status === 'excluded')
+  const ended: HistoryDay = {
+    date: today,
+    status: excluded ? 'excluded' : 'complete',
+    type: 'rest',
+    meals: kcal > 0 ? 1 : 0,
+    ...(kcal > 0 && { intake: { kcal, protein: 0, carbs: 0, fat: 0 } }),
+    ...(target !== undefined && { target: { kcal: target, protein: 0, carbs: 0, fat: 0 } }),
+  }
+  return weekAverage([...before, ended])
 }
 
 // plannedTarget is the kcal the plan sets a day to come: of the target in

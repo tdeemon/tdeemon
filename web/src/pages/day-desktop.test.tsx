@@ -79,7 +79,7 @@ function serveDay() {
   })
 }
 
-test("a desktop's day: the meals a table with their total, the week, the body, the check-in and the phase beside it", async () => {
+test("a desktop's day: the meals a table with their total, the week, the body and the check-in beside it", async () => {
   desktop()
   serveDay()
   renderAt('/')
@@ -116,38 +116,44 @@ test("a desktop's day: the meals a table with their total, the week, the body, t
       name: 'This week: average 1,905 of 2,079 · 174 under a day · 2 days logged',
     }),
   ).toBeDefined()
-  // The average a line across the bars, against the week's most.
-  const average = week.querySelector<HTMLElement>('[data-average]')
-  expect(Number.parseFloat(average?.style.bottom ?? '')).toBeCloseTo((1905 / 2079) * 100, 5)
-  // Then the body, the check-in and the phase, as a card of its own.
+  // Then the body and the check-in, open; the phase is the hero's.
   const order = screen
     .getAllByRole('region')
     .map((r) => r.getAttribute('aria-labelledby'))
-    .filter((id) => ['day-week', 'day-body', 'day-check-in', 'day-phase'].includes(id ?? ''))
-  expect(order).toEqual(['day-week', 'day-body', 'day-check-in', 'day-phase'])
-  const phase = screen.getByRole('region', { name: 'Phase' })
-  expect(await within(phase).findByRole('link', { name: 'Cut · week 8 of 12' })).toBeDefined()
-  expect(within(phase).getByText('31 days left')).toBeDefined()
-  // Not in the day's hero too.
+    .filter((id) => ['day-week', 'day-body', 'day-check-in'].includes(id ?? ''))
+  expect(order).toEqual(['day-week', 'day-body', 'day-check-in'])
+  expect(screen.getByRole('group', { name: 'Mood' })).toBeDefined()
+  const summary = screen.getByRole('region', { name: 'Energy and macros' })
+  expect(await within(summary).findByRole('link', { name: 'Cut · week 8 of 12' })).toBeDefined()
   expect(screen.getAllByRole('link', { name: /^Cut/ })).toHaveLength(1)
 })
 
-test('the phone has its week above the day, and the phase in the hero', async () => {
+test('the phone has the hero, then its week, the meals as cards, the body and the check-in as a row', async () => {
   serveDay()
   renderAt('/')
 
   const meals = await screen.findByRole('region', { name: 'Meals' })
   expect(within(meals).queryByText('Total')).toBeNull()
-  expect(screen.queryByRole('region', { name: 'This week' })).toBeNull()
-  expect(screen.queryByRole('region', { name: 'Phase' })).toBeNull()
+  const order = screen
+    .getAllByRole('region')
+    .map((r) => r.getAttribute('aria-labelledby'))
+    .filter((id) =>
+      ['day-summary', 'day-week', 'day-meals', 'day-body', 'day-check-in'].includes(id ?? ''),
+    )
+  expect(order).toEqual(['day-summary', 'day-week', 'day-meals', 'day-body', 'day-check-in'])
   const summary = screen.getByRole('region', { name: 'Energy and macros' })
   expect(await within(summary).findByRole('link', { name: 'Cut · week 8 of 12' })).toBeDefined()
+  // The check-in a row, which opens.
+  const checkIn = screen.getByRole('region', { name: 'Check-in' })
+  expect(within(checkIn).queryByRole('group', { name: 'Mood' })).toBeNull()
+  fireEvent.click(within(checkIn).getByRole('button', { name: 'Add a check-in' }))
+  expect(screen.getByRole('group', { name: 'Mood' })).toBeDefined()
 })
 
-// On a desktop another day's header is today's, as wide as the page: the
-// arrows, the date, then its type, the recent changes and the way back to
-// today.
-test("another day's header on a desktop is laid out as today's", async () => {
+// On a desktop another day's header is one row as a phone's: the arrows
+// either side of the date, the way back to today, and the user's mark in
+// a window too low for the sidebar.
+test("another day's header on a desktop is one row", async () => {
   desktop()
   fakeServer({
     ...signedIn(),
@@ -162,10 +168,8 @@ test("another day's header on a desktop is laid out as today's", async () => {
   )
   expect(parts).toEqual([
     'The day before',
-    'The day after',
     'Thursday, October 22',
-    'Type of day: Rest day',
-    'Recent changes',
+    'The day after',
     'Back to today',
     // The user's mark, shown in a window too low for the sidebar.
     'Settings and account',

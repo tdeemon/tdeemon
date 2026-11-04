@@ -11,7 +11,11 @@ test("a day's check-in and measurements are given, corrected and kept", async ({
   await expect(page.getByRole('heading', { name: 'Monday, June 2' })).toBeVisible()
   const checkIn = page.getByRole('region', { name: 'Check-in' })
 
+  // A phone's check-in is a row, which opens.
+  await checkIn.getByRole('button', { name: /^(Add a|Change the) check-in$/ }).click()
+  await expect(checkIn.getByRole('heading', { name: 'Check-in' })).toBeFocused()
   await checkIn.getByRole('group', { name: 'Mood' }).getByRole('button', { name: '4 good' }).click()
+  await expect(checkIn.getByText('4 · good')).toBeVisible()
   await checkIn
     .getByRole('group', { name: 'Hunger' })
     .getByRole('button', { name: '2 a bit hungry' })
@@ -19,7 +23,7 @@ test("a day's check-in and measurements are given, corrected and kept", async ({
   await checkIn.getByRole('button', { name: '+ Add a note' }).click()
   await checkIn.getByLabel('Note').fill('long walk')
   await checkIn.getByLabel('Note').blur()
-  // The day's type is the header's chip, a menu.
+  // The day's type is the hero's chip, a menu.
   await page.getByRole('button', { name: 'Type of day: Rest day' }).click()
   await page.getByRole('menuitemradio', { name: 'Training' }).click()
   await expect(page.getByRole('button', { name: 'Type of day: Training day' })).toBeVisible()
@@ -50,8 +54,13 @@ test("a day's check-in and measurements are given, corrected and kept", async ({
   // before the answer would cancel the delete.
   await expect(measurements).not.toContainText('Sleep')
 
-  // What the server kept comes back with the page.
+  // What the server kept comes back with the page: said in the row,
+  // whole once it opens.
   await page.reload()
+  await expect(
+    checkIn.getByText('Mood: good · Hunger: a bit hungry · a note · Out of calibration: sick'),
+  ).toBeVisible()
+  await checkIn.getByRole('button', { name: 'Change the check-in' }).click()
   await expect(checkIn.getByRole('button', { name: '4 good' })).toHaveAttribute(
     'aria-pressed',
     'true',
