@@ -107,12 +107,13 @@ test('Ctrl+K opens the palette from any screen: its actions and sections, each w
     expect(document.activeElement).toBe(field)
   })
   await waitFor(() => {
-    expect(options(p)).toContainEqual(["Repeat yesterday's breakfastR", 'R'])
+    expect(options(p)).toContainEqual(["Repeat yesterday's breakfast", null])
   })
   expect(options(p)).toEqual([
     ['Log a mealN', 'N'],
     ['Log a weigh-inW', 'W'],
-    ["Repeat yesterday's breakfastR", 'R'],
+    // No one key writes a meal: the palette's row alone repeats it.
+    ["Repeat yesterday's breakfast", null],
     ['Undo the latest changeCtrl+Z', 'Control+Z'],
     ['Keyboard shortcuts?', '?'],
     ['TodayG D', null],
@@ -230,7 +231,7 @@ async function choose(typed: string, row: string) {
   fireEvent.click(await p.findByRole('option', { name: row }))
 }
 
-test("a food found, a day and a setting lead to their pages; R repeats yesterday's breakfast", async () => {
+test("a food found, a day and a setting lead to their pages; yesterday's breakfast is repeated", async () => {
   const { logged } = server()
   const router = renderAt('/')
   await screen.findByRole('heading', { name: 'Today', level: 1 })
@@ -252,13 +253,18 @@ test("a food found, a day and a setting lead to their pages; R repeats yesterday
     expect(router.state.location.pathname).toBe('/settings/notifications')
   })
 
-  // Away from the day, a letter is no search, and R logs yesterday's
-  // breakfast again.
+  // Away from the day, a letter is no search, and R is no shortcut: it
+  // logs nothing.
   fireEvent.keyDown(document.body, { key: 'o' })
   fireEvent.keyDown(document.body, { key: 'r' })
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(logged).toEqual([])
+  expect(screen.queryByRole('dialog', { name: 'Search and commands' })).toBeNull()
+
+  // The palette's row logs yesterday's breakfast again.
+  await choose('rep', "Repeat yesterday's breakfast")
   expect(await screen.findByText(/^Repeated: Porridge/)).toBeDefined()
   expect(logged).toHaveLength(1)
-  expect(screen.queryByRole('dialog', { name: 'Search and commands' })).toBeNull()
 })
 
 test('the palette says it in Croatian, and nothing found', async () => {
@@ -279,49 +285,33 @@ test('the palette says it in Croatian, and nothing found', async () => {
   expect(p.queryByRole('option')).toBeNull()
 })
 
-// R asks for yesterday anew: a meal deleted since the palette showed it
-// is not logged again, and R says there is none. A meal's own row, a
-// phone's card too, takes R itself; a refusal is said.
-test('R repeats yesterday as it is now, never a focused meal, and says why it did not', async () => {
-  let posted = 0
+// The repeat asks for yesterday anew: a meal deleted since the palette
+// showed it is not logged again, and it says there is none; a refusal
+// is said, in a toast of its own, and the change before keeps its Undo.
+test("yesterday's meal again is of yesterday as it is now, and says why it was not logged", async () => {
   const { logged, yesterday } = server({
-    'POST /api/v1/meals': () => {
-      posted++
-      return Response.json(
+    'POST /api/v1/meals': () =>
+      Response.json(
         { status: 409, title: 'Conflict', detail: 'the food is archived' },
         { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
-      )
-    },
+      ),
   })
   renderAt('/foods')
   await screen.findByRole('heading', { name: 'Foods', level: 1 })
-  fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
-  const p = await palette()
-  await p.findByRole('option', { name: "Repeat yesterday's breakfast" })
-  fireEvent.keyDown(p.getByRole('combobox'), { key: 'Escape' })
-  await waitFor(() => {
-    expect(screen.queryByRole('dialog')).toBeNull()
-  })
 
-  // A meal's row has the focus: R is its own.
-  const row = document.createElement('button')
-  row.dataset.meal = porridge.id
-  document.body.append(row)
-  row.focus()
-  fireEvent.keyDown(row, { key: 'r' })
-  await new Promise((resolve) => setTimeout(resolve, 50))
-  expect(posted).toBe(0)
-  row.remove()
-
-  // Refused, R says why.
-  fireEvent.keyDown(document.body, { key: 'r' })
+  await choose('rep', "Repeat yesterday's breakfast")
   expect(
     await screen.findByText('The server did not take this meal: the food is archived'),
   ).toBeDefined()
 
-  // Deleted since, as a coach would: nothing logged, and R says so.
+  // Deleted since, as a coach would: the palette showed it, but nothing
+  // is logged, and it says so.
+  fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
+  const p = await palette()
+  fireEvent.change(p.getByRole('combobox'), { target: { value: 'rep' } })
+  const row = await p.findByRole('option', { name: "Repeat yesterday's breakfast" })
   yesterday.meals = []
-  fireEvent.keyDown(document.body, { key: 'r' })
+  fireEvent.click(row)
   expect(
     await screen.findByText('Yesterday has no meal of this time of day to repeat.'),
   ).toBeDefined()

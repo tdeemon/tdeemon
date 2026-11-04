@@ -78,7 +78,6 @@ export const en = {
     undo: 'Undo the latest change',
     palette: 'Search and commands',
     weighIn: 'Log a weigh-in',
-    repeatYesterday: "Repeat yesterday's meal of this time of day",
     // A section, a key after G: "G then D".
     andThen: 'then',
     sections: {

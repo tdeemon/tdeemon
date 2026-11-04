@@ -64,7 +64,6 @@ export const hr: Messages = {
     undo: 'Poništi zadnju promjenu',
     palette: 'Traženje i naredbe',
     weighIn: 'Upiši vaganje',
-    repeatYesterday: 'Ponovi jučerašnji obrok ovog doba dana',
     andThen: 'pa',
     sections: {
       today: 'Danas',

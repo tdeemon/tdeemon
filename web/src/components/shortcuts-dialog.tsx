@@ -42,7 +42,6 @@ export function ShortcutsDialog({
         { keys: [mod(), 'K'], join: '+', what: s.palette },
         { keys: ['N'], what: s.logMeal },
         { keys: ['W'], what: s.weighIn },
-        { keys: ['R'], what: s.repeatYesterday },
         { keys: ['/'], what: s.find },
         { keys: [mod(), 'Z'], join: '+', what: s.undo },
         // Base UI's key, which reaches them from a sheet too, as Tab does not.

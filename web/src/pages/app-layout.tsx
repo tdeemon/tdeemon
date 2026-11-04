@@ -28,12 +28,13 @@ import { cn } from '@/lib/utils'
 // opens the meal to log on today over the page, which stays as it was;
 // today's page logs it itself (LogHere).
 // The keyboard has a shortcut to the command palette (⌘K or Ctrl+K), to
-// log a meal (N), a weigh-in (W), to repeat yesterday's meal of the hour
-// (R), to find a food (/), to undo the latest change (⌘Z or Ctrl+Z, which
-// a toast says), to each section (G, then its letter), and to the list of
-// them (?). On a day's page, a letter or a digit typed outside a field,
-// and none of those keys, opens the palette with it (useShortcuts'
-// typed). The palette's actions are these, each with its key.
+// log a meal (N), a weigh-in (W), to find a food (/), to undo the latest
+// change (⌘Z or Ctrl+Z, which a toast says), to each section (G, then its
+// letter), and to the list of them (?). On a day's page, a letter or a
+// digit typed outside a field, and none of those keys, opens the palette
+// with it (useShortcuts' typed). The palette's actions are these, each
+// with its key; yesterday's meal again has none, as no one key writes a
+// meal from anywhere.
 export function AppLayout() {
   const t = useMessages()
   const navigate = useNavigate()
@@ -104,14 +105,6 @@ export function AppLayout() {
       w: () => {
         weigh(null)
       },
-      // A meal's row of the day repeats itself on R: a phone's card,
-      // whose row takes no key of its own, is no other meal's either.
-      r: () => {
-        if (globalThis.document.activeElement?.closest('[data-meal]')) {
-          return
-        }
-        void repeat.run()
-      },
       '/': find,
       'Mod+z': () => {
         latest.undo()
@@ -179,8 +172,6 @@ export function AppLayout() {
               icon: Repeat2,
               label: repeatLabel,
               words: k.repeat,
-              keys: 'R',
-              aria: 'R',
               run: () => {
                 void repeat.run()
               },

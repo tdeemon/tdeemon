@@ -57,8 +57,8 @@ down under a sheet, the settings an avatar in a page's header away),
 a rail on a tablet and a sidebar on a desktop, Log a meal over the
 screen shown, sheets with a handle, dragged down to close, keyboard
 shortcuts (a skip to the content, G and a letter to a section, ⌘Z or
-Ctrl+Z to undo the latest change, W a weigh-in, R yesterday's meal
-again, and ⌘K or Ctrl+K the command palette of the actions, the
+Ctrl+Z to undo the latest change, W a weigh-in, and ⌘K or Ctrl+K the
+command palette of the actions (yesterday's meal again among them), the
 sections, foods, days and settings, each row with its key, which
 typing on the day opens too), a light and a dark theme,
 each change said in a toast whose Undo takes it back, clear of a

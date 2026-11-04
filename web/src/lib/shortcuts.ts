@@ -35,7 +35,7 @@ export function mod(): string {
 const listening = new Set<{ current: Readonly<Record<string, () => void>> }>()
 
 // taken tells whether a key, in either case, is a shortcut of any page
-// mounted, alone or as the first of a sequence: N, G, R, W, ? or /, and
+// mounted, alone or as the first of a sequence: N, G, W, ? or /, and
 // a page's own, the plan's A and X.
 function taken(key: string): boolean {
   const lower = key.toLowerCase()
@@ -95,7 +95,8 @@ export function useShortcuts(
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const now = latest.current
-      if (event.defaultPrevented || event.isComposing) {
+      // A key held down repeats its keydown: an action runs once a press.
+      if (event.defaultPrevented || event.isComposing || event.repeat) {
         return
       }
       if (event.target instanceof Element && event.target.closest(ownKeys)) {

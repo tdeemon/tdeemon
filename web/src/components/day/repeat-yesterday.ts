@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useRef } from 'react'
 
 import { $api } from '@/api/client'
 import { dayQuery } from '@/api/day'
@@ -14,7 +15,7 @@ import { sayChange, sayFailed } from '@/lib/toast'
 
 // useRepeatYesterday is yesterday's meal of the meal of the day it is
 // at an instant, as today's chips offer it (Yesterday's breakfast),
-// logged again from anywhere: the command palette's and its key's, R.
+// logged again from the command palette (no one key does it).
 // label is its name at an instant, none while today or yesterday is not
 // known, or yesterday had no such meal: yesterday is asked for while
 // shown (the palette open); run logs the one of now, asking the server
@@ -29,6 +30,8 @@ export function useRepeatYesterday(shown: boolean): {
   const today = $api.useQuery('get', '/api/v1/me').data?.today
   const timeZone = useQuery(sessionQuery).data?.user.timezone ?? 'UTC'
   const queryClient = useQueryClient()
+  // A repeat on its way, from its start: see run.
+  const running = useRef(false)
   const before = dayQuery(addDays(today ?? '1970-01-01', -1))
   const yesterday = useQuery({ ...before, enabled: shown && today !== undefined })
   const log = useLogMeal(today ?? 'today', (answer) => {
@@ -59,24 +62,32 @@ export function useRepeatYesterday(shown: boolean): {
       return at && t.palette.repeat(t.quick.yesterday[at.slot])
     },
     run: async () => {
-      if (today === undefined || log.isPending) {
+      // One repeat at a time, however fast it is asked for again: the
+      // mutation's own pending state comes a render too late.
+      if (today === undefined || running.current) {
         return
       }
+      running.current = true
       let meals
       try {
         meals = (await queryClient.query(before)).meals
       } catch (error) {
+        running.current = false
         sayFailed(problem(t, error))
         return
       }
       const at = mealAt(Date.now(), meals)
       if (at === undefined) {
+        running.current = false
         sayFailed(t.palette.nothingToRepeat)
         return
       }
       log.mutate(
         { body: repeatOf(at.meal) },
         {
+          onSettled: () => {
+            running.current = false
+          },
           onError: (error) => {
             const status = statusOf(error)
             sayFailed(

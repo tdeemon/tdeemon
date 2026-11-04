@@ -42,7 +42,8 @@ import { cn } from '@/lib/utils'
 // A command of the palette's: what it shows (an icon, its name, a mark
 // beside it), the keys that do it from anywhere (keys, as shown, and as
 // aria-keyshortcuts says them, when they can be), the other words it is
-// found by, and what it does.
+// found by, and what it does; stale, a row of a search before the one
+// typed, still on its way, which Enter does not run.
 export interface Command {
   id: string
   icon: LucideIcon
@@ -51,6 +52,7 @@ export interface Command {
   aria?: string | undefined
   words?: string | undefined
   badge?: string | undefined
+  stale?: boolean | undefined
   run: () => void
 }
 
@@ -199,7 +201,7 @@ function PaletteBody({
     if (event.key === 'Enter') {
       event.preventDefault()
       const row = rows[at]
-      if (row) {
+      if (row && row.stale !== true) {
         onChoose(row)
       }
     }
@@ -406,6 +408,7 @@ function useGroups(query: string, actions: Command[]): Group[] {
     icon: isRecipe(food) ? ChefHat : Utensils,
     label: food.brand === undefined ? food.name : `${food.name} · ${food.brand}`,
     badge: isRecipe(food) ? t.palette.recipe : undefined,
+    stale: foods.isPlaceholderData,
     run: () => {
       void navigate({ to: '/foods/$id', params: { id: food.id } })
     },

@@ -88,3 +88,32 @@ test('typed takes a letter or a digit that is no shortcut, outside a field', asy
   expect(n).toHaveBeenCalledOnce()
   expect(typed).not.toHaveBeenCalled()
 })
+
+// A key held down repeats its keydown: its action runs once.
+test('a key held down runs its action once', () => {
+  const n = vi.fn<() => void>()
+  renderHook(() => {
+    useShortcuts({ n })
+  })
+  press('n')
+  fireEvent.keyDown(document.body, { key: 'n', repeat: true })
+  fireEvent.keyDown(document.body, { key: 'n', repeat: true })
+  expect(n).toHaveBeenCalledOnce()
+})
+
+// A page's shortcut is taken only while the page is there: once the plan
+// is left, its A is text on the day.
+test("a page's keys are typed again once it is gone", () => {
+  const typed = vi.fn<(key: string) => void>()
+  renderHook(() => {
+    useShortcuts({}, typed)
+  })
+  const plan = renderHook(() => {
+    useShortcuts({ a: vi.fn<() => void>() })
+  })
+  press('a')
+  expect(typed).not.toHaveBeenCalled()
+  plan.unmount()
+  expect(press('a')).toBe(true)
+  expect(typed.mock.calls).toEqual([['a']])
+})
