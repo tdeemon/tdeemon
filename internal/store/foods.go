@@ -975,7 +975,8 @@ func foodStateNow(ctx context.Context, tx *sql.Tx, userID uuid.UUID, e event.Eve
 // without regard to case or diacritics: "cev" finds "Ćevapi", "grčki jog"
 // finds "Grčki jogurt". Foods whose name holds every word come first,
 // then those whose name and aliases do, then the rest; within each, the
-// shorter name, then by name. The order depends on the user's foods
+// shorter name, then by name and brand in the alphabet of the user's
+// language (ListFoods' ByName), then by ID, so a tie has one order. The order depends on the user's foods
 // alone, not on other users' (which a relevance score over the whole
 // index would). A query with no words finds nothing.
 func (db *DB) FindFoods(ctx context.Context, userID uuid.UUID, query string, limit int) ([]food.Food, error) {
@@ -998,7 +999,10 @@ func (db *DB) findFoods(ctx context.Context, userID uuid.UUID, query string, lim
 	uid := userID.String()
 	var out []food.Food
 	err := db.readTx(ctx, func(tx *sql.Tx) error {
-		var err error
+		names, err := usersCollation(ctx, tx, uid)
+		if err != nil {
+			return err
+		}
 		out, err = queryFoods(ctx, tx, `
 			SELECT `+foodColumns+` FROM foods AS f
 			WHERE f.user_id = ? AND f.archived = ? AND `+notWithdrawn+`
@@ -1007,7 +1011,7 @@ func (db *DB) findFoods(ctx context.Context, userID uuid.UUID, query string, lim
 					WHEN f.id IN (SELECT food_id FROM foods_fts WHERE foods_fts MATCH ? AND user_id = ?) THEN 0
 					WHEN f.id IN (SELECT food_id FROM foods_fts WHERE foods_fts MATCH ? AND user_id = ?) THEN 1
 					ELSE 2
-				END, length(f.name), f.name
+				END, length(f.name), f.name_key COLLATE `+names+`, f.brand_key COLLATE `+names+`, f.id
 			LIMIT ?`, uid, archived, match, uid, "{name} : ("+match+")", uid, "{name aliases} : ("+match+")", uid, limit)
 		if err != nil {
 			return err
@@ -1078,16 +1082,14 @@ func (db *DB) ListFoods(ctx context.Context, userID uuid.UUID, archived bool, so
 			uid, archived, source, source).Scan(&total); err != nil {
 			return err
 		}
-		var locale string
-		if err := tx.QueryRowContext(ctx, "SELECT locale FROM users WHERE id = ?", uid).Scan(&locale); err != nil &&
-			!errors.Is(err, sql.ErrNoRows) {
+		names, err := usersCollation(ctx, tx, uid)
+		if err != nil {
 			return err
 		}
-		var err error
 		out, err = queryFoods(ctx, tx, `
 			SELECT `+foodColumns+` FROM foods AS f
 			WHERE f.user_id = ? AND f.archived = ? AND (? = '' OR f.source = ?) AND `+notWithdrawn+`
-			ORDER BY `+fmt.Sprintf(by, namesCollation(locale))+`
+			ORDER BY `+fmt.Sprintf(by, names)+`
 			LIMIT ? OFFSET ?`, uid, archived, source, source, limit, offset)
 		if err != nil {
 			return err

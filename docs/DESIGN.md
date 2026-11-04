@@ -520,8 +520,9 @@ runs over names, brands and aliases through a full-text index that
 ignores case and diacritics ("cevapi" finds "Ćevapi", and a đ is a d
 or a dj: "grozde" and "grozdje" find "grožđe") and matches word
 prefixes: foods whose name holds every word first, then name and
-aliases, then the rest, shorter names first, from the user's own foods
-alone; archived foods stay out of it but keep their history, and are
+aliases, then the rest, shorter names first, and names of one length
+in the alphabet of the user's language, then by brand (the catalog's
+too), from the user's own foods alone; archived foods stay out of it but keep their history, and are
 found alone in a search of the archived ones (`archived`).
 
 **Barcodes.** A food keeps its product's barcodes, and a barcode leads
