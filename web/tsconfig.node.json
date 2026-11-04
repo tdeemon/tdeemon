@@ -20,5 +20,11 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "playwright.config.ts", "e2e", "build"]
+  "include": [
+    "vite.config.ts",
+    "playwright.config.ts",
+    "playwright.screenshots.config.ts",
+    "e2e",
+    "build"
+  ]
 }

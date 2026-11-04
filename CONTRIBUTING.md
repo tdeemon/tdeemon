@@ -66,6 +66,13 @@ with it: `make e2e-browser` once, then `make e2e`. The app's service
 worker runs only in a build, not under `npm run dev`; the end-to-end
 tests block it but in `e2e/pwa.spec.ts`.
 
+The docs' screenshots in `docs/screenshots` are made, not drawn:
+`make screenshots` signs in as a demo user of made-up data
+(`scripts/screenshots-server.sh`, `tdeemon user demo`) and saves each
+screen of `web/e2e/docs-screenshots.shot.ts`, on a phone and a desktop,
+light and dark. Run it after a change of how the app looks, and commit
+what changed.
+
 A binary with the app inside:
 
 ```sh

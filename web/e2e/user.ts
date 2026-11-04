@@ -8,6 +8,10 @@ export const user = { email: 'ana@example.com', password: 'only-for-the-e2e-test
 // only look at them, and give their language back as they end.
 export const newUser = { email: 'iva@example.com', password: user.password }
 
+// demo is the demo user scripts/screenshots-server.sh creates for the
+// docs' screenshots (made up).
+export const demo = { email: 'demo@example.com', password: 'only-for-the-screenshots' }
+
 // signIn signs a user in from the sign-in page, the tests' own unless
 // another is given, and waits for the day.
 export async function signIn(page: Page, who: { email: string; password: string } = user) {
