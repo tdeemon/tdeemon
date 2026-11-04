@@ -68,7 +68,8 @@ const onAutopilot: Autopilot = autopilotBody({
     agreed_on: '2026-09-28',
     agreed_kcal: 2279,
   },
-  last: review(),
+  // Its step is the revision step.
+  last: review({ proposal_id: '0193c3a5-0000-7000-8000-0000000000c1' }),
 })
 
 // serve answers the plan and the autopilot as given.
@@ -99,19 +100,19 @@ test("the plan's card says the last review, why, the next and the drift, and lea
   within(numbers ?? document.body).getByText(
     'Each type of day moves -100 kcal, all carbs (-25 g): 2,179 → 2,079 kcal a day on average.',
   )
-  expect(card.getByRole('link', { name: "Take it back in the plan's history." })).toBeTruthy()
+  expect(
+    card.getByRole('link', { name: "Take it back in the plan's history." }).getAttribute('href'),
+  ).toBe(`/plan/history?rev=${step.id}`)
   card.getByText('Fri, Oct 30')
   card.getByText('Fridays')
   card.getByText('-200 of 390 kcal')
   expect(card.getByRole('progressbar', { name: 'Drift' })).toBeTruthy()
 
-  // The step is a revision of the plan, by the autopilot, taken back there.
-  const history = within(screen.getByRole('region', { name: 'Plan history' }))
-  history.getByText('Oct 23, by Autopilot')
-  history.getByText('Lowered your target by 100 kcal a day')
-  // Brief: the changes beneath say the rest.
-  expect(history.queryByText(/^Your TDEE is/)).toBeNull()
-  history.getByRole('button', { name: 'Take back' })
+  // The step is a revision of the plan, by the autopilot, a row to the
+  // plan's history.
+  expect(
+    screen.getByRole('link', { name: 'Plan history', description: '1 revision · Oct 23' }),
+  ).toBeTruthy()
 
   // The row of "You and limits" says it in short.
   expect(

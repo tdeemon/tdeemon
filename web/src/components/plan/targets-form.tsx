@@ -5,6 +5,7 @@ import { useId, useRef, useState, type SubmitEvent } from 'react'
 import { $api } from '@/api/client'
 import { detailOf, statusOf } from '@/api/errors'
 import type { components } from '@/api/schema'
+import { week, type Weekday } from '@/components/autopilot/weekday'
 import { useWarningText } from '@/components/plan/change-words'
 import { targetNow } from '@/components/plan/phases'
 import {
@@ -15,7 +16,8 @@ import {
 } from '@/components/plan/plan-edit'
 import { useDate, useViolationText, violationsOf } from '@/components/plan/proposal-text'
 import { Button } from '@/components/ui/button'
-import { useFormat } from '@/i18n/format'
+import { WeekSegments } from '@/components/ui/week-segments'
+import { rounded, useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
 import { problem } from '@/i18n/problem'
 import limits from '@/lib/limits.json'
@@ -26,7 +28,7 @@ import { cn } from '@/lib/utils'
 type Plan = components['schemas']['PlanBody']
 type DayTarget = components['schemas']['DayTargetBody']
 
-const days: readonly DayType[] = ['training', 'rest']
+const dayTypes: readonly DayType[] = ['training', 'rest']
 const fields: readonly TargetField[] = ['kcal', 'protein', 'fat']
 
 type Typed = Record<DayType, Record<TargetField, string>>
@@ -34,7 +36,8 @@ type Typed = Record<DayType, Record<TargetField, string>>
 // TargetsForm changes the plan's targets by type of day from today on, or,
 // before the plan's first target, that target from its day:
 // the kcal, the protein and the fat of each, the carbs following what the
-// kcal leave. What it can check it checks before it sends; what the
+// kcal leave; and the training days, from today on. Without them it is
+// one target, every day's. Only what changed is sent. What it can check it checks before it sends; what the
 // limits refuse the server says, each at its field, and one of the
 // user's own may be loosened in the limits, as their form asks. Saved, the
 // plan has a revision of the user's, which the history takes back.
@@ -60,15 +63,33 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
     training: typedOf(now?.training, f.field),
     rest: typedOf(now?.rest, f.field),
   }))
+  // The training days, from today on; without them, a target of every
+  // day, the rest days', and the training days' kept as they are.
+  const [trainingDays, setTrainingDays] = useState<Weekday[]>(() =>
+    week.filter((d) => plan.training_weekdays.includes(d)),
+  )
+  // A target of the training days' own (not the rest days') holds
+  // without training weekdays too: a day of a workout logged, or marked
+  // so, is a training day. It is shown, never kept out of sight.
+  const ownTraining =
+    now !== undefined &&
+    (now.training.kcal !== now.rest.kcal ||
+      now.training.protein !== now.rest.protein ||
+      now.training.fat !== now.rest.fat)
+  const split = trainingDays.length > 0 || ownTraining
+  const shown = split ? dayTypes : (['rest'] as const)
+  const daysChanged =
+    trainingDays.length !== plan.training_weekdays.length ||
+    trainingDays.some((d) => !plan.training_weekdays.includes(d))
   // Whether a wrong field says so: from the first save on, so typing does
   // not scold.
   const [checked, setChecked] = useState(false)
   const form = useRef<HTMLFormElement>(null)
   const change = $api.useMutation('post', '/api/v1/plan/changes', {
-    onSuccess: (answer) => {
+    onSuccess: (answer, request) => {
       void queryClient.invalidateQueries()
       sayChange({
-        title: e.saved.targets,
+        title: request.body.targets === undefined ? e.saved.days : e.saved.targets,
         lines: answer.preview.checks.flatMap((ck) => ck.warnings.map(warning)),
       })
       onDone()
@@ -80,7 +101,11 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
     protein: f.parse(typed[d].protein),
     fat: f.parse(typed[d].fat),
   })
-  const values = { training: parsed('training'), rest: parsed('rest') }
+  // One target, every day's, is the training days' too.
+  const values = {
+    training: split ? parsed('training') : parsed('rest'),
+    rest: parsed('rest'),
+  }
   // A day's target as it is sent: the carbs are what the kcal leave, and
   // the server takes no other.
   const sent = (d: DayType) => ({
@@ -121,7 +146,7 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     setChecked(true)
-    const bad = days.some(
+    const bad = shown.some(
       (d) => fields.some((k) => wrong(d, k) !== undefined) || (carbsOf(d) ?? 0) < 0,
     )
     if (bad) {
@@ -131,8 +156,26 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
       })
       return
     }
+    // Only what changed is sent: the server takes no change of nothing.
+    const targetChanged =
+      now === undefined ||
+      dayTypes.some((d) =>
+        fields.some(
+          (k) =>
+            rounded(sent(d)[k], k === 'kcal' ? 0 : 1) !== rounded(now[d][k], k === 'kcal' ? 0 : 1),
+        ),
+      )
+    if (!targetChanged && !daysChanged) {
+      onDone()
+      return
+    }
     change.mutate({
-      body: { targets: [{ from, training: sent('training'), rest: sent('rest') }] },
+      body: {
+        ...(targetChanged && {
+          targets: [{ from, training: sent('training'), rest: sent('rest') }],
+        }),
+        ...(daysChanged && { training_weekdays: trainingDays }),
+      },
     })
   }
 
@@ -148,11 +191,27 @@ export function TargetsForm({ plan, onDone }: { plan: Plan; onDone: () => void }
         {from === plan.today ? e.fromToday : e.fromDay(date(from))}
         {later !== undefined && ` ${e.laterTarget(date(later.effective_from))}`}
       </p>
-      {days.map((d) => {
+      <WeekSegments
+        multiple
+        legend={t.plan.targets.trainingDays}
+        describedBy={`${id}-days`}
+        value={trainingDays}
+        onChange={(chosen) => {
+          change.reset()
+          setTrainingDays(chosen)
+        }}
+      >
+        <p id={`${id}-days`} className="text-small text-muted-foreground">
+          {trainingDays.length > 0 ? e.daysHint : split ? e.workoutHint : e.noDaysHint}
+        </p>
+      </WeekSegments>
+      {shown.map((d) => {
         const carbs = carbsOf(d)
         return (
           <fieldset key={d} className="min-w-0 space-y-3 rounded-lg border p-3">
-            <legend className="px-1 font-medium">{t.plan.targets[d]}</legend>
+            <legend className="px-1 font-medium">
+              {split ? t.plan.targets[d] : t.plan.targets.everyDay}
+            </legend>
             <div className="grid grid-cols-3 gap-2">
               {fields.map((k) => {
                 const local = checked ? wrong(d, k) : undefined

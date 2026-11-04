@@ -85,7 +85,7 @@ function editServer(
 // openTargets opens the targets' edit, and returns the sheet.
 async function openTargets() {
   renderAt('/plan')
-  const card = within(await screen.findByRole('region', { name: 'Targets by type of day' }))
+  const card = within(await screen.findByRole('region', { name: 'Targets' }))
   fireEvent.click(card.getByRole('button', { name: 'Edit targets' }))
   return within(await screen.findByRole('dialog', { name: 'Targets by type of day' }))
 }
@@ -183,7 +183,7 @@ test('a target edited today names one planned later, in Croatian too', async () 
   })
   setLocale('hr')
   renderAt('/plan')
-  const card = within(await screen.findByRole('region', { name: 'Ciljevi po tipu dana' }))
+  const card = within(await screen.findByRole('region', { name: 'Ciljevi' }))
   fireEvent.click(card.getByRole('button', { name: 'Uredi ciljeve' }))
   const sheet = within(await screen.findByRole('dialog', { name: 'Ciljevi po tipu dana' }))
   expect(
@@ -230,12 +230,164 @@ test('a refusal of the target as a whole is said under the form', async () => {
     refusal({ rule: 'implied_loss_rate', limit: -0.7, proposed: -0.9, level: 'instance' }),
   )
   const sheet = await openTargets()
+  fireEvent.change(field('Rest', 'kcal'), { target: { value: '1500' } })
   fireEvent.click(sheet.getByRole('button', { name: 'Save' }))
   const alert = await sheet.findByRole('alert')
   expect(alert.textContent).toBe(
     "The limits do not allow it.the loss the target makes: -0.9 proposed, the limit -0.7: the instance's limit",
   )
   expect(sheet.queryByRole('link', { name: 'Loosen it in your limits' })).toBeNull()
+})
+
+// Only what changed is sent: the training days alone, as the days of
+// the week a segmented control of seven picks; nothing changed, nothing.
+test("the training days are changed in the targets' sheet, alone", async () => {
+  const { sent } = editServer()
+  const sheet = await openTargets()
+  const days = within(sheet.getByRole('group', { name: 'Training days' }))
+  expect(
+    days.getAllByRole('checkbox').map((d) => d instanceof HTMLInputElement && d.checked),
+  ).toEqual([true, false, true, false, false, false, false])
+  fireEvent.click(days.getByRole('checkbox', { name: 'Fri' }))
+  fireEvent.click(sheet.getByRole('button', { name: 'Save' }))
+  await waitFor(() => {
+    expect(sent).toEqual([{ training_weekdays: ['monday', 'wednesday', 'friday'] }])
+  })
+  await screen.findByText('Training days changed')
+})
+
+test('a sheet saved unchanged sends nothing', async () => {
+  const { sent } = editServer()
+  const sheet = await openTargets()
+  fireEvent.click(sheet.getByRole('button', { name: 'Save' }))
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: 'Targets by type of day' })).toBeNull()
+  })
+  expect(sent).toEqual([])
+})
+
+// Without training days the plan has one target, every day's: the card
+// says it once and offers to add them, which opens the sheet on the days.
+test('without training days, one target and a way to add them', async () => {
+  const sent: unknown[] = []
+  const rest = { kcal: 1950, protein: 160, carbs: 197, fat: 58 }
+  fakeServer({
+    ...signedIn(),
+    'GET /api/v1/limits': () => Response.json(limitsBody()),
+    'GET /api/v1/plan': () =>
+      Response.json(
+        planBody({
+          ...plan,
+          training_weekdays: [],
+          targets: [{ effective_from: '2026-09-07', training: rest, rest }],
+        }),
+      ),
+    'POST /api/v1/plan/changes': async (r) => {
+      sent.push(await r.json())
+      return Response.json({ proposal: applied, preview: { checks: [] } })
+    },
+  })
+  renderAt('/plan')
+  const card = within(await screen.findByRole('region', { name: 'Targets' }))
+  expect(card.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+    'Every day',
+  ])
+  fireEvent.click(card.getByRole('button', { name: 'Add training days' }))
+  const sheet = within(await screen.findByRole('dialog', { name: 'Targets by type of day' }))
+  sheet.getByText('No training days: one target for every day.')
+  // One target, every day's, until a day is chosen.
+  expect(sheet.queryByRole('group', { name: 'Training' })).toBeNull()
+  sheet.getByRole('group', { name: 'Every day' })
+  const days = within(sheet.getByRole('group', { name: 'Training days' }))
+  fireEvent.click(days.getByRole('checkbox', { name: 'Tue' }))
+  fireEvent.click(days.getByRole('checkbox', { name: 'Thu' }))
+  expect(field('Training', 'kcal')).toHaveProperty('value', '1950')
+  fireEvent.click(sheet.getByRole('button', { name: 'Save' }))
+  await waitFor(() => {
+    expect(sent).toEqual([{ training_weekdays: ['tuesday', 'thursday'] }])
+  })
+})
+
+// A training target of its own holds without training weekdays too (a
+// day of a workout logged is a training day): it is shown, in the card
+// and the sheet, and sent as it is seen.
+test('without training days, a training target of its own is shown, not hidden', async () => {
+  const sent: unknown[] = []
+  fakeServer({
+    ...signedIn(),
+    'GET /api/v1/limits': () => Response.json(limitsBody()),
+    'GET /api/v1/plan': () => Response.json(planBody({ ...plan, training_weekdays: [] })),
+    'POST /api/v1/plan/changes': async (r) => {
+      sent.push(await r.json())
+      return Response.json({ proposal: applied, preview: { checks: [] } })
+    },
+  })
+  renderAt('/plan')
+  const card = within(await screen.findByRole('region', { name: 'Targets' }))
+  expect(card.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+    'Training',
+    'Rest',
+  ])
+  card.getByText('days you log a workout')
+  fireEvent.click(card.getByRole('button', { name: 'Edit targets' }))
+  const sheet = within(await screen.findByRole('dialog', { name: 'Targets by type of day' }))
+  sheet.getByText('No training days: the training target is for days you log a workout.')
+  expect(field('Training', 'kcal')).toHaveProperty('value', '2250')
+  fireEvent.change(field('Rest', 'kcal'), { target: { value: '1800' } })
+  fireEvent.click(sheet.getByRole('button', { name: 'Save' }))
+  await waitFor(() => {
+    expect(sent).toEqual([
+      {
+        targets: [
+          {
+            from: '2026-10-23',
+            training: { kcal: 2250, protein: 165, fat: 65 },
+            rest: { kcal: 1800, protein: 160, fat: 58 },
+          },
+        ],
+      },
+    ])
+  })
+})
+
+// Without training days the one target is every day's: the training
+// days' follows it, as it was the same.
+test("without training days, every day's target is sent for both types of day", async () => {
+  const sent: unknown[] = []
+  const same = { kcal: 2000, protein: 160, carbs: 194, fat: 65 }
+  fakeServer({
+    ...signedIn(),
+    'GET /api/v1/limits': () => Response.json(limitsBody()),
+    'GET /api/v1/plan': () =>
+      Response.json(
+        planBody({
+          ...plan,
+          training_weekdays: [],
+          targets: [{ effective_from: '2026-09-07', training: same, rest: same }],
+        }),
+      ),
+    'POST /api/v1/plan/changes': async (r) => {
+      sent.push(await r.json())
+      return Response.json({ proposal: applied, preview: { checks: [] } })
+    },
+  })
+  const sheet = await openTargets()
+  const every = within(sheet.getByRole('group', { name: 'Every day' }))
+  fireEvent.change(every.getByRole('textbox', { name: 'kcal' }), { target: { value: '1900' } })
+  fireEvent.click(sheet.getByRole('button', { name: 'Save' }))
+  await waitFor(() => {
+    expect(sent).toEqual([
+      {
+        targets: [
+          {
+            from: '2026-10-23',
+            training: { kcal: 1900, protein: 160, fat: 65 },
+            rest: { kcal: 1900, protein: 160, fat: 65 },
+          },
+        ],
+      },
+    ])
+  })
 })
 
 test('the phase is edited: its rate as how fast, its end and its goal', async () => {

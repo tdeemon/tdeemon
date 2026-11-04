@@ -167,7 +167,9 @@ test('turning it off applies at once, and the drift goes', async () => {
   })
 })
 
-test('the review day is a chip of the week, with the next review', async () => {
+// A segmented control of seven, one row at any width (UX #330: chips
+// broke 6 + 1, the one chosen a white pill).
+test('the review day is a segment of the week, with the next review', async () => {
   const { sent } = autopilotServer()
   renderAt('/plan/autopilot')
   const day = within(await screen.findByRole('region', { name: 'Review day' }))
@@ -180,6 +182,9 @@ test('the review day is a chip of the week, with the next review', async () => {
     'Sat',
     'Sun',
   ])
+  const row = day.getByRole('radio', { name: 'Mon' }).closest('label')?.parentElement
+  expect(row?.className).toContain('grid-cols-7')
+  expect(row?.children).toHaveLength(7)
   expect(day.getByRole('radio', { name: 'Mon' })).toHaveProperty('checked', true)
   day.getByText('In the morning, before your morning summary. Next review: Mon, Oct 26.')
 

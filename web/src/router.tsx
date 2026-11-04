@@ -35,6 +35,7 @@ import { NotFoundPage } from '@/pages/not-found'
 import { NotesPage } from '@/pages/notes'
 import { NotificationsPage } from '@/pages/notifications'
 import { PlanPage } from '@/pages/plan'
+import { PlanHistoryPage } from '@/pages/plan-history'
 import { ProfilePage } from '@/pages/profile'
 import { RootLayout } from '@/pages/root-layout'
 import { SettingsIndexPage, SettingsPage } from '@/pages/settings'
@@ -233,6 +234,15 @@ const autopilotRoute = createRoute({
   path: '/plan/autopilot',
   component: AutopilotPage,
 })
+// The history of the plan, and the revision open of it (rev).
+const planHistoryRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/plan/history',
+  validateSearch: (search: Record<string, unknown>): { rev?: string | undefined } => ({
+    rev: typeof search.rev === 'string' ? search.rev : undefined,
+  }),
+  component: PlanHistoryPage,
+})
 const notesRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/plan/notes',
@@ -331,6 +341,7 @@ const routeTree = rootRoute.addChildren([
     limitsRoute,
     notesRoute,
     autopilotRoute,
+    planHistoryRoute,
     settingsRoute.addChildren([
       settingsIndexRoute,
       appearanceRoute,

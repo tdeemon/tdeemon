@@ -8,6 +8,7 @@ import { useMessages } from '@/i18n/messages'
 import { FocusTitle } from '@/lib/focus-title'
 import { formPage } from '@/lib/form-page'
 import { useDesktop } from '@/lib/media'
+import { cn } from '@/lib/utils'
 
 // SubPage is a page of the plan's list or the settings': the way back to
 // the list, its title (titleId names it, for a form it holds) and what it
@@ -19,12 +20,16 @@ export function SubPage({
   titleId,
   from,
   hint,
+  wide = false,
   children,
 }: {
   title: string
   titleId?: string
   from: 'plan' | 'settings'
   hint?: string
+  // A page of two panes (a desktop's history of the plan) takes the
+  // width a form does not.
+  wide?: boolean
   children: ReactNode
 }) {
   const t = useMessages()
@@ -40,7 +45,7 @@ export function SubPage({
   }, [beside, focusTitle])
 
   return (
-    <section className="max-w-2xl space-y-4">
+    <section className={cn('space-y-4', wide ? 'max-w-5xl' : 'max-w-2xl')}>
       {!beside && (
         <div className="flex items-center justify-between gap-2">
           <Link to={from === 'plan' ? '/plan' : '/settings'} className={back}>

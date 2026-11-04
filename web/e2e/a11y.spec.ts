@@ -461,6 +461,7 @@ const screens: Screen[] = [
     '/plan/limits',
     '/plan/notes',
     '/plan/autopilot',
+    '/plan/history',
     '/settings/appearance',
     '/settings/account',
     '/settings/devices',
@@ -531,7 +532,131 @@ const screens: Screen[] = [
       await settled(page)
     },
   },
+  // A plan, a coach's proposal of it that waits, with the warnings of
+  // the limits, opened; and its history, a revision open. Last, as the
+  // screens before have no plan; the test takes it away after
+  // (clearPlan).
+  {
+    name: 'plan-proposal',
+    open: async (page) => {
+      await makePlan(page)
+      await page.goto('/plan')
+      await page.getByRole('button', { name: /(guardrail|granica)/ }).click()
+      await settled(page)
+    },
+  },
+  {
+    name: 'plan-revision',
+    open: async (page) => {
+      await page.goto('/plan/history')
+      await page
+        .getByRole('link', { name: /(by you|, ti)/ })
+        .first()
+        .click()
+      await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible()
+      await settled(page)
+    },
+  },
 ]
+
+// todayOf is the user's day now, as the server has it.
+async function todayOf(page: Page): Promise<string> {
+  const me: unknown = await (await page.request.get('/api/v1/me')).json()
+  return typeof me === 'object' && me !== null && 'today' in me ? String(me.today) : ''
+}
+
+// makePlan gives the user a plan from today, a cut with its targets and
+// training days, and a coach's proposal of two lower targets, below the
+// resting burn on both types of day, so the limits warn of them.
+async function makePlan(page: Page) {
+  const api = page.request
+  const today = await todayOf(page)
+  const day = (n: number) => {
+    const d = new Date(`${today}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + n)
+    return d.toISOString().slice(0, 10)
+  }
+  expect(
+    (
+      await api.put('/api/v1/profile', {
+        data: { sex: 'male', birth_date: '1990-06-15', height_cm: 180 },
+      })
+    ).ok(),
+  ).toBe(true)
+  const changed = await api.post('/api/v1/plan/changes', {
+    data: {
+      phases: [
+        { start: today, type: 'cut', rate_pct_week: -0.5, goal_weight: 68, milestone_weight: 70 },
+      ],
+      targets: [
+        {
+          from: today,
+          training: { kcal: 2100, protein: 140, fat: 60 },
+          rest: { kcal: 1900, protein: 140, fat: 55 },
+        },
+      ],
+      training_weekdays: ['monday', 'wednesday', 'friday'],
+    },
+  })
+  expect(changed.ok()).toBe(true)
+  const proposed = await api.post('/api/v1/proposals', {
+    data: {
+      rationale:
+        'The trend is flat after three weeks, made up for the checks: two lower targets, a week apart, with more carbs on training days for recovery.',
+      model: 'claude-opus-5-5',
+      targets: [
+        {
+          from: day(1),
+          training: { kcal: 1700, protein: 140, fat: 55 },
+          rest: { kcal: 1600, protein: 140, fat: 50 },
+        },
+        {
+          from: day(8),
+          training: { kcal: 1650, protein: 140, fat: 55 },
+          rest: { kcal: 1550, protein: 140, fat: 50 },
+        },
+      ],
+    },
+  })
+  expect(proposed.status()).toBe(201)
+}
+
+// get is a field of an answer's object, or undefined.
+function get(x: unknown, key: string): unknown {
+  return typeof x === 'object' && x !== null
+    ? Object.entries(x).find(([k]) => k === key)?.[1]
+    : undefined
+}
+
+// clearPlan takes the plan of makePlan away, and its proposal, for the
+// other tests: what is not there is left.
+async function clearPlan(page: Page) {
+  const api = page.request
+  const today = await todayOf(page)
+  const plan: unknown = await (await api.get('/api/v1/plan')).json()
+  const pending = get(get(plan, 'pending'), 'id')
+  if (typeof pending === 'string') {
+    await api.post(`/api/v1/proposals/${pending}/reject`)
+  }
+  const fromToday = (key: string, field: string) => {
+    const list = get(plan, key)
+    return Array.isArray(list) && list.some((x: unknown) => get(x, field) === today)
+  }
+  const phase = fromToday('phases', 'start')
+  const target = fromToday('targets', 'effective_from')
+  const days = get(plan, 'training_weekdays')
+  const anyDays = Array.isArray(days) && days.length > 0
+  if (phase || target || anyDays) {
+    await api.post('/api/v1/plan/changes', {
+      data: {
+        ...(phase && { phases: [{ start: today, delete: true }] }),
+        ...(target && { targets: [{ from: today, delete: true }] }),
+        ...(anyDays && { training_weekdays: [] }),
+      },
+    })
+  }
+  await api.put('/api/v1/profile', { data: {} })
+}
 
 // serious is what axe finds of a serious or critical impact, against
 // WCAG 2.2 AA, each said with where.
@@ -711,8 +836,9 @@ for (const size of sizes) {
         })
 
         test.afterEach(async ({ page }) => {
-          // The e2e user's language back for the other tests.
+          // The e2e user's language back for the other tests, and no plan.
           await page.request.patch('/api/v1/me', { data: { locale: 'en' } })
+          await clearPlan(page)
         })
 
         test('every screen passes axe, its targets and its focus', async ({ page }, testInfo) => {
@@ -729,19 +855,22 @@ for (const size of sizes) {
             (size.name === 'desktop' && locale === 'en')
 
           const found: Record<string, string[]> = {}
-          await inTurn(screens, async (screen) => {
-            await screen.open(page, made)
-            const problems = [
-              ...(await serious(page)),
-              ...(size.hasTouch ? await smallTargets(page) : await unfocused(page)),
-            ]
-            if (problems.length > 0) {
-              found[screen.name] = problems
-            }
-            if (photographed) {
-              await photograph(page, testInfo, screen.name)
-            }
-          })
+          await inTurn(
+            screens.filter((s) => s.name.startsWith('plan')),
+            async (screen) => {
+              await screen.open(page, made)
+              const problems = [
+                ...(await serious(page)),
+                ...(size.hasTouch ? await smallTargets(page) : await unfocused(page)),
+              ]
+              if (problems.length > 0) {
+                found[screen.name] = problems
+              }
+              if (photographed) {
+                await photograph(page, testInfo, screen.name)
+              }
+            },
+          )
           expect(found).toEqual({})
         })
       })

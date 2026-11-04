@@ -194,15 +194,16 @@ function LastReview({
       )}
       {review.outcome === 'applied' && (
         <p className="text-sm">
-          <a
-            href="#plan-history"
+          <Link
+            to="/plan/history"
+            search={{ rev: review.proposal_id }}
             className={cn(
               linkTarget,
               'font-medium text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring',
             )}
           >
             {a.takeBack}
-          </a>
+          </Link>
         </p>
       )}
     </div>

@@ -160,12 +160,20 @@ the usual and its range said, each tile a button to a chart, over the
 phase by default (all the days while it is young), 30 or 90 days, a
 year or all; ECharts loaded with them, in the theme's tokens), the plan
 (its phase as the hero, with its pace,
-week, progress and the phases on a timeline, edited and the next one
-planned in a sheet, a proposal that waits, saying only what it changes,
-who made it, when it expires and what the data say beside it, marked
+week, the way to its goal as a bar (or its days) and the phases on a
+timeline, edited and the next one
+planned in a sheet, a proposal that waits, saying only what it changes
+(now, new and the difference, in a table), who made it, when it
+expires, why in three lines, the limits' warnings each rule once, in a
+row that opens, and what the data say beside it, Accept and Reject at
+its foot (A and X on a desktop), each answer said in a toast, marked
 on the plan's section and in a banner on the day, the targets by type of
-day and the deficit they plan, edited in a sheet, the history of its
-revisions with a revert, their rationales of the app's own as codes, a
+day (one, every day's, without training days, but a training target
+of its own for a workout's day, and a way to add them)
+and the deficit they plan, edited with the training days in a sheet,
+the history of its revisions, a page of its own (its rows beside the
+one open on a desktop, the latest beside the plan) with a revert said
+in a toast, their rationales of the app's own as codes, a
 proposal of the limits accepted there alone, the autopilot's card (its
 mode, its last weekly review said from its numbers, the next review,
 the drift against its limit or the step it may propose) and its steps
@@ -174,7 +182,8 @@ the review's line on the day of it,
 and, before a plan, how one comes; what it rests on of the user's, each
 a row to its page: the profile, the limits in groups that open, a wrong
 one focused at its field, the autopilot's settings (asking before it is
-turned on, the review's weekday, what it may and never changes and when
+turned on, the review's weekday in seven
+segments, what it may and never changes and when
 it waits), the notes for a coach) and the settings as a
 list under the account's card, beside the page open of it on a desktop,
 signing out last and the version and the export at its foot (the

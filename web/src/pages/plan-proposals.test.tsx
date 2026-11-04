@@ -100,6 +100,19 @@ function refusal(): Response {
   )
 }
 
+// rowsOf are the rows of the tables in el, each cell's words.
+function rowsOf(el: HTMLElement): (string | null)[][] {
+  return within(el)
+    .getAllByRole('row')
+    .map((row) => [...row.querySelectorAll('th, td')].map((cell) => cell.textContent))
+}
+
+// revisionAt opens the revision id on the plan's history, and returns it.
+async function revisionAt(id: string, name = /, by /) {
+  renderAt(`/plan/history?rev=${id}`)
+  return screen.findByRole('region', { name })
+}
+
 function closed(status: number): Response {
   return Response.json(
     { status, title: 'An error', detail: 'the proposal is superseded: it waits no more' },
@@ -157,23 +170,38 @@ function coachServer(
 test('a proposal that waits says why, what it changes and what it comes to, and is accepted', async () => {
   const { sent } = coachServer({ pending: step, pending_preview: preview })
   renderAt('/plan')
-  const card = within(await screen.findByRole('region', { name: 'A proposed change' }))
+  const region = await screen.findByRole('region', { name: 'A proposed change' })
+  const card = within(region)
+  card.getByText('Claude')
   card.getByText('Proposed by Claude (claude-opus-5-5) · 8 hr. ago')
   card.getByText("The loss is under the cut's rate.")
   card.getByText('Drawn from the days Sep 25 to Oct 22.')
-  card.getByText('New target from Oct 24')
-  card.getByText('1,900 kcal · P 160 g · C 220 g · F 60 g')
-  card.getByText('From Oct 24: 1,900 kcal a day on average, -0.53% a week (-0.44 kg)')
+  // A new target, the same on both types of day: every day's, its macros
+  // under its kcal.
+  expect(rowsOf(region)).toEqual([
+    ['From Oct 24', 'Now', 'New', 'Δ'],
+    ['Every day kcalP 160 · C 220 · F 60 g', '—', '1,900', ''],
+  ])
   card.getByText('expires in 7 days')
+  // The buttons at its foot, last.
+  expect(
+    within(region)
+      .getAllByRole('button')
+      .map((b) => b.textContent),
+  ).toEqual(['Accept', 'Reject'])
 
   fireEvent.click(card.getByRole('button', { name: 'Accept' }))
   await waitFor(() => {
     expect(screen.queryByRole('region', { name: 'A proposed change' })).toBeNull()
   })
   expect(sent).toEqual([`POST /api/v1/proposals/${step.id}/apply`])
-  // Now a revision of the plan.
-  const history = within(screen.getByRole('region', { name: 'Plan history' }))
-  history.getByText("The loss is under the cut's rate.")
+  // The answer is said, and the plan has a revision now, a row to its
+  // history.
+  await screen.findByText('Proposal accepted')
+  const row = await screen.findByRole('link', { name: 'Plan history' })
+  expect(document.getElementById(row.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
+    '1 revision · Oct 23',
+  )
 })
 
 test('a proposal that waits is rejected', async () => {
@@ -185,9 +213,10 @@ test('a proposal that waits is rejected', async () => {
     expect(screen.queryByRole('region', { name: 'A proposed change' })).toBeNull()
   })
   expect(sent).toEqual([`POST /api/v1/proposals/${step.id}/reject`])
+  await screen.findByText('Proposal rejected')
   // No plan yet, and no history of one.
   screen.getByRole('region', { name: 'No plan yet' })
-  expect(screen.queryByRole('region', { name: 'Plan history' })).toBeNull()
+  expect(screen.queryByRole('link', { name: 'Plan history' })).toBeNull()
 })
 
 test('a proposal the limits refuse now says why, in words', async () => {
@@ -212,11 +241,16 @@ test('a proposal that waits no more says so', async () => {
 
 test('the history shows a revision, which is taken back in a step', async () => {
   const { sent } = coachServer({ revisions: [sundays] })
-  renderAt('/plan')
-  const history = within(await screen.findByRole('region', { name: 'Plan history' }))
+  const region = await revisionAt(sundays.id)
+  const history = within(region)
+  history.getByRole('heading', { name: 'Oct 20, by Claude (claude-opus-5-5)' })
   history.getByText('Train on Sundays too.')
-  history.getByText('Training days')
-  history.getByText('Mon → Sun, Mon')
+  expect(rowsOf(region)).toEqual([
+    // Of the day it was applied, not today: 2 a.m. in Los Angeles, before
+    // the user's day starts at 4, is the 19th's.
+    ['From Oct 19', 'Before', 'After', 'Δ'],
+    ['Training days', 'Mon', 'Sun, Mon', ''],
+  ])
 
   fireEvent.click(history.getByRole('button', { name: 'Take back' }))
   history.getByText('Take this change back, from now on?')
@@ -227,6 +261,9 @@ test('the history shows a revision, which is taken back in a step', async () => 
       `POST /api/v1/proposals/${step.id}/apply`,
     ])
   })
+  // Said in a toast, with what it took back.
+  const toast = await screen.findByText('Change taken back')
+  expect(toast.parentElement?.textContent).toContain('Training days: Sun, Mon')
 })
 
 test('a change that took effect cannot be taken back, and says so', async () => {
@@ -234,13 +271,130 @@ test('a change that took effect cannot be taken back, and says so', async () => 
     { revisions: [sundays] },
     { revert: () => Response.json({ status: 422, detail: 'invalid proposal' }, { status: 422 }) },
   )
-  renderAt('/plan')
-  const history = within(await screen.findByRole('region', { name: 'Plan history' }))
+  const history = within(await revisionAt(sundays.id))
   fireEvent.click(history.getByRole('button', { name: 'Take back' }))
   fireEvent.click(history.getByRole('button', { name: 'Take back' }))
   expect((await history.findByRole('alert')).textContent).toBe(
     "This change can't be taken back anymore. It took effect, or the plan changed since. Ask for a new change.",
   )
+})
+
+// desktop makes the window a desktop's width, as matchMedia says.
+function desktop() {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query === '(min-width: 64rem)',
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }))
+}
+
+// The history is a page of its own: on a phone its rows, each to its
+// revision, which leads back to them.
+test("the plan's history is a row to its page, of rows to each revision", async () => {
+  const edited: Proposal = {
+    ...sundays,
+    id: '0193c3a5-0000-7000-8000-0000000000b2',
+    rationale: 'changed in the app',
+    by: { client: 'web' },
+    decided_at: '2026-10-22T09:00:00Z',
+  }
+  coachServer({ revisions: [edited, { ...sundays, status: 'reverted' }] })
+  const router = renderAt('/plan')
+  fireEvent.click(await screen.findByRole('link', { name: 'Plan history' }))
+  await screen.findByRole('heading', { name: 'Plan history', level: 1 })
+  const rows = screen.getAllByRole('link', { name: /, by / })
+  expect(rows.map((r) => r.textContent)).toEqual([
+    'Oct 22, by youTraining days: Sun, Mon',
+    'Oct 20, by Claude (claude-opus-5-5) · Taken backTraining days: Sun, Mon',
+  ])
+  fireEvent.click(rows[1] ?? document.body)
+  const revision = within(await screen.findByRole('region', { name: /^Oct 20, by/ }))
+  revision.getByText('Train on Sundays too.')
+  // Taken back, it is taken back no more.
+  expect(revision.queryByRole('button', { name: 'Take back' })).toBeNull()
+  fireEvent.click(screen.getByRole('link', { name: 'All changes' }))
+  await waitFor(() => {
+    expect(router.state.location.search).toEqual({})
+  })
+  expect(screen.getAllByRole('link', { name: /, by / })).toHaveLength(2)
+})
+
+// On a desktop the rows stay beside the revision open, the latest at
+// first; the plan has its latest revisions beside it.
+test("on a desktop the history's rows stay beside the revision open", async () => {
+  desktop()
+  coachServer({ revisions: [sundays] })
+  renderAt('/plan')
+  const card = within(await screen.findByRole('region', { name: 'Plan history' }))
+  expect(screen.queryByRole('link', { name: 'Plan history' })).toBeNull()
+  fireEvent.click(card.getByRole('link', { name: '1 revision' }))
+  const revision = await screen.findByRole('region', { name: /^Oct 20, by/ })
+  within(revision).getByText('Train on Sundays too.')
+  expect(screen.getByRole('link', { name: /^Oct 20, by/ }).getAttribute('aria-current')).toBe(
+    'page',
+  )
+})
+
+// On a desktop the keyboard answers a proposal: A accepts it, X rejects
+// it; the header says so.
+test('on a desktop A accepts a proposal and X rejects one', async () => {
+  desktop()
+  const { sent } = coachServer({ pending: step })
+  renderAt('/plan')
+  await screen.findByRole('region', { name: 'A proposed change' })
+  const header = screen.getByRole('heading', { name: 'Plan', level: 1 }).parentElement
+  expect(header?.querySelector('p')?.textContent).toBe('A proposal waits · A accept · X reject')
+  fireEvent.keyDown(document.body, { key: 'x' })
+  await waitFor(() => {
+    expect(sent).toEqual([`POST /api/v1/proposals/${step.id}/reject`])
+  })
+  cleanup()
+
+  const accepted = coachServer({ pending: step })
+  renderAt('/plan')
+  await screen.findByRole('region', { name: 'A proposed change' })
+  // With Caps Lock on, as the key comes.
+  fireEvent.keyDown(document.body, { key: 'A' })
+  await waitFor(() => {
+    expect(accepted.sent).toEqual([`POST /api/v1/proposals/${step.id}/apply`])
+  })
+})
+
+// G, then A, is a way to a section the app does not have, not an
+// answer.
+test('on a desktop G then A or X does not answer a proposal', async () => {
+  desktop()
+  const { sent } = coachServer({ pending: step })
+  renderAt('/plan')
+  await screen.findByRole('region', { name: 'A proposed change' })
+  fireEvent.keyDown(document.body, { key: 'g' })
+  fireEvent.keyDown(document.body, { key: 'a' })
+  fireEvent.keyDown(document.body, { key: 'g' })
+  fireEvent.keyDown(document.body, { key: 'x' })
+  await act(() => Promise.resolve())
+  expect(sent).toEqual([])
+})
+
+// A revision past the latest the plan holds is said gone, not shown as
+// another.
+test('a revision the plan does not hold is said older, not another shown', async () => {
+  desktop()
+  coachServer({ revisions: [sundays] })
+  renderAt('/plan/history?rev=0193c3a5-0000-7000-8000-00000000ffff')
+  await screen.findByText('This change is older than the latest ones shown here.')
+  expect(screen.queryByRole('region', { name: /^Oct 20, by/ })).toBeNull()
+  expect(screen.getAllByRole('link', { name: /, by / })).toHaveLength(1)
+})
+
+// A phone has no such keys: a letter typed is no answer.
+test("on a phone a letter doesn't answer a proposal", async () => {
+  const { sent } = coachServer({ pending: step })
+  renderAt('/plan')
+  await screen.findByRole('region', { name: 'A proposed change' })
+  fireEvent.keyDown(document.body, { key: 'a' })
+  await act(() => Promise.resolve())
+  expect(sent).toEqual([])
 })
 
 // A proposal that came in place of one that waits no more starts afresh:
@@ -379,14 +533,29 @@ function summaryOf(over: Partial<Summary> = {}): Summary {
   }
 }
 
-// planPage serves a plan, calibration's summary, and the user's profile.
-function planPage(plan: Partial<Plan>, summary: Summary = summaryOf(), profile = me().profile) {
+// planPage serves a plan, calibration's summary, the user's profile,
+// and the trend of the days asked for, from trends by day.
+function planPage(
+  plan: Partial<Plan>,
+  summary: Summary = summaryOf(),
+  profile = me().profile,
+  trends: Record<string, number> = {},
+) {
   fakeServer({
     ...signedIn(),
     'GET /api/v1/me': () => Response.json({ ...me(), profile }),
     'GET /api/v1/limits': () => Response.json(limitsBody()),
     'GET /api/v1/plan': () => Response.json(planBody(plan)),
     'GET /api/v1/summary': () => Response.json(summary),
+    'GET /api/v1/history': (r) => {
+      const q = new URL(r.url).searchParams
+      const from = q.get('from') ?? ''
+      const to = q.get('to') ?? ''
+      const days = Object.entries(trends)
+        .filter(([date]) => date >= from && date <= to)
+        .map(([date, kg]) => ({ date, trend_kg: kg, meals: 0, status: 'open', type: 'rest' }))
+      return Response.json({ from, to, days, weeks: [] })
+    },
   })
 }
 
@@ -431,9 +600,23 @@ test('a phase with a milestone and no goal shows the milestone', async () => {
 // The phase of today is the plan's hero: its type, its pace and range,
 // the rate measured, its week, how far it has come, and its goal; and
 // the phases on a timeline.
-test('the phase of today shows its pace, its week and how far it came, among the phases', async () => {
+test('the phase of today shows its pace, its week and the way to its goal, among the phases', async () => {
   planPage(
-    cut,
+    {
+      ...cut,
+      phases: [
+        { type: 'maintain', start: '2026-06-01', end: '2026-09-06', rate_pct_week: 0 },
+        {
+          type: 'cut',
+          start: '2026-09-07',
+          end: '2026-12-13',
+          rate_pct_week: -0.5,
+          goal_weight: 80,
+          milestone_weight: 83.75,
+        },
+        { type: 'maintain', start: '2026-12-14', rate_pct_week: 0 },
+      ],
+    },
     summaryOf({
       trend: { date: '2026-10-22', kg: 82.5 },
       verdict: {
@@ -444,23 +627,33 @@ test('the phase of today shows its pace, its week and how far it came, among the
         tolerance_pct_week: 0.1,
       },
     }),
+    me().profile,
+    // The trend as the cut began, a day after its start.
+    { '2026-09-08': 85, '2026-09-09': 84.9 },
   )
   renderAt('/plan')
-  const hero = within(await screen.findByRole('region', { name: 'Cut' }))
+  const region = await screen.findByRole('region', { name: 'Cut' })
+  const hero = within(region)
   hero.getByText('Current phase · since Sep 7')
   hero.getByText('Week 7 of 14')
-  hero.getByText('-0.5% a week')
-  expect(await hero.findByText('≈ -0.41 kg a week')).toBeTruthy()
-  hero.getByText('in range from -0.6% to -0.4%')
-  hero.getByText('-0.48% a week')
-  hero.getByText('in range')
-  // 47 days gone of 98, today's included.
-  const days = hero.getByRole('progressbar', { name: 'Days of the phase' })
-  expect([days.getAttribute('value'), days.getAttribute('max')]).toEqual(['47', '98'])
-  expect(days.getAttribute('aria-valuetext')).toBe('51 days left')
-  // Under the bar, and on the timeline.
-  expect(hero.getAllByText('Sep 7 – Dec 13')).toHaveLength(2)
-  expect(hero.getByText(/^Goal 80 kg/).textContent).toBe('Goal 80 kg · trend 82.5 kg, 2.5 kg to go')
+  expect((await hero.findByText('-0.5% a week')).parentElement?.textContent).toBe(
+    '-0.5% a week · ≈ -0.41 kg a week',
+  )
+  expect(hero.getByText(/^Measured/).textContent).toBe(
+    'Measured -0.48% a week, in range· target range -0.6% to -0.4%',
+  )
+  // From 85 kg as it began to the goal of 80: half the way, the
+  // milestone a quarter of it.
+  const way = hero.getByRole('progressbar', { name: 'The way to the goal' })
+  await waitFor(() => {
+    expect([way.getAttribute('value'), way.getAttribute('max')]).toEqual(['50', '100'])
+  })
+  expect(way.getAttribute('aria-valuetext')).toBe('trend 82.5 kg, 2.5 kg to go')
+  const marks = [...region.querySelectorAll<HTMLElement>('[style]')].map((m) => m.style.left)
+  expect(marks).toEqual(['50%', '25%'])
+  hero.getByText('82.5 kg trend')
+  hero.getByText('milestone 83.8 kg')
+  hero.getByText('Goal 80 kg')
 
   const phases = within(hero.getByRole('list', { name: 'Phases' }))
     .getAllByRole('listitem')
@@ -470,6 +663,22 @@ test('the phase of today shows its pace, its week and how far it came, among the
     'Cut · -0.5% a weekSep 7 – Dec 13Now',
     'Maintenance · 0% a weekfrom Dec 14Planned',
   ])
+})
+
+// Without a goal, a phase with a planned end says how far it came in
+// days.
+test('a phase with an end and no goal shows its days', async () => {
+  planPage({
+    phases: [{ type: 'cut', start: '2026-09-07', end: '2026-12-13', rate_pct_week: -0.5 }],
+  })
+  renderAt('/plan')
+  const hero = within(await screen.findByRole('region', { name: 'Cut' }))
+  // 47 days gone of 98, today's included.
+  const days = hero.getByRole('progressbar', { name: 'Days of the phase' })
+  expect([days.getAttribute('value'), days.getAttribute('max')]).toEqual(['47', '98'])
+  expect(days.getAttribute('aria-valuetext')).toBe('51 days left')
+  hero.getByText('Sep 7 – Dec 13')
+  expect(hero.queryByRole('progressbar', { name: 'The way to the goal' })).toBeNull()
 })
 
 test('a phase not measured yet says so, and one with no end its week alone', async () => {
@@ -494,7 +703,7 @@ test('the targets by type of day come to a weekly average, against the TDEE', as
     }),
   )
   renderAt('/plan')
-  const targets = within(await screen.findByRole('region', { name: 'Targets by type of day' }))
+  const targets = within(await screen.findByRole('region', { name: 'Targets' }))
   targets.getByText('since Sep 7')
   const tile = (name: string) => targets.getByRole('heading', { name }).parentElement?.textContent
   expect(tile('Training')).toBe('Training2,300 kcalP 160 · C 230 · F 70 g2 days a week · Mon, Wed')
@@ -526,7 +735,7 @@ test('a TDEE not trusted yet is about so much, and one not measured says so', as
     summaryOf({ tdee: { ...summaryOf().tdee, measured: true, trusted: false, kcal: 1900 } }),
   )
   renderAt('/plan')
-  const targets = within(await screen.findByRole('region', { name: 'Targets by type of day' }))
+  const targets = within(await screen.findByRole('region', { name: 'Targets' }))
   const term = (name: string) => targets.getByText(name).nextElementSibling?.textContent
   await waitFor(() => {
     expect(term('TDEE')).toBe('≈1,900 kcal a day')
@@ -536,7 +745,7 @@ test('a TDEE not trusted yet is about so much, and one not measured says so', as
 
   planPage(cut)
   renderAt('/plan')
-  const without = within(await screen.findByRole('region', { name: 'Targets by type of day' }))
+  const without = within(await screen.findByRole('region', { name: 'Targets' }))
   await waitFor(() => {
     expect(without.getByText('TDEE').nextElementSibling?.textContent).toBe('not measured yet')
   })
@@ -561,7 +770,7 @@ test('a plan that starts tomorrow is one to come', async () => {
   expect(within(hero.getByRole('list', { name: 'Phases' })).getByRole('listitem').textContent).toBe(
     'Cut · -0.4% a weekfrom Oct 24Planned',
   )
-  const targets = within(screen.getByRole('region', { name: 'Targets by type of day' }))
+  const targets = within(screen.getByRole('region', { name: 'Targets' }))
   targets.getByText('No target yet.')
   expect(targets.getByText('From Oct 24:').parentElement?.textContent).toBe(
     'From Oct 24: 2,400 kcal · P 200 g · C 231 g · F 75 g',
@@ -582,7 +791,7 @@ test('no plan yet says how one comes, and the first step to it', async () => {
     '/plan/profile',
     '/settings/devices?connect=coach',
   ])
-  expect(screen.queryByRole('region', { name: 'Targets by type of day' })).toBeNull()
+  expect(screen.queryByRole('region', { name: 'Targets' })).toBeNull()
   fireEvent.click(first)
   await screen.findByRole('heading', { name: 'Profile', level: 1 })
   expect(router.state.location.pathname).toBe('/plan/profile')
@@ -599,7 +808,7 @@ test('no plan yet says how one comes, and the first step to it', async () => {
 test('a plan of training days alone shows them', async () => {
   planPage({ training_weekdays: ['monday', 'wednesday'] })
   renderAt('/plan')
-  const targets = within(await screen.findByRole('region', { name: 'Targets by type of day' }))
+  const targets = within(await screen.findByRole('region', { name: 'Targets' }))
   expect(targets.getByText('Training days:').parentElement?.textContent).toBe(
     'Training days: Mon, Wed',
   )
@@ -674,11 +883,13 @@ function limitsServer(pending: Proposal) {
 test('a proposal of the limits shows each, loosened or tightened, and asks before it loosens one', async () => {
   const { applied } = limitsServer(faster)
   renderAt('/plan')
-  const card = within(await screen.findByRole('region', { name: 'A proposed change' }))
-  card.getByText('Limit: Fastest loss in a cut, BMI under 30')
-  card.getByText('0.7% a week → 1% a week, loosened')
-  card.getByText('Limit: Least protein')
-  card.getByText('1.6 g/kg → 1.8 g/kg, tightened')
+  const region = await screen.findByRole('region', { name: 'A proposed change' })
+  const card = within(region)
+  expect(rowsOf(region)).toEqual([
+    ['From Oct 23', 'Now', 'New', 'Δ'],
+    ['Fastest loss in a cut, BMI under 30', '0.7% a week', '1% a week', 'loosened'],
+    ['Least protein', '1.6 g/kg', '1.8 g/kg', 'tightened'],
+  ])
   card.getByText(
     'A change of your limits is accepted only here, in the app, never by your AI coach.',
   )
@@ -803,9 +1014,9 @@ test('taking back a tightened limit says it loosens it, and confirms it', async 
     },
   }
   const { applied } = takeBackServer(tightened, back)
-  renderAt('/plan')
-  const history = within(await screen.findByRole('region', { name: 'Plan history' }))
-  history.getByText('1.6 g/kg → 1.8 g/kg, tightened')
+  const region = await revisionAt(tightened.id)
+  const history = within(region)
+  expect(rowsOf(region)).toContainEqual(['Least protein', '1.6 g/kg', '1.8 g/kg', 'tightened'])
   fireEvent.click(history.getByRole('button', { name: 'Take back' }))
   history.getByText('Taking it back loosens Least protein, which allows a plan the limit refused.')
   fireEvent.click(history.getByRole('button', { name: 'Take back' }))
@@ -830,8 +1041,7 @@ test('a take-back that loosens what the question did not say is not confirmed', 
     },
   }
   const { applied } = takeBackServer(tightened, back)
-  renderAt('/plan')
-  const history = within(await screen.findByRole('region', { name: 'Plan history' }))
+  const history = within(await revisionAt(tightened.id))
   fireEvent.click(history.getByRole('button', { name: 'Take back' }))
   fireEvent.click(history.getByRole('button', { name: 'Take back' }))
   await waitFor(() => {
@@ -868,11 +1078,49 @@ const fewerOnRest: Proposal = {
 test('a proposal says only what it changes, from what it was to what it is to be', async () => {
   planPage({ targets: [splitTarget], training_weekdays: ['monday'], pending: fewerOnRest })
   renderAt('/plan')
-  const card = within(await screen.findByRole('region', { name: 'A proposed change' }))
-  card.getByText('Target from Oct 24')
-  expect(card.getByText('Rest days: 1,950 → 1,850 kcal · C 197 → 172 g')).toBeTruthy()
-  expect(card.queryByText(/^Training days/)).toBeNull()
-  expect(card.queryByText(/251/)).toBeNull()
+  const region = await screen.findByRole('region', { name: 'A proposed change' })
+  // Each type of day's kcal, and under it only the macros it changes:
+  // not the training days' carbs, whose decimal none shows.
+  expect(rowsOf(region)).toEqual([
+    ['From Oct 24', 'Now', 'New', 'Δ'],
+    ['Training kcal', '2,250', '2,250', '—'],
+    ['Rest kcalC 197 → 172 g', '1,950', '1,850', '-100'],
+  ])
+  expect(within(region).queryByText(/251/)).toBeNull()
+})
+
+// A target of a later day is told against the one the proposal sets
+// before it.
+test('a second period is told against the first', async () => {
+  const lower = (kcal: number) => ({
+    training: { ...splitTarget.training, kcal: kcal + 300 },
+    rest: { ...splitTarget.rest, kcal },
+  })
+  planPage({
+    targets: [splitTarget],
+    training_weekdays: ['monday'],
+    pending: {
+      ...step,
+      changes: {
+        phases: [],
+        targets: [
+          { from: '2026-11-07', after: lower(1800) },
+          { from: '2026-10-24', after: lower(1900) },
+        ],
+        limits: [],
+      },
+    },
+  })
+  renderAt('/plan')
+  const region = await screen.findByRole('region', { name: 'A proposed change' })
+  expect(rowsOf(region)).toEqual([
+    ['From Oct 24', 'Now', 'New', 'Δ'],
+    ['Training kcal', '2,250', '2,200', '-50'],
+    ['Rest kcal', '1,950', '1,900', '-50'],
+    ['From Nov 7', 'Now', 'New', 'Δ'],
+    ['Training kcal', '2,200', '2,100', '-100'],
+    ['Rest kcal', '1,900', '1,800', '-100'],
+  ])
 })
 
 test('a change of a phase says each value it changes', async () => {
@@ -927,11 +1175,12 @@ test('what the data say stands beside the proposal, and says when they ask for n
     }),
   )
   renderAt('/plan')
-  const data = within(await screen.findByRole('region', { name: 'What the data say' }))
-  data.getByText("Calibration measures -0.55% a week, within the phase's range (-0.6% to -0.4%).")
-  data.getByText('Its TDEE, 2,400 ± 40 kcal, is reliable.')
+  const card = within(await screen.findByRole('region', { name: 'A proposed change' }))
+  expect((await card.findByText('The data:')).parentElement?.textContent).toBe(
+    'The data: TDEE 2,400 ± 40 kcal · pace -0.55% a week, in range (-0.6% to -0.4%)',
+  )
   expect(
-    data.getByText("The pace is in range, so the data alone don't ask for this change."),
+    card.getByText("The pace is in range, so the data alone don't ask for this change."),
   ).toBeTruthy()
 })
 
@@ -952,11 +1201,12 @@ test('the data that ask the other way say so, and a TDEE not trusted is about so
     }),
   )
   renderAt('/plan')
-  const data = within(await screen.findByRole('region', { name: 'What the data say' }))
-  data.getByText("Calibration measures -0.8% a week, below the phase's range (-0.6% to -0.4%).")
-  data.getByText('Its TDEE, about 2,400 kcal, is not reliable yet.')
+  const card = within(await screen.findByRole('region', { name: 'A proposed change' }))
+  expect((await card.findByText('The data:')).parentElement?.textContent).toBe(
+    'The data: TDEE ≈ 2,400 kcal, not reliable yet · pace -0.8% a week, below range (-0.6% to -0.4%)',
+  )
   expect(
-    data.getByText('The data point the other way: they ask for more kcal, not fewer.'),
+    card.getByText('The data point the other way: they ask for more kcal, not fewer.'),
   ).toBeTruthy()
 })
 
@@ -979,11 +1229,86 @@ test("a limit's warning is said in plain words, with why it matters", async () =
   })
   renderAt('/plan')
   const card = within(await screen.findByRole('region', { name: 'A proposed change' }))
-  expect(
-    card.getByText(
-      'Rest days: low energy for your lean mass (27 kcal/kg, at least 30 advised). Over time it can tire you and slow recovery.',
-    ),
-  ).toBeTruthy()
+  const row = card.getByRole('button', { name: /guardrail warning/ })
+  expect(row.textContent).toBe(
+    '1 guardrail warning · rest daysLow energy for your lean mass (27 kcal/kg, at least 30 advised). Over time it can tire you and slow recovery.',
+  )
+  // Opened, each where it is found.
+  expect(row.getAttribute('aria-expanded')).toBe('false')
+  fireEvent.click(row)
+  expect(row.getAttribute('aria-expanded')).toBe('true')
+  expect(card.getByText('From Oct 24:').parentElement?.textContent).toBe(
+    'From Oct 24: Rest days: low energy for your lean mass (27 kcal/kg, at least 30 advised). Over time it can tire you and slow recovery.',
+  )
+})
+
+// below is a warning of a target below the resting burn.
+function below(day_type: 'training' | 'rest', value: number) {
+  return { rule: 'below_bmr' as const, day_type, value, threshold: 1830 }
+}
+
+// A period the proposal deletes is not the one a later period is told
+// against: the target before it is.
+test('a period after one deleted is told against the target before it', async () => {
+  const lower = (kcal: number) => ({
+    training: { ...splitTarget.training, kcal: kcal + 300 },
+    rest: { ...splitTarget.rest, kcal },
+  })
+  const deleted = { effective_from: '2026-10-26', ...lower(1700) }
+  planPage({
+    targets: [splitTarget, deleted],
+    training_weekdays: ['monday'],
+    pending: {
+      ...step,
+      changes: {
+        phases: [],
+        targets: [
+          { from: '2026-10-26', before: lower(1700) },
+          { from: '2026-11-07', after: lower(1800) },
+        ],
+        limits: [],
+      },
+    },
+  })
+  renderAt('/plan')
+  const region = await screen.findByRole('region', { name: 'A proposed change' })
+  expect(rowsOf(region).slice(3)).toEqual([
+    ['From Nov 7', 'Now', 'New', 'Δ'],
+    ['Training kcal', '2,250', '2,100', '-150'],
+    ['Rest kcal', '1,950', '1,800', '-150'],
+  ])
+})
+
+// A rule the limits warn of on both types of day, in two periods, is
+// said once, with the values from the least to the most (U2 PL1).
+test('a warning of both types of day and two periods is said once', async () => {
+  planPage({
+    pending: step,
+    pending_preview: {
+      checks: [
+        {
+          of: 'target',
+          day: '2026-10-24',
+          warnings: [below('training', 1700), below('rest', 1600)],
+          violations: [],
+        },
+        {
+          of: 'target',
+          day: '2026-11-07',
+          warnings: [below('training', 1650), below('rest', 1600)],
+          violations: [],
+        },
+      ],
+    },
+  })
+  renderAt('/plan')
+  const card = within(await screen.findByRole('region', { name: 'A proposed change' }))
+  expect(card.getAllByText(/resting burn/i)).toHaveLength(1)
+  expect(card.getByRole('button', { name: /guardrail warning/ }).textContent).toBe(
+    '1 guardrail warning · both day types, both periodsBelow your resting burn (1,600–1,700 kcal, BMR about 1,830). Fine for a while, but hard to keep up.',
+  )
+  fireEvent.click(card.getByRole('button', { name: /guardrail warning/ }))
+  expect(card.getAllByText(/resting burn/i)).toHaveLength(5)
 })
 
 test('a proposal that waits marks the plan in the sections, and none does not', async () => {
@@ -1055,7 +1380,13 @@ test('in Croatian the proposal says who made it, when, and how long it waits', a
   const card = within(await screen.findByRole('region', { name: 'Prijedlog promjene' }))
   card.getByText('Predložio Claude (claude-opus-5-5) · prije 8 h')
   card.getByText('istječe za 7 dana')
-  expect(card.getByText('Dani odmora: 1.950 → 1.850 kcal · UH 197 → 172 g')).toBeTruthy()
+  const rows = rowsOf(screen.getByRole('region', { name: 'Prijedlog promjene' }))
+  expect(rows[0]).toEqual(['Od 24. lis', 'Sad', 'Novo', 'Δ'])
+  expect(rows.map((r) => r.slice(0, 3))).toContainEqual([
+    'Odmor kcalUH 197 → 172 g',
+    '1.950',
+    '1.850',
+  ])
 })
 
 // The app's own changes have a code for their rationale, said in the
@@ -1070,12 +1401,13 @@ test("a revision made or taken back in the app is said in the reader's language"
   }
   const before: Proposal = { ...sundays, status: 'reverted', rationale: 'Vraćeno u aplikaciji.' }
   coachServer({ revisions: [edited, before] })
-  renderAt('/plan')
-  const history = within(await screen.findByRole('region', { name: 'Plan history' }))
-  history.getByText('Changed in the app.')
-  history.getByText('Oct 20, by you')
-  history.getByText('Taken back in the app.')
-  expect(history.queryByText('Vraćeno u aplikaciji.')).toBeNull()
+  const yours = within(await revisionAt(edited.id))
+  yours.getByRole('heading', { name: 'Oct 20, by you' })
+  yours.getByText('Changed in the app.')
+  cleanup()
+  const back = within(await revisionAt(before.id))
+  back.getByText('Taken back in the app.')
+  expect(back.queryByText('Vraćeno u aplikaciji.')).toBeNull()
 })
 
 test('a revision is taken back with a code, in any language', async () => {
@@ -1091,8 +1423,7 @@ test('a revision is taken back with a code, in any language', async () => {
     [`POST /api/v1/proposals/${step.id}/apply`]: () =>
       Response.json({ proposal: { ...step, status: 'applied' } }),
   })
-  renderAt('/plan')
-  const history = within(await screen.findByRole('region', { name: 'Povijest plana' }))
+  const history = within(await revisionAt(sundays.id, /claude-opus-5-5/))
   fireEvent.click(history.getByRole('button', { name: 'Vrati' }))
   fireEvent.click(history.getByRole('button', { name: 'Vrati' }))
   await waitFor(() => {

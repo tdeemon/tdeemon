@@ -1,6 +1,8 @@
-import { Gauge, NotebookPen, ShieldCheck, UserRound } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Gauge, History, NotebookPen, ShieldCheck, UserRound } from 'lucide-react'
 
 import { $api } from '@/api/client'
+import { sessionQuery } from '@/api/session'
 import { weekdayOf } from '@/components/autopilot/weekday'
 import { ListGroup } from '@/components/list-group'
 import { ListRow } from '@/components/list-row'
@@ -9,11 +11,13 @@ import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
 
 // YouList is what a plan rests on of the user's, each a row to its page
-// with its value in short: the profile (or what a plan still needs of
-// it), the limits (how fast a loss may go, and the least protein, as they
-// hold), the autopilot (whether it asks first, its day, and in autopilot
-// its drift) and the notes for a coach (their first line).
-export function YouList() {
+// with its value in short: the autopilot (whether it asks first, its
+// day, and in autopilot its drift), the profile (or what a plan still
+// needs of it), the limits (how fast a loss may go, and the least
+// protein, as they hold) and the notes for a coach (their first line);
+// and with history, a phone's, the plan's history (how many revisions,
+// and the latest's day).
+export function YouList({ history = false }: { history?: boolean }) {
   const t = useMessages()
   const f = useFormat()
   const me = $api.useQuery('get', '/api/v1/me')
@@ -24,6 +28,9 @@ export function YouList() {
   const holds = limits.data?.effective
   const plan = $api.useQuery('get', '/api/v1/plan')
   const autopilot = plan.data?.autopilot
+  const revisions = plan.data?.revisions
+  const session = useQuery(sessionQuery)
+  const timeZone = session.data?.user.timezone ?? 'UTC'
 
   let profileSummary
   if (profile !== undefined) {
@@ -39,26 +46,6 @@ export function YouList() {
 
   return (
     <ListGroup title={t.plan.you}>
-      <ListRow
-        icon={UserRound}
-        title={t.plan.profile}
-        to="/plan/profile"
-        summary={profileSummary}
-        warn={profile !== undefined && profile.missing.length > 0}
-      />
-      <ListRow
-        icon={ShieldCheck}
-        title={t.plan.limits}
-        to="/plan/limits"
-        summary={
-          holds?.cut_rate === undefined || holds.protein_floor === undefined
-            ? undefined
-            : t.plan.limitsSummary(
-                limit.value('cut_rate', holds.cut_rate),
-                limit.value('protein_floor', holds.protein_floor),
-              )
-        }
-      />
       <ListRow
         icon={Gauge}
         title={t.autopilot.name}
@@ -83,6 +70,26 @@ export function YouList() {
         }
       />
       <ListRow
+        icon={UserRound}
+        title={t.plan.profile}
+        to="/plan/profile"
+        summary={profileSummary}
+        warn={profile !== undefined && profile.missing.length > 0}
+      />
+      <ListRow
+        icon={ShieldCheck}
+        title={t.plan.limits}
+        to="/plan/limits"
+        summary={
+          holds?.cut_rate === undefined || holds.protein_floor === undefined
+            ? undefined
+            : t.plan.limitsSummary(
+                limit.value('cut_rate', holds.cut_rate),
+                limit.value('protein_floor', holds.protein_floor),
+              )
+        }
+      />
+      <ListRow
         icon={NotebookPen}
         title={t.settings.notes}
         to="/plan/notes"
@@ -94,6 +101,22 @@ export function YouList() {
               : notes
         }
       />
+      {history && revisions !== undefined && revisions.length > 0 && (
+        <ListRow
+          icon={History}
+          title={t.plan.revisions.title}
+          to="/plan/history"
+          summary={[
+            // The plan holds its latest ten (planRevisions, internal/api/coach.go).
+            revisions.length >= 10
+              ? t.plan.revisions.all(revisions.length)
+              : t.plan.revisions.count(revisions.length),
+            ...(revisions[0]?.decided_at === undefined
+              ? []
+              : [f.day(revisions[0].decided_at, timeZone)]),
+          ].join(' · ')}
+        />
+      )}
     </ListGroup>
   )
 }

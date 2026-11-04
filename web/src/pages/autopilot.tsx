@@ -5,7 +5,6 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { $api } from '@/api/client'
 import type { components } from '@/api/schema'
 import { DriftMeter } from '@/components/autopilot/drift-meter'
-import { week } from '@/components/autopilot/weekday'
 import { SaveStatus } from '@/components/day/save-status'
 import { ListGroup } from '@/components/list-group'
 import { ListRow } from '@/components/list-row'
@@ -14,10 +13,9 @@ import { useDate } from '@/components/plan/proposal-text'
 import { Skeleton } from '@/components/skeleton'
 import { SubPage } from '@/components/sub-page'
 import { Button } from '@/components/ui/button'
-import { ChipGroup } from '@/components/ui/chip-group'
 import { SegmentedControl } from '@/components/ui/segmented'
+import { WeekSegments } from '@/components/ui/week-segments'
 import { useFormat } from '@/i18n/format'
-import { useLocale } from '@/i18n/locale'
 import { useMessages } from '@/i18n/messages'
 import { sayChange } from '@/lib/toast'
 
@@ -67,7 +65,6 @@ function Settings({ autopilot, holds }: { autopilot: Autopilot; holds: Record<st
   const t = useMessages()
   const f = useFormat()
   const date = useDate()
-  const locale = useLocale()
   const id = useId()
   const queryClient = useQueryClient()
   const a = t.autopilot
@@ -110,7 +107,6 @@ function Settings({ autopilot, holds }: { autopilot: Autopilot; holds: Record<st
   const mode = sending?.mode ?? autopilot.mode
   const weekday = sending?.weekday ?? autopilot.weekday
   const on = mode === 'autopilot'
-  const weekdayName = new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' })
   const shown = asking ? 'autopilot' : mode
   // The step it would take now, as the API has it, else the limits'.
   const turnOnStep = autopilot.step_kcal > 0 ? autopilot.step_kcal : step
@@ -194,13 +190,9 @@ function Settings({ autopilot, holds }: { autopilot: Autopilot; holds: Record<st
         <h2 id={`${id}-day`} className="font-semibold">
           {a.day}
         </h2>
-        <ChipGroup
+        <WeekSegments
           legend={a.day}
-          options={week.map((d, i) => ({
-            value: d,
-            // 2026-10-26 is a Monday.
-            label: weekdayName.format(Date.UTC(2026, 9, 26 + i)),
-          }))}
+          hideLegend
           value={weekday}
           onChange={(d) => {
             setAsking(false)

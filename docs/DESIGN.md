@@ -1078,7 +1078,8 @@ coach or nutritionist. For a one-off session like that, the right tool
 is a strong model through MCP, paid for by the user's own
 Claude/ChatGPT subscription. The user may still change the plan in the
 app (decided on 29 October 2026): edit the phase, plan the next one, and
-set the targets by type of day, each change a proposal of the user's
+set the targets by type of day and the training weekdays, each
+change a proposal of the user's
 own, applied at once (below).
 
 | layer | who | how often | may change |
@@ -1103,10 +1104,12 @@ own, applied at once (below).
    AI calls `apply_proposal`. Mostly a chat ends so; a proposal it left
    undecided waits, shows in the web app's plan (its section) with
    only what it changes, each value from what it was to what it is to
-   be, who made it and when, how long it waits, what the data say
-   beside it (the pace calibration measures against the phase's range,
-   how far its TDEE is trusted, and whether they ask for the change),
-   its preview by the data now, Accept and Reject, so a proposal made
+   be (a table of now, new and the difference), who made it and when,
+   how long it waits, what the data say beside it (the pace calibration
+   measures against the phase's range, how far its TDEE is trusted, the
+   rate it would make, and whether they ask for the change), the
+   limits' warnings by the data now, each rule once however many types
+   of day and periods it is of, Accept and Reject, so a proposal made
    in Claude can be accepted in the app; while it waits, the plan's
    section has a dot and the day a line of its gist, and the morning
    summary says it waits. One that changes the user's limits is
@@ -1129,7 +1132,7 @@ own, applied at once (below).
    the past as it was: a change that took effect moves on by a new
    proposal. The web app shows the plan as it holds today (the phase and
    the target in force, by their numbers, the training days, and what is
-   to come), the history, and takes a revision back
+   to come), the history, a page of its own, and takes a revision back
    in one step: the user, there, consents to the inverse, which applies
    at once (a revert the limits refuse waits, as any proposal).
 4. **Lifetime.** A proposal waits a week for consent, then expires. It

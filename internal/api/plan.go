@@ -112,7 +112,7 @@ func (s *sessions) registerPlan(a huma.API) {
 		Method:      http.MethodPost,
 		Path:        Prefix + "/plan/changes",
 		Summary:     "Change your plan",
-		Description: "Needs a web session: the user's own change of the phases and the targets, in the app. " +
+		Description: "Needs a web session: the user's own change of the phases, the targets and the training weekdays, in the app. " +
 			"It is a proposal of the user's, made and applied at once: a revision of the plan, which the history shows and a revert takes back, " +
 			"its rationale the code `" + proposal.ChangedInTheApp + "`. " +
 			"The limits hold it as they hold any proposal: one past them is refused (422), each violation an error detail as propose_changes gives it, " +
