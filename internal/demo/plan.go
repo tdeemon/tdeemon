@@ -55,7 +55,7 @@ func (sd *seeder) profile(ctx context.Context) error {
 	if err := sd.db.SetProfile(ctx, sd.u.ID, userActor, demoProfile, sd.start, now); err != nil {
 		return fmt.Errorf("profile: %w", err)
 	}
-	if err := sd.db.SetProfileNotes(ctx, sd.u.ID, userActor, demoNotes.in(sd.u.Locale), now); err != nil {
+	if err := sd.db.SetProfileNotes(ctx, sd.u.ID, importActor, demoNotes.in(sd.u.Locale), now); err != nil {
 		return fmt.Errorf("notes: %w", err)
 	}
 	return nil

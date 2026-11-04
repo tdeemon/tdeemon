@@ -11,6 +11,7 @@ import (
 
 	"github.com/zarnautovic/tdeemon/internal/domain/calibration"
 	"github.com/zarnautovic/tdeemon/internal/domain/day"
+	"github.com/zarnautovic/tdeemon/internal/domain/event"
 	"github.com/zarnautovic/tdeemon/internal/domain/food"
 	"github.com/zarnautovic/tdeemon/internal/domain/limits"
 	"github.com/zarnautovic/tdeemon/internal/domain/meal"
@@ -401,6 +402,22 @@ func TestSeedsCalibrate(t *testing.T) {
 }
 
 // Seed refuses a number of days out of its bounds, and makes the least.
+// A fresh demo user has nothing to undo: the user's first Undo takes none
+// of the demo data back, the notes for a coach included.
+func TestSeedLeavesNothingToUndo(t *testing.T) {
+	t.Parallel()
+
+	db := storetest.Open(t)
+	u, _ := seeded(t, db, MinDays, DefaultSeed, "en")
+	webUser := event.Actor{Kind: event.User, Client: "web"}
+	if ev, err := db.UndoLast(t.Context(), u.ID, webUser, now); !errors.Is(err, store.ErrNothingToUndo) {
+		t.Errorf("undo on a fresh demo user: %+v, %v; want ErrNothingToUndo", ev, err)
+	}
+	if notes, err := db.ProfileNotes(t.Context(), u.ID); err != nil || notes == "" {
+		t.Errorf("notes after the undo %q (%v), want the demo's", notes, err)
+	}
+}
+
 func TestSeedDays(t *testing.T) {
 	t.Parallel()
 
