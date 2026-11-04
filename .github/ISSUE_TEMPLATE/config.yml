@@ -1,2 +1,11 @@
 # Issues start from a template, so they carry the details a fix needs.
 blank_issues_enabled: false
+# A question, an idea still to talk over, or a setup to show goes to
+# Discussions; an issue is a bug or a feature to build.
+contact_links:
+  - name: Ask a question
+    url: https://github.com/tdeemon/tdeemon/discussions/categories/q-a
+    about: How to set something up, or why tdeemon does what it does.
+  - name: Share an idea
+    url: https://github.com/tdeemon/tdeemon/discussions/categories/ideas
+    about: An idea to talk over before it becomes a feature request.
