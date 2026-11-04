@@ -316,7 +316,7 @@ func refusal(err error) (string, bool) {
 	switch {
 	case errors.Is(err, store.ErrEmailNotVerified):
 		return "the sign-in provider does not confirm that your email address is verified, so it cannot be linked " +
-			"to an account here; ask the admin (see the README on single sign-on)", true
+			"to an account here; ask the admin (see the self-hosting guide on single sign-on)", true
 	case errors.Is(err, store.ErrAlreadyLinked):
 		return "your account here is linked to another account at this sign-in provider; ask the admin", true
 	case errors.Is(err, store.ErrEmailNotLinkable):

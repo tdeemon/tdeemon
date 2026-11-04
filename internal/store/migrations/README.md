@@ -13,7 +13,7 @@ the `schema_migrations` table.
   a new migration. Before tdeemon applies migrations to a database that
   already has a schema, it writes a snapshot to
   `DATA_DIR/backups/pre-migrate-<version>-<time>.db`, which is the way
-  back (the top-level README has the restore steps). The newest snapshot
+  back (docs/self-hosting.md, "Data", has the restore steps). The newest snapshot
   of each schema version is kept, for the three newest versions.
 - **Never edit a merged migration.** Instances that already ran it will
   not run it again. tdeemon logs a warning when an applied migration's

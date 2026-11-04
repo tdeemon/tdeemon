@@ -1,724 +1,79 @@
 # tdeemon
 
-Self-hosted, AI-first nutrition tracking with an adaptive TDEE.
+Self-hosted nutrition tracking with an adaptive TDEE, made to work with
+an AI coach.
 
-Log meals by chat or photo from any AI client (via MCP) or the built-in
-chat; tdeemon does the math, learns your real energy expenditure from
-intake and weight trend, and lets an AI coach adjust your goals — cut,
-maintenance, bulk or recomp — within limits enforced in code: you and
-the admin may tighten them, and loosen some within a floor nobody can
-lower.
+Log meals from the web app or from any MCP client (Claude Code, Codex,
+Hermes, a local model). tdeemon does the math: it learns your
+real energy expenditure from what you eat and how your weight moves,
+and lets an AI coach adjust your plan (cut, maintenance, bulk or recomp)
+only through proposals you accept, within limits enforced in code.
 
-> **Status: early development.** Only the server skeleton, the database
-> layer, the API contract and the web app's frame with the day, the
-> foods, the charts and the settings exist so far.
-> The full design lives in [`docs/DESIGN.md`](docs/DESIGN.md).
+> **Status: early.** tdeemon runs every day for its author, and this is
+> its first release for other self-hosters. Expect changes between
+> releases, each said in its notes.
 
-## Planned highlights
+## What it does
 
-- One container, one SQLite file, multi-user (household or friends):
-  a household shares one kitchen, every food and recipe, while each
-  member's meals, weight and plan stay their own.
-- MCP server: any MCP client, with any model (Claude Code, Codex,
-  Hermes, a local model), and coaching sessions that read the numbers
-  as tdeemon computes them.
-- Built-in chat with your own API key, photo logging, PWA.
-- Apple Health import (Health Auto Export), later native HealthKit.
-- Adaptive calibration with confidence intervals; AI changes plans only
-  through proposals you accept, and limits are enforced in code
-  ([docs/limits.md](docs/limits.md), with their sources; not medical
-  advice).
+- **A day at a glance:** what is left of the target, the macros, the
+  week, the meals; logging by search, a barcode (the camera, or Open
+  Food Facts), a recipe's portion, a quick estimate, or yesterday's meal
+  again.
+- **An adaptive TDEE:** measured from intake and the weight's trend, with
+  its interval and a verdict on the phase, explained number by number
+  ([methodology](docs/methodology.md)).
+- **A plan with limits:** phases, targets by type of day, and limits
+  nobody can lower below a floor in the code ([limits](docs/limits.md));
+  an AI coach proposes changes, you accept or reject them, and anything
+  is undone.
+- **Autopilot:** a weekly review that steps the plan within your limits,
+  or asks.
+- **An AI coach over MCP:** the tools, the coaching sessions and the
+  methodology, for any MCP client and model.
+- **Devices:** Apple Health through Health Auto Export, workouts from
+  Strong, a morning summary and alarms on Telegram or as push
+  notifications.
+- **For a household:** several users on one instance, a shared kitchen
+  of foods and recipes, each person's meals, weight and plan their own.
+- **One container, one SQLite file**, an installable web app (PWA), in
+  English and Croatian.
 
-## Development
+## Quick start
 
-The toolchain and every linter are pinned in `mise.toml`; install them
-with [mise](https://mise.jdx.dev). `make check` runs what CI checks,
-except a few checks that only CI runs, and the git hooks run the fast part
-on each commit. The rules for code and tests, and the CI-only checks, are
-in [docs/conventions.md](docs/conventions.md), and
-[CONTRIBUTING.md](CONTRIBUTING.md) says how to contribute. Report a
-security vulnerability privately, as [SECURITY.md](SECURITY.md) describes.
-
-```sh
-mise install
-lefthook install    # git hooks, once per clone
-make check          # make fmt formats, make help lists the targets
-
-TDEEMON_BASE_URL=http://localhost:8080 \
-TDEEMON_SECRET_KEY="$(openssl rand -base64 32)" \
-TDEEMON_LOG_FORMAT=text \
-go run ./cmd/tdeemon
-```
-
-### Web app
-
-The web app in `web/` (React, TypeScript, Vite) is compiled into the
-binary only with the `webui` build tag, so Go builds and tests never need
-Node; a binary built without the tag serves a short notice at `/`. To work
-on the app, run the server as above and the Vite dev server next to it,
-which forwards `/api` to the server (`TDEEMON_DEV_SERVER`, default
-`http://localhost:8080`):
+With Docker and Compose, on the machine that will run it:
 
 ```sh
-cd web && npm ci
-npm run dev     # http://localhost:5173
-npm test        # Vitest
-npm run lint    # oxlint; npm run format for Prettier
-```
+mkdir tdeemon && cd tdeemon
+base=https://raw.githubusercontent.com/zarnautovic/tdeemon/main/deploy/compose
+curl -fsSLO "$base/compose.yaml" -O "$base/compose.caddy.yaml" -O "$base/Caddyfile" -O "$base/.env.example"
 
-The end-to-end tests run the app in Chromium against the binary built
-with it: `make e2e-browser` once, then `make e2e`. The app's service
-worker runs only in a build, not under `npm run dev`; the end-to-end
-tests block it but in `e2e/pwa.spec.ts`.
-
-A binary with the app inside:
-
-```sh
-(cd web && npm ci && npm run build)   # writes internal/webui/dist
-go build -tags webui ./cmd/tdeemon
-```
-
-The build also writes a Brotli and a gzip copy of each script and
-stylesheet, and the server sends the copy a browser accepts, so an
-instance without a compressing proxy sends about a quarter of the bytes.
-
-### API contract
-
-The JSON API under `/api/v1` is described by an OpenAPI 3.1 document that
-is generated from the Go handlers in `internal/api` (with
-[huma](https://huma.rocks)). It is served at `/api/v1/openapi.json` and
-committed as `api/openapi.json`, and the TypeScript types in
-`web/src/api/schema.d.ts` are generated from it. `go test` fails when
-`api/openapi.json` is stale, and `npm run check:api` in `web/codegen` when
-the types are stale or no longer type-check. After changing the API:
-
-```sh
-go test ./internal/api -run TestOpenAPISpec -update
-cd web/codegen && npm ci && npm run gen:api
-```
-
-## Configuration
-
-All settings come from environment variables:
-
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `TDEEMON_BASE_URL` | — (required) | public URL of the instance, without a path (tdeemon is served at the root of its host), e.g. `https://tdeemon.example.com` |
-| `TDEEMON_SECRET_KEY` | — (required) | at least 32 bytes; seals the single sign-on state, derives the Web Push (VAPID) key, and will encrypt stored secrets (sessions do not depend on it; a new one makes every device subscribe to notifications again) |
-| `TDEEMON_LISTEN` | `:8080` | address the HTTP server binds |
-| `TDEEMON_DATA_DIR` | `./data` | the database (`tdeemon.db`) and its snapshots; keep it on a local disk, never NFS |
-| `TDEEMON_BACKUP_KEEP` | `0` | how many daily snapshots of the database to keep in `TDEEMON_DATA_DIR/backups`, up to 366; for a backup that copies files ([Data](#data)) |
-| `TDEEMON_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
-| `TDEEMON_LOG_FORMAT` | `json` | `json` or `text` |
-| `TDEEMON_OIDC_ISSUER` | — | issuer URL of an OpenID Connect provider for single sign-on (https; http only for localhost) |
-| `TDEEMON_OIDC_CLIENT_ID` | — | tdeemon's client ID there; required with the issuer |
-| `TDEEMON_OIDC_CLIENT_SECRET` | — | its client secret, for a confidential client |
-| `TDEEMON_OIDC_NAME` | `Single sign-on` | what the sign-in page calls the provider |
-| `TDEEMON_TRUSTED_PROXIES` | — | reverse proxies whose `X-Forwarded-For` names the client, as addresses or CIDR ranges (`10.42.0.0/16, fd00::/8`); set it behind a proxy, or the limits on failed sign-ins count the proxy's address, that is everyone together |
-| `TDEEMON_LIMIT_<NAME>` | the column "Hard limit" of [docs/limits.md](docs/limits.md) | the instance's limits of a plan, such as `TDEEMON_LIMIT_KCAL_FLOOR_FEMALE=1000` for a clinician's patient; the names are in docs/limits.md, "The names of the limits". Never below the floor in the code, and some only tighter |
-| `TDEEMON_TELEGRAM_BOT_TOKEN` | — | the token of a Telegram bot (from @BotFather) that sends users their notifications and answers their commands ([Telegram](#telegram)) |
-| `TDEEMON_TELEGRAM_API_URL` | `https://api.telegram.org` | the Bot API, Telegram's or a [Bot API server](https://github.com/tdlib/telegram-bot-api) of your own; `http` only for one in your network, as the token is in every request |
-| `TDEEMON_OPEN_FOOD_FACTS_URL` | `https://world.openfoodfacts.org` | the [Open Food Facts](https://openfoodfacts.org) server where a barcode none of a user's foods nor the catalog has is looked up, its data open under the ODbL; `off` sends no request there |
-| `TZ` | system | default time zone of the instance |
-
-Every invalid or missing variable is reported at startup in one go.
-
-## Docker Compose
-
-[`deploy/compose`](deploy/compose) runs tdeemon with one service and one
-volume. In a directory of its own, with its files:
-
-```sh
-# Once: the settings, readable by you only, with a new secret key. Keep
-# the key. set -C refuses to replace an existing .env, so running this
-# again keeps it.
+# The settings, readable by you only, with a new secret key. Keep the key.
 (umask 077 && set -C && sed "s|^TDEEMON_SECRET_KEY=\$|TDEEMON_SECRET_KEY=$(openssl rand -base64 32)|" \
   .env.example > .env)
-# Set TDEEMON_BASE_URL in .env to the instance's public URL, then:
+# In .env, set TDEEMON_BASE_URL to the address it will have, such as
+# https://tdeemon.example.com, or http://localhost:8080 to try it here.
+
 docker compose up -d --wait
+docker compose exec tdeemon /tdeemon user create --admin --email you@example.com
 ```
 
-- tdeemon serves on `http://127.0.0.1:8080`, for a reverse proxy on the
-  same machine that terminates HTTPS. Without one,
-  `compose.caddy.yaml` adds Caddy, with a certificate from Let's
-  Encrypt for the host of `TDEEMON_BASE_URL`, which must point at the
-  machine, ports 80 and 443 open. Uncomment
-  `COMPOSE_FILE=compose.yaml:compose.caddy.yaml` in `.env`, so that every
-  `docker compose` command, an upgrade's too, takes both files; then
-  `docker compose up -d --wait` as above.
-- The image is `ghcr.io/zarnautovic/tdeemon:latest`, the newest
-  release; pin `:X.Y.Z` in `compose.yaml` to upgrade when you choose.
-  `docker compose pull && docker compose up -d --wait` upgrades.
-- Its health check is `tdeemon healthcheck`: it asks the server's
-  `/healthz` at `TDEEMON_LISTEN` and never opens the database.
-- What follows for `docker run` holds for Compose too: the volume at
-  `/data`, the read-only container, 20 seconds to stop.
-
-## Docker
-
-The image holds one static binary with the web app inside, on distroless,
-and runs as an unprivileged user (uid 65532). Everything it writes goes to
-one volume at `/data`, so the root filesystem can be read-only. Each
-release publishes it as `ghcr.io/zarnautovic/tdeemon:X.Y.Z` (also `:X.Y` and
-`:latest`),
-for linux/amd64 and linux/arm64; or build it yourself:
-
-```sh
-docker build -t tdeemon .
-
-# Once: the settings, readable by you only. Keep the secret key: it seals
-# the single sign-on state and will encrypt stored secrets. set -C refuses
-# to replace an existing .env, so running this again keeps the key.
-(umask 077 && set -C && printf 'TDEEMON_BASE_URL=%s\nTDEEMON_SECRET_KEY=%s\n' \
-  http://localhost:8080 "$(openssl rand -base64 32)" > .env)
-
-docker run --read-only --stop-timeout 20 -v tdeemon-data:/data \
-  -p 8080:8080 --env-file .env tdeemon
-```
-
-- `--env-file` keeps the key out of the command line, where other users
-  could see it in the process list; `.env` is ignored by git and by the
-  image build.
-- Mount a volume at `/data`. The image declares none on purpose: without
-  one, a read-only container stops at startup instead of keeping the
-  database where it gets lost with the container. A named volume takes the
-  right ownership; a host directory must be writable by uid 65532 (with
-  rootless Podman, add `:U` to the mount, e.g. `-v ./data:/data:U`).
-- Nothing else needs to be writable, so `--read-only` (or
-  `readOnlyRootFilesystem` in Kubernetes) works without a tmpfs.
-- On stop the server gives in-flight requests up to 15 seconds;
-  `--stop-timeout 20` waits for that, where the default of 10 would kill
-  the process first.
-- `--build-arg VERSION=v1.2.3` sets the version the server reports
-  (default `dev`). Without arguments the binary runs the server,
-  `user create` adds a user ([Users](#users)), and `healthcheck` is the
-  image's health check; anything else prints the usage and exits
-  without touching the database.
-- The build runs `go vet` and the tests against the web app it embeds.
-  Podman builds the same file.
-
-## On a phone
-
-The web app installs as an app (a PWA): on an iPhone open it in Safari,
-then Share → Add to Home Screen; on Android, Chrome's menu → Install
-app. It opens full screen under its own icon, and without a network it
-opens all the same and says the server is out of reach. A new version
-shows as a toast, once the app comes back into view or within the hour,
-and its Reload takes it. Browsers install an app only from HTTPS (or
-localhost), and give the camera, which scans a barcode in Log a meal,
-only there.
-
-## Users
-
-tdeemon has no sign-up page: the admin invites users, and adds the first
-admin with the binary itself. The binary works on the database of a
-server that has started at least once, which creates and migrates it,
-and the server may keep running:
-
-```sh
-docker exec <container> /tdeemon user create --admin \
-  --email you@example.com --timezone Europe/Zagreb
-# or, in Kubernetes:
-kubectl exec deploy/tdeemon -- /tdeemon user create --admin --email you@example.com
-```
-
-- It prints a generated password once; keep it in a password manager.
-  To choose the password instead, add `--password-stdin` and pass it on
-  the first line of standard input (`docker exec -i`).
-- A password has at least 15 characters, as NIST SP 800-63B-4 advises
-  when it is the only factor, and at most 256. tdeemon stores only its
-  argon2id hash.
-- `--name` sets the name the app shows (by default, the part of the
-  address before the @), `--timezone` the user's time zone (by default
-  `TZ`, or UTC), and `--locale` their language, `en` or `hr` (by default
-  `en`); `tdeemon user set-locale --email … --locale hr` changes it later.
-  `tdeemon help` lists the flags.
-- `tdeemon user set-password --email …` gives a user a new password,
-  generated or with `--password-stdin`, and ends their sessions: the way
-  back when a password is lost. Their API tokens keep working; if they
-  may have leaked too, revoke them (see API tokens below).
-- `tdeemon user delete --email … --yes` deletes a user and all their
-  data, for good; so does the admin's `DELETE /api/v1/users/{id}`, and a
-  user deletes their own account with `DELETE /api/v1/account`, their
-  address in the body. The instance's only admin cannot be deleted.
-  Snapshots of the database taken before keep the data until they go
-  ([Data](#data)).
-- The admin invites a user by their address (`POST /api/v1/invites`,
-  as a user or an admin) and sends them the link it answers, once: it
-  makes one account for the address in the next 7 days, with the name,
-  password, time zone and language they give, and signs it in. With a
-  provider (single sign-on below), they may choose it instead of a
-  password: the account takes the provider's name and is linked to
-  the identity it vouches for, whatever address the provider has. A new
-  invite of an address replaces the admin's own before (another admin's
-  is refused), and the admin revokes one (`DELETE
-  /api/v1/invites/{id}`). The link's token is after its
-  `#`, so it reaches no server's log.
-- The admin lists the users (`GET /api/v1/users`) and changes one
-  (`PATCH /api/v1/users/{id}`): `{"active": false}` deactivates them
-  (they cannot sign in, their sessions end and their API tokens are
-  refused, their data stay, and the scheduled jobs skip them),
-  `{"active": true}` brings them back, and `{"role": "admin"}` or
-  `"user"` sets their role. The instance's only active admin can be
-  neither deactivated nor made a user.
-- `GET /api/v1/account/export` gives a user all their data as a ZIP:
-  `tdeemon.json`, every table of theirs, and a CSV file of each, without
-  the secrets (hashes of the password, tokens and sessions; the
-  devices' push subscriptions).
-- In the web app, the admin invites, revokes and changes users in the
-  settings' Users, which shows the link once to copy; the link opens
-  the app's `/invite` page, which makes the account. A user exports
-  their data or deletes their account in the settings' Account.
-- The commands read the same `TDEEMON_*` variables as the server, and
-  they refuse a database the server has not migrated to their version.
-
-Signing in goes through the web app's sign-in page (`/login`), with a
-password or the OpenID Connect provider, or straight through the API
-(`POST /api/v1/auth/login`); either sets an HttpOnly session cookie for
-30 days. Cross-origin browser requests that change something are
-refused (Go's `http.CrossOriginProtection`), and over HTTPS the cookie is
-a `__Host-` cookie.
-
-Against guessing and floods:
-
-- **Failed sign-ins:** after 10 in 15 minutes from one client address
-  (an IPv6 address counts by its /64), or 100 for one account (from
-  anywhere, and the same for an address no account has), sign-ins from
-  there or for it answer 429 with `Retry-After` until the 15 minutes
-  have passed, the right password included. Someone who knows your
-  email address cannot keep you out from an address or two of theirs:
-  it takes ten. Sign-ins still being checked count too, so a burst sent
-  at once gets no further. A successful sign-in starts the account's
-  count over. Single sign-on is not counted.
-- **Bad API tokens:** after 50 in 15 minutes from one address, a bad
-  token from there answers 429 until the 15 minutes have passed. A good
-  one goes on, so a device behind the same NAT keeps working.
-- **Behind a reverse proxy**, set `TDEEMON_TRUSTED_PROXIES` to its
-  addresses, so the limits count the client it forwards
-  (`X-Forwarded-For`, the right-most address that is not a trusted
-  proxy) and not the proxy; tdeemon logs a warning when forwarded
-  requests come in without it. The counts live in memory, at most 100,000
-  addresses or accounts per limit (past that, new ones go uncounted
-  until older ones expire, and up to 14 seconds more), and start over
-  when the server restarts.
-- **Password hashing** runs at most one hash per CPU at a time; more
-  sign-ins at once wait their turn instead of adding 19 MiB each, for up
-  to 10 seconds, then answer 503 with `Retry-After`; such a sign-in does
-  not count as a failure. A client that goes away while it waits gives up
-  its place; one that leaves while its password is being checked counts
-  as a failed sign-in.
-- **Security headers** on every response: a content security policy
-  that loads nothing from other sites and forbids framing
-  (`default-src 'self'; frame-ancestors 'none'`), whose scripts may
-  compile WebAssembly (`'wasm-unsafe-eval'`, the barcode reader) and
-  evaluate no text, `nosniff`,
-  `Referrer-Policy: no-referrer`, and HSTS over HTTPS.
-
-### Telegram
-
-tdeemon sends a user's notifications to a Telegram chat through a bot of
-the instance, in the user's language (English, or Croatian for `hr`), and
-answers the commands sent to it there. It reads the bot's messages by
-asking Telegram for them (long polling), so no link from Telegram
-reaches it; no other program may poll the same bot.
-
-1. Create a bot with [@BotFather](https://t.me/BotFather) (`/newbot`) and
-   set its token as `TDEEMON_TELEGRAM_BOT_TOKEN`.
-2. The user opens the bot in Telegram and presses **Start**: a bot may
-   only write to someone who has written to it first.
-3. Find the chat's id, the user's id in Telegram for a private chat: a
-   running tdeemon logs it for a message from a chat that is no user's
-   (`a message to the Telegram bot from a chat that is no user's`,
-   `chat_id`), such as the **Start** above, or in a group a command
-   (`/start@<bot>`). Without one running, the bot's updates have it
-   (`https://api.telegram.org/bot<token>/getUpdates`, `message.chat.id`).
-4. Set it for the user:
-
-   ```sh
-   kubectl exec deploy/tdeemon -- /tdeemon user set-telegram \
-     --email you@example.com --chat-id 123456789
-   ```
-
-   The chat gets a message first; a chat that does not take it (a wrong
-   id, a bot not started) is not set, and neither is one while Telegram
-   does not answer. `--chat-id 0` removes it.
-
-**The morning summary** comes at 10:00 on the user's clock (or later
-that morning, if the server was down at 10:00), once a day, without an
-LLM, to the chat and to the user's devices. In the user's language
-(English, or Croatian for `hr`), it has a line for each of these that
-came:
-
-- last night's sleep (the night that ended this morning, never the one
-  before, whatever hour the user's day starts);
-- this morning's weight, the trend weight and body fat;
-- yesterday against its target: kcal, protein, carbs and fat, the day's
-  type, and whether it is excluded; or that nothing was logged;
-- yesterday's steps, active kcal and exercise;
-- calibration's verdict in a line: the rate against the target and
-  what it proposes, or else the TDEE measured and why there is no
-  verdict yet (no plan, a phase just begun with about when its first
-  comes, a TDEE not trusted yet), that a TDEE of 0 or less asks whether
-  the meals are all logged, or about when a first estimate comes;
-- recovery's flags, with their averages.
-
-A value that did not come is left out; nothing is guessed.
-
-**Commands**, in the user's chat with the bot, which Telegram's menu
-lists:
-
-- `/sazetak` or `/summary`: the morning summary, as it is now;
-- `/pomoc`, `/help` or `/start`, or, in a private chat, any other
-  message: the commands.
-
-The answer is in the user's language, and in a group set for several
-users, one for each; a group's other messages get none. A chat that is
-no user's gets no answer, and neither does a command older than 5
-minutes (one sent while the server was down). A command changes
-nothing: the morning summary still comes at 10:00.
-
-**The watchdog** looks each hour and tells the user, in the same chat
-and on their devices ([Web Push](#notifications-on-a-device-web-push)),
-when their data stop coming:
-
-- no new or changed metric for more than 26 hours: a day of syncs
-  missed, as a day of a user who moves changes its steps;
-- an ingest token unused for more than 3 days: the device that sends
-  with it has stopped. Every ingest token counts as a daily device's, so
-  one that sends only now and then (a Strong export twice a week) alarms
-  after each pause, until the alarms have settings.
-
-Each stop alarms once (and a chat that blocked the bot, not at all); it
-alarms again only after data have come and stopped again. A group chat
-that Telegram turns into a supergroup is followed to its new id, at the
-change's message or at the next send.
-
-### Notifications on a device (Web Push)
-
-The morning summary and the watchdog's alarms also go to each device a
-user turns the notifications on for in the web app, by Web Push: the
-browser's push service (Apple's, Google's, Mozilla's or Microsoft's)
-takes them to the device, installed as an app on iOS. Nothing needs
-setting up: the instance's key (VAPID) is derived from
-`TDEEMON_SECRET_KEY`, and a new secret key makes every device subscribe
-again. The server must reach the push services over HTTPS.
-
-The settings' **Notifications** turn them on for the device in hand (the
-browser asks for the permission then), list the devices that get them,
-each removed apart, and send a test to them all. On an iPhone or iPad
-they come to the app added to the home screen (Safari's Share, Add to
-Home Screen), from iOS 16.4; Safari itself cannot get them. The app
-tells the server of the device's subscription each time it opens, as
-iOS can drop one without a word. Signing out turns the device off, so
-whoever signs in next on it gets none of the notifications before
-turning them on.
-
-A device shows the summary in a line (yesterday's kcal against the
-target, the weight, the sleep); a tap opens the whole in the app. An
-alarm opens the devices in the settings. A notification goes to every
-channel the user has, Telegram's chat and each device, and is sent
-again later only when none took it.
-
-### Single sign-on (OpenID Connect)
-
-With `TDEEMON_OIDC_*` set, users can sign in through a provider such as
-Authentik or Keycloak instead of a password (the password keeps working,
-for when the provider is down):
-
-1. At the provider, create an OAuth2/OpenID Connect application: a
-   confidential client with the redirect URI
-   `<TDEEMON_BASE_URL>/api/v1/auth/oidc/callback` and the scopes
-   `openid`, `email` and `profile`. In Authentik the issuer is
-   `https://<authentik>/application/o/<slug>/`.
-2. Make the provider say whether an address is verified
-   (`email_verified`): tdeemon links an account by its address only when
-   it is. Authentik sends `false` by default since 2025.10. Its guide
-   ([Verify email addresses](https://docs.goauthentik.io/add-secure-apps/providers/oauth2/verify-email-address))
-   records the address a user confirmed through an email link in the
-   `email_verified_address` attribute; then a scope mapping
-   (Customization → Property Mappings → Scope Mapping, scope name
-   `email`), chosen for the provider instead of the default one, vouches
-   for exactly that address:
-
-   ```python
-   email = request.user.email
-   verified_address = request.user.attributes.get("email_verified_address")
-   return {
-       "email": email,
-       "email_verified": bool(email and verified_address == email),
-   }
-   ```
-
-   An address that changes afterwards (by the user, an admin or a source
-   sync) is no longer vouched for until it is confirmed again, unless it
-   returns to the address confirmed before; to require a new
-   confirmation then too, clear the attribute on every change, as the
-   guide says. If only the admin sets addresses, `"email_verified": True`
-   does instead.
-   Authentik's own warning applies: do not assert verified addresses
-   that users can change freely, or one of them could take over another's
-   tdeemon account at the first sign-in.
-3. Create the user in tdeemon (`tdeemon user create --email …`) with the
-   address they have at the provider. Nobody gets an account by signing
-   in.
-4. The first sign-in links the provider's account to that user, if the
-   provider says the address is verified, the address matches exactly
-   (ASCII letter case aside) and the user has no other account at that
-   provider; after that the provider's subject identifies them, whatever
-   the address becomes. A refused sign-in says why, and the log records
-   the reason. `tdeemon user unlink --email … [--issuer …]` undoes a
-   link, for a provider's account made anew or a subject that changed.
-
-The browser starts at `/api/v1/auth/oidc/login` (add `?return_to=/path`
-to land somewhere else on the instance); `GET /api/v1/auth/methods` says
-whether the instance has a provider. The flow uses PKCE, a nonce and a
-state bound to the browser in a short-lived sealed cookie. tdeemon finds
-the provider on the first sign-in, so it starts while the provider is
-down; after a failure it waits 30 seconds before asking again. The
-provider's endpoints must use https, like its issuer.
-
-### API tokens
-
-Devices and clients act for a user with an API token instead of a
-session: the phone (Health Auto Export) sends health data, an AI client
-logs meals through MCP. A token has scopes: `ingest` (health data from
-the phone), `tools` (the tools: read, log and change, through MCP) and
-`read` (the tools that only read).
-
-```sh
-# Signed in (the session cookie in cookies.txt), create one; the token is
-# shown only in this answer, tdeemon keeps only its hash.
-curl -b cookies.txt -H 'Content-Type: application/json' \
-  -d '{"name":"iPhone","scopes":["ingest"]}' https://tdeemon.example.com/api/v1/tokens
-
-# The device sends it with every request:
-curl -H 'Authorization: Bearer tdm_…' https://tdeemon.example.com/api/v1/auth/whoami
-```
-
-`GET /api/v1/tokens` lists them (name, scopes, when last used),
-`DELETE /api/v1/tokens/{id}` revokes one at once, and
-`DELETE /api/v1/tokens` all of them, as after a password reset. A token
-reaches only
-the operations open to its scopes: `GET /api/v1/auth/whoami` and
-`GET /api/v1/info` with any scope, the imports below with `ingest`, and
-the tools: those that read with `read` or `tools` (`GET /api/v1/me`,
-the profile and the plan today; `GET /api/v1/days/{date}`, a day,
-`today` or `YYYY-MM-DD`; `GET /api/v1/foods?query=…`, the user's
-foods and then the instance's catalog's, and
-`GET /api/v1/foods/{id}`; `GET /api/v1/barcodes/{code}`, a barcode's
-food, the user's, the catalog's or Open Food Facts' product, 30 lookups
-there a minute; `GET /api/v1/summary`, calibration's summary
-of the days up to yesterday; `GET /api/v1/history`, the days or weeks of
-a span), and those that
-write with `tools` alone (`POST /api/v1/foods`, a food saved or
-corrected; `POST /api/v1/meals`, and `PATCH` and `DELETE` on
-`/api/v1/meals/{id}`, a meal logged, changed or deleted;
-`PUT` and `DELETE` on `/api/v1/days/{date}/metrics/{kind}`, a
-measurement logged or deleted; `PATCH /api/v1/days/{date}`, a
-check-in; `PUT /api/v1/me/notes`, the notes for a coach;
-`POST /api/v1/undo`, the latest change taken back). Every
-other
-operation is closed to tokens (403), so a token can never create, list
-or revoke tokens, read the session or change a setting (the name,
-language, time zone, day's start, profile or limits), nor change the
-plan as the app does (`POST /api/v1/plan/changes`), nor apply a
-proposal that changes the limits. Only
-`Authorization: Bearer tdm_…` carries a token (an empty Bearer is a bad
-one): another header, such as a reverse proxy's Basic credentials or the
-ID token an authenticating proxy passes on as a Bearer, leaves the
-request to its session cookie.
-The web app's settings list and revoke them too, and connect another
-(Devices and AI coaches → Connect, where a token is an access key): an
-AI coach, with `tools`; an iPhone with Health Auto Export, with
-`ingest`; or another, of the scopes picked. The token is shown once,
-when it is made, with the steps to give it to the client below, and the
-sheet says when the client first calls with it.
-
-### MCP
-
-Any MCP client that takes tools reaches tdeemon, with any model: a
-client from Anthropic or OpenAI, an open model such as DeepSeek, or a
-local one. The address is `<TDEEMON_BASE_URL>/mcp` (MCP over Streamable
-HTTP), with an API token as a Bearer token: one with `tools` for every
-tool, or `read` for those that only read. Each tool is the operation of
-the API above, with its validation and its answers, and a meal or a
-change made through MCP is the client `mcp`'s. The server tells every
-client how to log (its MCP instructions), so a client's own skill, if
-any, shrinks to a few lines.
-
-The app's Connect gives the token, the address being the instance's
-(`TDEEMON_BASE_URL`, which `GET /api/v1/info` says as `base_url`), and
-the commands for Claude Code and Claude Desktop. For a few clients:
-
-- **Claude Code:**
-
-  ```sh
-  claude mcp add --transport http tdeemon https://tdeemon.example.com/mcp \
-    --header "Authorization: Bearer tdm_…"
-  ```
-
-- **Claude Desktop:** its configuration, through
-  [mcp-remote](https://www.npmjs.com/package/mcp-remote), which passes
-  the header on (the app's Connect gives it).
-- **Codex:** the token in an environment variable of the shell Codex
-  runs in, then
-
-  ```sh
-  export TDEEMON_TOKEN=tdm_…
-  codex mcp add tdeemon --url https://tdeemon.example.com/mcp \
-    --bearer-token-env-var TDEEMON_TOKEN
-  ```
-
-- **Hermes Agent:** in its `config.yaml`, the token in its environment
-  (`.env`):
-
-  ```yaml
-  mcp_servers:
-    tdeemon:
-      url: https://tdeemon.example.com/mcp
-      headers:
-        Authorization: Bearer ${MCP_TDEEMON_API_KEY}
-  ```
-
-  Hermes finds a server's tools by searching them and does not pass the
-  server's instructions to its model: its own skill names the tools it
-  should use, `get_coaching_guide` for a coaching session among them.
-
-ChatGPT's and claude.ai's connectors sign in with OAuth rather than a
-header, which tdeemon does not offer; whether they would work, on a
-phone above all, is not checked yet. The built-in chat (planned) is the
-way in from a phone.
-
-#### Coaching sessions
-
-Ask in words, in any client: "do a monthly review", "my weight has
-stalled", "plan a bulk from January". The model calls
-`get_coaching_guide` first, which answers the session's steps and
-[how tdeemon reads the numbers](docs/methodology.md), and follows them:
-a monthly review, a plateau check or a new phase. A change of the plan
-is a proposal, applied only after your yes. A client that shows MCP
-prompts lists the same sessions as commands (in Claude Code,
-`/mcp__tdeemon__monthly_review`, `…plateau_check`, `…new_phase`, with
-what you want from it after them), and serves the methodology as the
-resource `tdeemon://methodology`.
-
-### Import from Apple Health
-
-[Health Auto Export](https://www.healthexportapp.com) (iOS, its REST
-API automation is a paid feature) sends the phone's and the watch's
-metrics to tdeemon:
-
-- **URL:** `https://tdeemon.example.com/api/v1/ingest/hae`, method POST,
-  format JSON;
-- **header:** `Authorization: Bearer tdm_…`, a token with the `ingest`
-  scope;
-- **metrics:** step count, active energy, basal energy burned, Apple
-  exercise time, sleep analysis, weight, body fat percentage, lean body
-  mass, resting heart rate, heart rate variability and VO2 max. Others
-  are skipped, and the answer names them; workouts are not imported;
-- **Summarize Data:** on, with the time grouping by day, and a date
-  range that starts at midnight (such as today, or since the last sync
-  from a whole day): a day's total is then whole, and only grows from
-  sync to sync. Sleep comes as nights; a sleep stage of an export that
-  is not summarized is left out, and the answer says to turn it on.
-
-The app's Connect, for an iPhone, makes the token and gives this as a
-checklist, with the URL and the header's value to copy.
-
-A value belongs to the calendar date of its point, the parts of a day's
-total add up, the longest sleep is the night, and the day keeps its
-earliest weighing, with body fat and lean mass from the same weighing.
-A metric in a unit tdeemon does not take for it (stones, seconds of
-exercise) is left out rather than read wrong.
-
-The values merge as an import: a value you entered stays, the day's
-first weighing stays, and a running total only grows, so a sync of part
-of the day undoes nothing. A value out of its bounds is left out, and
-so is one of a date after today in your time zone (a phone's clock
-set wrong); the answer says why. A body must be under 10 MB; split a large first
-export by date range in the app.
-
-`POST /api/v1/ingest/metrics` takes the same from a script, one day at a
-time:
-
-```sh
-curl -H 'Authorization: Bearer tdm_…' -H 'Content-Type: application/json' \
-  -d '{"date": "2026-10-21", "metrics": {"weight": 80.2, "steps": 9000}}' \
-  https://tdeemon.example.com/api/v1/ingest/metrics
-```
-
-Both routes take an API token, not a web session: what they write is
-recorded as an import. tdeemon keeps the values it reads, not the
-bodies.
-
-### Import from Strong
-
-The Strong app's CSV export (Settings, Export Strong Data) holds the
-whole history of workouts. tdeemon keeps the days they were on, each
-workout on the day it starts in, by your day start hour, as a meal is:
-a day with a workout counts as a training day, for the targets that
-differ by the type of day, unless you set the day's type in the
-check-in yourself. The sets themselves wait for the training module,
-which reads them from the latest export tdeemon keeps.
-
-Send the export as it comes, with a token with the `ingest` scope, from
-an iOS Shortcut for instance (Get Contents of URL, method POST, request
-body File, or Form with the file as `file`):
-
-```sh
-curl -H 'Authorization: Bearer tdm_…' -H 'Content-Type: text/csv' \
-  --data-binary @strong_workouts.csv \
-  https://tdeemon.example.com/api/v1/ingest/strong
-```
-
-Each export replaces the days of the one before: a workout you deleted
-in Strong is no longer a day of a workout. A workout on a day after
-your today (a phone's clock set wrong, or a time zone) is left out, and
-the answer's `future` lists its day. An export without a workout up to
-today is refused, so a wrong file cannot clear them.
-
-## Data
-
-tdeemon keeps everything in one SQLite file, `TDEEMON_DATA_DIR/tdeemon.db`,
-which it creates readable by its owner only, and applies database
-migrations at startup. Before it migrates a database that already has
-data, it saves a snapshot to
-`TDEEMON_DATA_DIR/backups/pre-migrate-<version>-<time>.db`. It keeps the
-newest snapshot of each schema version, for the three newest versions.
-
-Backing the data up is the host's: a snapshot of the volume, as
-Kubernetes' storage or a ZFS or LVM snapshot takes it, holds the
-database as a sudden stop would leave it, which SQLite recovers from.
-A backup that copies files while tdeemon runs (rsync, restic over the
-directory) can catch the database and its write-ahead log at different
-moments: for one, set `TDEEMON_BACKUP_KEEP` to 1 or more and back up
-the snapshots, not `tdeemon.db`.
-
-Then once a day it saves a snapshot to
-`TDEEMON_DATA_DIR/backups/daily-<time>.db` (the time in UTC): at startup
-when there is none of the last 23½ hours, and then at a check every hour,
-so at the same hour each day. It keeps the newest `TDEEMON_BACKUP_KEEP`
-of them and removes the older ones after each snapshot: a lower number
-takes effect with the next one, and `0`, the default, takes no more but
-leaves the ones there. A snapshot is a whole copy of the database,
-written with `VACUUM INTO` while tdeemon runs; writes wait for it. Leave
-room on the volume for one copy more than it keeps, as the oldest goes
-only once the new one is written, besides the three snapshots before a
-migration. A user's data deleted stays in the snapshots taken before,
-until they go.
-
-To restore a snapshot:
-
-1. Stop tdeemon.
-2. Move `tdeemon.db`, `tdeemon.db-wal` and `tdeemon.db-shm` aside
-   together, for example into a `before-restore/` folder. After an
-   unclean stop the `-wal` file holds the latest committed changes, so
-   the three files are only a complete copy of the current database
-   together. Left next to the restored file, SQLite would replay the old
-   `-wal` onto it.
-3. Copy the snapshot to `tdeemon.db`.
-4. Start tdeemon. A release newer than the snapshot migrates it again; to
-   stay on the snapshot's schema, run the release that shipped it.
+The last command prints your password once. Open the base URL and sign
+in; the first steps on the day take you to a plan.
+
+tdeemon then listens on `127.0.0.1:8080`. For HTTPS, put your reverse
+proxy in front of it, or let Caddy do it: uncomment `COMPOSE_FILE` in
+`.env` and run `docker compose up -d --wait` again
+([Docker Compose](docs/self-hosting.md#docker-compose)).
+
+## Documentation
+
+- [Self-hosting](docs/self-hosting.md): configuration, users, devices,
+  an AI coach, backups and upgrades.
+- [Methodology](docs/methodology.md): how the numbers come about.
+- [Limits](docs/limits.md): the limits of a plan and their sources.
+- [Design](docs/DESIGN.md): the whole design.
+- [Contributing](CONTRIBUTING.md), and [security](SECURITY.md): report a
+  vulnerability privately.
 
 ## Disclaimer
 
