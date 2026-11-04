@@ -19,10 +19,10 @@ project=tdeemon-compose-test
 cp "$root/deploy/compose/compose.yaml" "$root/deploy/compose/compose.caddy.yaml" \
   "$root/deploy/compose/Caddyfile" "$dir/"
 # The recipe of README.md, "Docker Compose", with the base URL of this
-# machine.
+# machine, its trailing slash allowed.
 (cd "$dir" && umask 077 && set -C &&
   sed -e "s|^TDEEMON_SECRET_KEY=\$|TDEEMON_SECRET_KEY=$(openssl rand -base64 32)|" \
-    -e 's|^TDEEMON_BASE_URL=.*|TDEEMON_BASE_URL=http://localhost|' \
+    -e 's|^TDEEMON_BASE_URL=.*|TDEEMON_BASE_URL=http://localhost/|' \
     "$root/deploy/compose/.env.example" > .env)
 # Caddy on a port of the test's: 80 and 443 may be taken on this machine.
 cat >"$dir/compose.test.yaml" <<'EOF2'
@@ -45,7 +45,7 @@ cleanup() {
   compose "${all[@]}" down -v --remove-orphans || true
   # The network of tdeemon alone, which no service behind Caddy uses.
   compose -f compose.yaml down -v || true
-  rm -rf "$dir"
+  rm -rf -- "${dir:?}"
   exit "$status"
 }
 trap cleanup EXIT
@@ -61,6 +61,8 @@ echo "== behind Caddy"
 echo "COMPOSE_FILE=compose.yaml:compose.caddy.yaml:compose.test.yaml" >>"$dir/.env"
 compose up -d --wait --wait-timeout 180
 curl -fsS --retry 10 --retry-connrefused -H "Host: localhost" http://127.0.0.1:8081/healthz
+# Every path reaches tdeemon, not / alone.
+curl -fsS -H "Host: localhost" http://127.0.0.1:8081/api/v1/info | grep -q '"name":"tdeemon"'
 # tdeemon publishes no port of its own any more.
 if curl -fsS --max-time 5 http://127.0.0.1:8080/healthz >/dev/null 2>&1; then
   echo "tdeemon still answers on 127.0.0.1:8080 behind Caddy" >&2

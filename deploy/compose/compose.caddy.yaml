@@ -30,6 +30,15 @@ services:
     # out of this container.
     environment:
       TDEEMON_BASE_URL: ${TDEEMON_BASE_URL:?set TDEEMON_BASE_URL in .env}
+    # Without a trailing slash, which tdeemon allows: as a site address,
+    # https://host/ would match the path / alone, and nothing else would
+    # reach tdeemon.
+    command:
+      - sh
+      - -c
+      - >-
+        export TDEEMON_BASE_URL="$${TDEEMON_BASE_URL%/}" &&
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     ports:
       - 80:80
       - 443:443
