@@ -723,7 +723,8 @@ and its weigh-in joins the trend once the day is over (§7). It is the
 table a coach looks back with (§8). `GET /api/v1/plan`, the tool
 `get_plan`, is the plan a coach reads (§8): the phases and the targets
 in force within the last 365 days and those to come, the limits that
-hold, the proposal that waits for consent and the latest 10 revisions.
+hold, the proposal that waits for consent and the latest 10 revisions,
+and whether there are older ones (`revisions_more`).
 Each target's days up to yesterday come with their outcome: the intake
 and the target of the logged days, and what calibration measures of
 them (`calibration.Measure`, without the first 14 days after a change
@@ -1108,7 +1109,9 @@ own, applied at once (below).
    be (a table of now, new and the difference), who made it and when,
    how long it waits, what the data say beside it (the pace calibration
    measures against the phase's range, how far its TDEE is trusted, the
-   rate it would make, and whether they ask for the change), the
+   rate it would make, of each period from its day when it sets more
+   than one, and whether they ask for the change; a later period, in
+   its table and its toast alike, against the one it sets before), the
    limits' warnings by the data now, each rule once however many types
    of day and periods it is of, Accept and Reject, so a proposal made
    in Claude can be accepted in the app; while it waits, the plan's

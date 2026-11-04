@@ -1820,6 +1820,11 @@ export const en = {
         noTdee: 'no TDEE measured yet',
         nothing: 'nothing measured yet',
         expected: (pct: string, kg: string) => `with this ${pct} a week (${kg} kg)`,
+        // Of a proposal of more than one period: each its rate, from its
+        // day ("with this from Nov 10 −0.53 % a week (−0.44 kg), from …").
+        expectedPeriods: (periods: string) => `with this ${periods}`,
+        expectedFrom: (date: string, pct: string, kg: string) =>
+          `from ${date} ${pct} a week (${kg} kg)`,
         inRange: "The pace is in range, so the data alone don't ask for this change.",
         more: 'The data point the other way: they ask for more kcal, not fewer.',
         fewer: 'The data point the other way: they ask for fewer kcal, not more.',

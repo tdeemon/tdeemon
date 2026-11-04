@@ -62,7 +62,9 @@ export function Rationale({
 }
 
 // Clamped is a text cut to three lines, with a button that shows the
-// rest (More) when it is longer, and cuts it again (Less).
+// rest (More) when it is longer, and cuts it again (Less). Whether it is
+// longer is measured again as its width changes (a phone turned, a
+// window made narrower).
 function Clamped({ text }: { text: string }) {
   const t = useMessages()
   const shown = useRef<HTMLParagraphElement>(null)
@@ -70,8 +72,17 @@ function Clamped({ text }: { text: string }) {
   const [longer, setLonger] = useState(false)
   useLayoutEffect(() => {
     const p = shown.current
-    if (p !== null && !open && text !== '') {
+    if (p === null || open || text === '') {
+      return undefined
+    }
+    const measure = () => {
       setLonger(p.scrollHeight > p.clientHeight + 1)
+    }
+    measure()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
+    observer?.observe(p)
+    return () => {
+      observer?.disconnect()
     }
   }, [text, open])
 

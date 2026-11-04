@@ -2806,6 +2806,8 @@ export interface components {
             phases: components["schemas"]["PhaseBody"][];
             /** @description The plan's latest revisions, the proposals applied (reverted ones too), newest first, up to 10. */
             revisions: components["schemas"]["ProposalBody"][];
+            /** @description Whether the plan has revisions older than those given. */
+            revisions_more: boolean;
             /** @description The targets, in order: those in force within the last 365 days, and those to come, each with what its days came to. */
             targets: components["schemas"]["TargetPeriodBody"][];
             /**

@@ -1606,6 +1606,9 @@ export const hr: Messages = {
         noTdee: 'TDEE još nije izmjeren',
         nothing: 'još ništa nije izmjereno',
         expected: (pct: string, kg: string) => `s ovim ${pct} tjedno (${kg} kg)`,
+        expectedPeriods: (periods: string) => `s ovim ${periods}`,
+        expectedFrom: (date: string, pct: string, kg: string) =>
+          `od ${date} ${pct} tjedno (${kg} kg)`,
         inRange: 'Tempo je u rasponu, pa sami podaci ne traže ovu promjenu.',
         more: 'Podaci pokazuju suprotno: traže više kcal, ne manje.',
         fewer: 'Podaci pokazuju suprotno: traže manje kcal, ne više.',

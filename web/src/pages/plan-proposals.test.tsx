@@ -1430,3 +1430,240 @@ test('a revision is taken back with a code, in any language', async () => {
     expect(sent).toEqual({ rationale: 'taken back in the app' })
   })
 })
+
+// lowered is splitTarget at kcal on rest days, 300 more on training days.
+function lowered(kcal: number) {
+  return {
+    training: { ...splitTarget.training, kcal: kcal + 300 },
+    rest: { ...splitTarget.rest, kcal },
+  }
+}
+
+// A proposal of two periods says the rate of each, from its day.
+test('what the data say gives the rate of each period a proposal sets', async () => {
+  planPage(
+    {
+      targets: [splitTarget],
+      training_weekdays: ['monday'],
+      pending: {
+        ...step,
+        changes: {
+          phases: [],
+          targets: [
+            { from: '2026-10-24', after: lowered(1900) },
+            { from: '2026-11-07', after: lowered(1800) },
+          ],
+          limits: [],
+        },
+      },
+      pending_preview: {
+        ...preview,
+        checks: [
+          {
+            of: 'target',
+            warnings: [],
+            violations: [],
+            day: '2026-11-07',
+            expected_pct_week: -0.7,
+            expected_kg_week: -0.58,
+          },
+          {
+            of: 'target',
+            warnings: [],
+            violations: [],
+            day: '2026-10-24',
+            expected_pct_week: -0.53,
+            expected_kg_week: -0.44,
+          },
+        ],
+      },
+    },
+    summaryOf({
+      tdee: {
+        ...summaryOf().tdee,
+        measured: true,
+        trusted: true,
+        kcal: 2400,
+        half_width: 40,
+        doubts: [],
+      },
+    }),
+  )
+  renderAt('/plan')
+  const card = within(await screen.findByRole('region', { name: 'A proposed change' }))
+  expect((await card.findByText('The data:')).parentElement?.textContent).toContain(
+    'with this from Oct 24 -0.53% a week (-0.44 kg), from Nov 7 -0.7% a week (-0.58 kg)',
+  )
+})
+
+// Its toast says a later period against the one the proposal sets before
+// it, as its table does.
+test("a proposal's toast tells a second period against the first, as its table", async () => {
+  const pending: Proposal = {
+    ...step,
+    changes: {
+      phases: [],
+      targets: [
+        { from: '2026-11-07', after: lowered(1800) },
+        { from: '2026-10-24', after: lowered(1900) },
+      ],
+      limits: [],
+    },
+  }
+  fakeServer({
+    ...signedIn(),
+    'GET /api/v1/profile': () => Response.json({ missing: [] }),
+    'GET /api/v1/limits': () => Response.json(limitsBody()),
+    'GET /api/v1/plan': () =>
+      Response.json(planBody({ targets: [splitTarget], training_weekdays: ['monday'], pending })),
+    [`POST /api/v1/proposals/${step.id}/apply`]: () =>
+      Response.json({ proposal: { ...pending, status: 'applied' } }),
+  })
+  renderAt('/plan')
+  const card = within(await screen.findByRole('region', { name: 'A proposed change' }))
+  fireEvent.click(card.getByRole('button', { name: /^Accept/ }))
+  const toast = await screen.findByText('Proposal accepted')
+  expect(toast.parentElement?.textContent).toContain(
+    'Training days 2,250 → 2,200 kcal, rest days 1,950 → 1,900 kcal',
+  )
+  expect(toast.parentElement?.textContent).toContain(
+    'Training days 2,200 → 2,100 kcal, rest days 1,900 → 1,800 kcal',
+  )
+})
+
+// The plan says whether it has revisions older than those it gives,
+// and the history's link says it: the latest, or all of them.
+test("the history's link says whether there are older revisions", async () => {
+  desktop()
+  const many = Array.from({ length: 10 }, (_, i) => ({
+    ...sundays,
+    id: `0193c3a5-0000-7000-8000-0000000001${String(i).padStart(2, '0')}`,
+  }))
+  coachServer({ revisions: many, revisions_more: false })
+  renderAt('/plan')
+  const card = within(await screen.findByRole('region', { name: 'Plan history' }))
+  expect(card.getByRole('link', { name: '10 revisions' })).toBeDefined()
+  cleanup()
+
+  coachServer({ revisions: many.slice(0, 3), revisions_more: true })
+  renderAt('/plan')
+  const more = within(await screen.findByRole('region', { name: 'Plan history' }))
+  expect(more.getByRole('link', { name: 'Latest 3' })).toBeDefined()
+})
+
+// The oldest revision shown, taken back, leaves the latest; the history
+// shows the revision that took it back, not that it is older.
+test('the oldest revision taken back gives its place to the one that took it back', async () => {
+  const back: Proposal = {
+    ...sundays,
+    id: '0193c3a5-0000-7000-8000-0000000000c9',
+    status: 'pending',
+    rationale: 'taken back',
+    reverts: sundays.id,
+    by: { client: 'web' },
+    changes: {
+      ...sundays.changes,
+      training_weekdays: { before: ['sunday', 'monday'], after: ['monday'] },
+    },
+    created_at: '2026-10-23T09:00:00Z',
+    decided_at: '2026-10-23T09:00:00Z',
+    decided_by: { client: 'web' },
+  }
+  const again: Proposal = {
+    ...back,
+    id: '0193c3a5-0000-7000-8000-0000000000ca',
+    reverts: back.id,
+    changes: {
+      ...sundays.changes,
+      training_weekdays: { before: ['monday'], after: ['sunday', 'monday'] },
+    },
+    created_at: '2026-10-24T09:00:00Z',
+    decided_at: '2026-10-24T09:00:00Z',
+  }
+  let plan = planBody({ revisions: [sundays] })
+  fakeServer({
+    ...signedIn(),
+    'GET /api/v1/profile': () => Response.json({ missing: [] }),
+    'GET /api/v1/limits': () => Response.json(limitsBody()),
+    'GET /api/v1/plan': () => Response.json(plan),
+    [`POST /api/v1/proposals/${sundays.id}/revert`]: () =>
+      Response.json({ proposal: back, preview }, { status: 201 }),
+    [`POST /api/v1/proposals/${back.id}/apply`]: () => {
+      // The latest ten no longer hold the oldest.
+      const applied = { ...back, status: 'applied' as const }
+      plan = planBody({ revisions: [applied], revisions_more: true })
+      return Response.json({ proposal: applied })
+    },
+    [`POST /api/v1/proposals/${back.id}/revert`]: () =>
+      Response.json({ proposal: again, preview }, { status: 201 }),
+    [`POST /api/v1/proposals/${again.id}/apply`]: () => {
+      // Nor the one that took it back.
+      const applied = { ...again, status: 'applied' as const }
+      plan = planBody({ revisions: [applied], revisions_more: true })
+      return Response.json({ proposal: applied })
+    },
+  })
+  const region = within(await revisionAt(sundays.id))
+  fireEvent.click(region.getByRole('button', { name: 'Take back' }))
+  fireEvent.click(region.getByRole('button', { name: 'Take back' }))
+  await screen.findByText('Change taken back')
+  const next = within(await screen.findByRole('region', { name: /^Oct 23, by you/ }))
+  expect(screen.queryByText('This change is older than the latest ones shown here.')).toBeNull()
+
+  // Taken back in turn, it gives its place to the next.
+  fireEvent.click(next.getByRole('button', { name: 'Take back' }))
+  fireEvent.click(next.getByRole('button', { name: 'Take back' }))
+  expect(await screen.findByRole('region', { name: /^Oct 24, by you/ })).toBeDefined()
+  expect(screen.queryByText('This change is older than the latest ones shown here.')).toBeNull()
+})
+
+// The reason's three lines are measured again as its width changes: a
+// window made narrower can make it longer than three, and More shows.
+test("a proposal's reason is measured again when its width changes", async () => {
+  let resized: (() => void) | undefined
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        resized = callback
+      }
+      observe() {
+        return undefined
+      }
+      disconnect() {
+        return undefined
+      }
+    },
+  )
+  // Its text's height, against the three lines it shows.
+  let height = 40
+  const scroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
+  const client = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
+  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+    configurable: true,
+    get: () => height,
+  })
+  Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+    configurable: true,
+    get: () => 60,
+  })
+  try {
+    coachServer({ pending: step })
+    renderAt('/plan')
+    const card = within(await screen.findByRole('region', { name: 'A proposed change' }))
+    card.getByText("The loss is under the cut's rate.")
+    expect(card.queryByRole('button', { name: 'More' })).toBeNull()
+    height = 120
+    act(() => {
+      resized?.()
+    })
+    expect(await card.findByRole('button', { name: 'More' })).toBeDefined()
+  } finally {
+    if (scroll) {
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', scroll)
+    }
+    if (client) {
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', client)
+    }
+  }
+})

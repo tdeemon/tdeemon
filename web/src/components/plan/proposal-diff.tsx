@@ -1,5 +1,5 @@
 import type { components } from '@/api/schema'
-import { priorOf, useChangeWords, type TargetValues } from '@/components/plan/change-words'
+import { priorsOf, useChangeWords, type TargetValues } from '@/components/plan/change-words'
 import { useDate, useLimitWords, usePlanWords } from '@/components/plan/proposal-text'
 import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
@@ -96,16 +96,10 @@ export function ProposalDiff({
   const add = (day: string, rows: Row[]) => {
     tables.set(day, [...(tables.get(day) ?? []), ...rows])
   }
-  // The plan's targets as the changes before each leave them, so a later
-  // one is told against what the proposal sets (or deletes) before it.
-  let timeline: readonly Target[] = targets
-  for (const ch of changes.targets.toSorted((a, b) => a.from.localeCompare(b.from))) {
-    const before = priorOf(ch, timeline)
+  // A later change is told against what the proposal sets (or deletes)
+  // before it (priorsOf).
+  for (const { change: ch, prior: before } of priorsOf(changes.targets, targets)) {
     const after = ch.after
-    timeline = [
-      ...timeline.filter((tg) => tg.effective_from !== ch.from),
-      ...(after === undefined ? [] : [{ effective_from: ch.from, ...after }]),
-    ].toSorted((a, b) => a.effective_from.localeCompare(b.effective_from))
     add(
       ch.from,
       unsplit(before) && unsplit(after)
