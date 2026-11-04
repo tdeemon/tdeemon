@@ -1909,7 +1909,9 @@ export const en = {
       none: 'No change of the plan yet.',
       count: (n: number) =>
         `${String(n)} ${plural('en', n, { one: 'revision', other: 'revisions' })}`,
-      all: (n: number) => `All ${String(n)}`,
+      all: (n: number) => `Latest ${String(n)}`,
+      // A revision past the latest the plan holds.
+      missing: 'This change is older than the latest ones shown here.',
       allShort: 'All changes',
       done: 'Change taken back',
       applied: (date: string, who: string) => `${date}, by ${who}`,

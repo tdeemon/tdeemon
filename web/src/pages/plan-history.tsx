@@ -35,8 +35,18 @@ export function PlanHistoryPage() {
     body = <p className="text-sm text-muted-foreground">{r.none}</p>
   } else {
     const { revisions } = plan.data
-    const open = revisions.find((x) => x.id === rev) ?? (desktop ? revisions[0] : undefined)
-    const detail = open && <RevisionDetail key={open.id} rev={open} plan={plan.data} />
+    // A revision asked for that the plan's latest do not hold is said
+    // gone, not shown as another.
+    const asked = rev === undefined ? undefined : revisions.find((x) => x.id === rev)
+    const missing = rev !== undefined && asked === undefined
+    const open = asked ?? (desktop && rev === undefined ? revisions[0] : undefined)
+    const detail = missing ? (
+      <p className="text-sm text-muted-foreground">
+        {r.missing}
+      </p>
+    ) : (
+      open && <RevisionDetail key={open.id} rev={open} plan={plan.data} />
+    )
     if (desktop) {
       body = (
         <div className="grid grid-cols-[minmax(0,22rem)_minmax(0,1fr)] items-start gap-6">
@@ -47,7 +57,12 @@ export function PlanHistoryPage() {
         </div>
       )
     } else if (open === undefined) {
-      body = <RevisionList revisions={revisions} targets={plan.data.targets} />
+      body = (
+        <>
+          {detail}
+          <RevisionList revisions={revisions} targets={plan.data.targets} />
+        </>
+      )
     } else {
       body = (
         <>

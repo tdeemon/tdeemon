@@ -246,8 +246,9 @@ test('the history shows a revision, which is taken back in a step', async () => 
   history.getByRole('heading', { name: 'Oct 20, by Claude (claude-opus-5-5)' })
   history.getByText('Train on Sundays too.')
   expect(rowsOf(region)).toEqual([
-    ['From Oct 23', 'Before', 'After', 'Δ'],
-    ['Training days', 'Mon', 'Sun, Mon', '+1'],
+    // Of the day it was applied, not today.
+    ['From Oct 20', 'Before', 'After', 'Δ'],
+    ['Training days', 'Mon', 'Sun, Mon', ''],
   ])
 
   fireEvent.click(history.getByRole('button', { name: 'Take back' }))
@@ -326,7 +327,7 @@ test("on a desktop the history's rows stay beside the revision open", async () =
   renderAt('/plan')
   const card = within(await screen.findByRole('region', { name: 'Plan history' }))
   expect(screen.queryByRole('link', { name: 'Plan history' })).toBeNull()
-  fireEvent.click(card.getByRole('link', { name: 'All 1' }))
+  fireEvent.click(card.getByRole('link', { name: 'Latest 1' }))
   const revision = await screen.findByRole('region', { name: /^Oct 20, by/ })
   within(revision).getByText('Train on Sundays too.')
   expect(screen.getByRole('link', { name: /^Oct 20, by/ }).getAttribute('aria-current')).toBe(
@@ -356,6 +357,32 @@ test('on a desktop A accepts a proposal and X rejects one', async () => {
   await waitFor(() => {
     expect(accepted.sent).toEqual([`POST /api/v1/proposals/${step.id}/apply`])
   })
+})
+
+// G, then A, is a way to a section the app does not have, not an
+// answer.
+test('on a desktop G then A or X does not answer a proposal', async () => {
+  desktop()
+  const { sent } = coachServer({ pending: step })
+  renderAt('/plan')
+  await screen.findByRole('region', { name: 'A proposed change' })
+  fireEvent.keyDown(document.body, { key: 'g' })
+  fireEvent.keyDown(document.body, { key: 'a' })
+  fireEvent.keyDown(document.body, { key: 'g' })
+  fireEvent.keyDown(document.body, { key: 'x' })
+  await act(() => Promise.resolve())
+  expect(sent).toEqual([])
+})
+
+// A revision past the latest the plan holds is said gone, not shown as
+// another.
+test('a revision the plan does not hold is said older, not another shown', async () => {
+  desktop()
+  coachServer({ revisions: [sundays] })
+  renderAt('/plan/history?rev=0193c3a5-0000-7000-8000-00000000ffff')
+  await screen.findByText('This change is older than the latest ones shown here.')
+  expect(screen.queryByRole('region', { name: /^Oct 20, by/ })).toBeNull()
+  expect(screen.getAllByRole('link', { name: /, by / })).toHaveLength(1)
 })
 
 // A phone has no such keys: a letter typed is no answer.

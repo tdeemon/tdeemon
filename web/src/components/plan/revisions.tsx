@@ -16,6 +16,7 @@ import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
 import { sayChange } from '@/lib/toast'
 import { cn } from '@/lib/utils'
+import { dateAt } from '@/lib/zoned'
 
 type Plan = components['schemas']['PlanBody']
 
@@ -111,6 +112,8 @@ export function RevisionDetail({ rev, plan }: { rev: Proposal; plan: Plan }) {
   const revert = $api.useMutation('post', '/api/v1/proposals/{id}/revert')
   const apply = $api.useMutation('post', '/api/v1/proposals/{id}/apply')
   const busy = revert.isPending || apply.isPending
+  const session = useQuery(sessionQuery)
+  const timeZone = session.data?.user.timezone ?? 'UTC'
   const r = t.plan.revisions
 
   async function takeBack() {
@@ -164,7 +167,15 @@ export function RevisionDetail({ rev, plan }: { rev: Proposal; plan: Plan }) {
         )}
       </header>
       <Rationale proposal={rev} />
-      <ProposalDiff changes={rev.changes} targets={plan.targets} today={plan.today} past />
+      {/* What took effect at once did so on the day it was applied. */}
+      <ProposalDiff
+        changes={rev.changes}
+        targets={plan.targets}
+        today={
+          rev.decided_at === undefined ? plan.today : dateAt(Date.parse(rev.decided_at), timeZone)
+        }
+        past
+      />
       {failed !== undefined && (
         <p role="alert" className="text-sm text-destructive">
           {why(failed.error)}

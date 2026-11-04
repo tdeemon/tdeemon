@@ -107,7 +107,10 @@ export function YouList({ history = false }: { history?: boolean }) {
           title={t.plan.revisions.title}
           to="/plan/history"
           summary={[
-            t.plan.revisions.count(revisions.length),
+            // The plan holds its latest ten.
+            revisions.length >= 10
+              ? t.plan.revisions.all(revisions.length)
+              : t.plan.revisions.count(revisions.length),
             ...(revisions[0]?.decided_at === undefined
               ? []
               : [f.day(revisions[0].decided_at, timeZone)]),

@@ -70,6 +70,13 @@ export function useShortcuts(actions: Readonly<Record<string, () => void>>) {
         action()
         return
       }
+      // The second key of a sequence begun is the sequence's, even one
+      // it does not know: no other page's shortcut takes it (G, then A
+      // is no A).
+      if (before !== undefined) {
+        event.preventDefault()
+        return
+      }
       if (Object.keys(now).some((name) => name.startsWith(`${key} `))) {
         event.preventDefault()
         first = key

@@ -119,7 +119,7 @@ export function ProposalDiff({
         name: c.weekdays,
         now: w.before.length === 0 ? none : plan.days(w.before),
         next: w.after.length === 0 ? none : plan.days(w.after),
-        delta: signed(w.after.length - w.before.length),
+        delta: '',
       },
     ])
   }

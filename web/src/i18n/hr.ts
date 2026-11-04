@@ -1692,7 +1692,8 @@ export const hr: Messages = {
       none: 'Plan još nije mijenjan.',
       count: (n: number) =>
         `${String(n)} ${plural('hr', n, { one: 'revizija', few: 'revizije', other: 'revizija' })}`,
-      all: (n: number) => `Sve (${String(n)})`,
+      all: (n: number) => `Zadnjih ${String(n)}`,
+      missing: 'Ova je promjena starija od zadnjih prikazanih ovdje.',
       allShort: 'Sve promjene',
       done: 'Promjena vraćena',
       applied: (date: string, who: string) => `${date}, ${who}`,
