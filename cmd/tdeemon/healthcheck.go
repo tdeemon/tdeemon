@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -27,11 +28,11 @@ func healthcheck(ctx context.Context, args []string, lookup config.LookupFunc) e
 	}
 	ctx, cancel := context.WithTimeout(ctx, healthcheckTimeout)
 	defer cancel()
-	url, err := healthzURL(ctx, lookup)
+	target, err := healthzURL(ctx, lookup)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("health check: %w", err)
 	}
@@ -45,7 +46,7 @@ func healthcheck(ctx context.Context, args []string, lookup config.LookupFunc) e
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("health check: %s answered %s", url, resp.Status)
+		return fmt.Errorf("health check: %s answered %s", target, resp.Status)
 	}
 	return nil
 }
@@ -70,5 +71,7 @@ func healthzURL(ctx context.Context, lookup config.LookupFunc) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%sLISTEN %q: %w", config.Prefix, listen, err)
 	}
-	return "http://" + net.JoinHostPort(host, strconv.Itoa(n)) + "/healthz", nil
+	// Through url.URL, which escapes an IPv6 zone's % ([fe80::1%25eth0]).
+	u := url.URL{Scheme: "http", Host: net.JoinHostPort(host, strconv.Itoa(n)), Path: "/healthz"}
+	return u.String(), nil
 }

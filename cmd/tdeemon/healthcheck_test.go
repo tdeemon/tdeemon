@@ -106,6 +106,7 @@ func TestHealthzURL(t *testing.T) {
 		{"[::1]:9000", true, "http://[::1]:9000/healthz"},
 		{"localhost:9000", true, "http://localhost:9000/healthz"},
 		{":http", true, "http://127.0.0.1:80/healthz"},
+		{"[fe80::1%eth0]:9000", true, "http://[fe80::1%25eth0]:9000/healthz"},
 	} {
 		env := map[string]string{}
 		if tc.set {
