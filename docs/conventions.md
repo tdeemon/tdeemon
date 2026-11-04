@@ -295,8 +295,8 @@ A change is done when:
     `org.opencontainers.image.source` label links it here: anyone pulls
     it without credentials. A package first pushed any other way would
     be private;
-  - a `Release-As: vX.Y.Z` trailer, the last line of a pull request's
-    description and so of its squash commit, sets the next version
+  - a line `Release-As: vX.Y.Z` in a pull request's description, and so
+    in its squash commit, sets the next version
     outright, past the last tag and the version the commits give: the
     way from v0.x to v1.0.0, which the rules above never take. A commit
     of any type with it makes that release;

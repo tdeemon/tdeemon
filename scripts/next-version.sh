@@ -52,8 +52,8 @@ if [[ -z $last || $last == v0.* ]]; then
   fi
 fi
 
-# A "Release-As: vX.Y.Z" trailer in a commit since the last tag (the
-# squash merge's body, from its pull request's description) sets the
+# A "Release-As: vX.Y.Z" line in a commit since the last tag (the squash
+# merge's body, from its pull request's description) sets the
 # version outright, such as v1.0.0, which the rules above never reach
 # from v0.x. It must be past the last tag and the version computed; a
 # commit of any type makes that release.
@@ -61,7 +61,9 @@ range=HEAD
 if [[ -n $last ]]; then
   range=$last..HEAD
 fi
-wanted=$(git log --format='%(trailers:key=Release-As,valueonly)' "$range" | sed '/^[[:space:]]*$/d' | sort -uV | tail -n 1)
+# A line of its own, not git's trailers: those miss it after a BREAKING
+# CHANGE footer, whose token has a space.
+wanted=$(git log --format=%B "$range" | sed -n 's/^Release-As:[[:space:]]*//p' | sort -uV | tail -n 1)
 if [[ -n $wanted ]]; then
   wanted=${wanted//[[:space:]]/}
   if [[ ! $wanted =~ $semver ]]; then
