@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { Moon } from 'lucide-react'
-import { useState } from 'react'
 
 import { $api } from '@/api/client'
 import { sessionQuery } from '@/api/session'
@@ -10,6 +9,7 @@ import { weekEnding, weekOf } from '@/components/day/week'
 import { ProposalNudge } from '@/components/plan/proposal-nudge'
 import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
+import { useNow } from '@/lib/now'
 import { hourAt } from '@/lib/zoned'
 
 // The evening starts at 18:00 on the user's clock, and lasts until their
@@ -25,8 +25,8 @@ export function DayNow({ day }: { day: Day }) {
   const me = $api.useQuery('get', '/api/v1/me')
   const plan = $api.useQuery('get', '/api/v1/plan')
   const user = useQuery(sessionQuery).data?.user
-  // When the page opened.
-  const [now] = useState(Date.now)
+  // Now, as the clock goes on: a page left open turns to the evening.
+  const now = useNow()
   if (me.data?.today !== day.date) {
     return null
   }

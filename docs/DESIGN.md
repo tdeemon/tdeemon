@@ -1608,7 +1608,9 @@ the first spec.
     waits (at any hour, in the coach's colour: "Claude proposes 2 plan
     changes", what they are and when it expires), or in the evening
     (from 18:00 until the user's day starts) how the week ends if today
-    ends there. Within 5 % of the kcal target
+    ends there. The hour is asked again each minute and as the page is
+    shown again, so an app left open turns to the evening. Within 5 % of
+    the kcal target
     either way, and 100 kcal at least, a day is on it, in the brand's
     colour; past that, the ring, and the week's columns above the
     target's tick, run on in a warm neutral (`--over`), thinner, so it
@@ -1646,15 +1648,21 @@ the first spec.
     in a tap are under the meals, their row fading at a phone's edge.
     A day that does not come keeps its header and its week.
   - A new user's first steps take the place of the day's hero until
-    there is a plan, or a proposal of one: a card of four, each ticked
-    once done (the profile; a first weigh-in, in the card; an AI coach
-    or a phone that called with its access key; a first meal), and,
-    once the first three are, what to ask the AI coach for a plan, to
-    copy. Put off for later, in the browser, the plan's page brings it
-    back. Until the user has measured anything, the check-in is a row
-    that asks how the day was, and the body has no empty tiles, only the
-    way to a first weigh-in. A day before the plan's first target says
-    when the plan starts, not to set one up.
+    there is a plan, or a proposal of one: a card of four, with how many
+    are done and a bar of them, each a numbered row to its page until it
+    is done, then ticked, with what was given under it (the profile; a
+    first weigh-in, in the card; an AI coach or a phone that called with
+    its access key; a first meal); and under it the step after them, a
+    card in the coach's colour: what to write the AI coach for a plan,
+    copied in a tap, and that its proposal lands in the plan and changes
+    nothing until accepted. A desktop has how tdeemon works beside them,
+    in four rows (you log, you weigh in, it measures the TDEE, your AI
+    coach proposes and you decide). Put off for later, in the browser,
+    the plan's page brings them back. Until the user has measured
+    anything, the check-in is a row that asks how the day was, and the
+    body has no empty tiles, only the way to a first weigh-in. A day
+    before the plan's first target says when the plan starts, not to set
+    one up.
   - A weigh-in is a tap away: each of the body's tiles opens its
     measurement (the weight in a field in its place, hinting with the
     day before's; the others in the measurements' sheet, at their own),
@@ -1719,6 +1727,11 @@ the first spec.
     before until it comes. What did not load says so in its place, within
     the page's frame (its header and the navigation stay): what did not
     ("Couldn't load today."), why, and Try again, not in an error's red.
+    A place with nothing in it yet (the day's meals, a list of foods, the
+    access keys, the devices notified, the household, the recent
+    changes, the plan's history, the day's measurements) says so as
+    each other does: an icon in a soft tile, one sentence, and the one
+    action that fills it, where there is one.
     What came stays when asking for it again fails (TanStack Query's
     error with data), under a thin bar over the page that says since when
     ("Offline · data from 21:14", or "Not updated" when the server

@@ -6,11 +6,11 @@ import { $api } from '@/api/client'
 import { HttpError, NoAnswerError } from '@/api/errors'
 import { safeTarget, sessionQuery } from '@/api/session'
 import { signIn } from '@/api/sign-in'
-import { BrandMark } from '@/components/brand-mark'
+import { AuthFrame, Or } from '@/components/auth-frame'
 import { Button, buttonVariants } from '@/components/ui/button'
 import type { Messages } from '@/i18n/en'
 import { useMessages } from '@/i18n/messages'
-import { inputClass, narrowPage } from '@/lib/styles'
+import { fieldLabel, inputClass } from '@/lib/styles'
 import { cn } from '@/lib/utils'
 
 // text is a text field's value in a form.
@@ -37,8 +37,9 @@ function problem(t: Messages, error: unknown): string {
 }
 
 // LoginPage signs a person in with a password, or through the instance's
-// OpenID Connect provider, and then goes where they were headed. Above
-// the form, the product's mark and name, and what it is.
+// OpenID Connect provider, and then goes where they were headed: a card
+// in the middle of the screen, under the product's mark and name, and
+// what it is.
 export function LoginPage() {
   const t = useMessages()
   const target = safeTarget(useSearch({ from: '/login' }).redirect)
@@ -65,16 +66,7 @@ export function LoginPage() {
 
   const oidc = methods.data?.oidc
   return (
-    <main className={cn(narrowPage, 'max-w-sm space-y-6 pt-10')}>
-      {/* What the app is, before the form. */}
-      <div className="space-y-2">
-        <p className="flex items-center gap-2.5 text-h2">
-          <BrandMark className="size-9" />
-          tdeemon
-        </p>
-        <p className="text-muted-foreground">{t.signIn.tagline}</p>
-      </div>
-      <h1 className="text-2xl font-semibold">{t.signIn.title}</h1>
+    <AuthFrame title={t.signIn.title} tagline={t.signIn.tagline}>
       {methods.isPending && <p className="text-muted-foreground">{t.connecting}</p>}
       {methods.isError && (
         <p role="alert" className="text-destructive">
@@ -83,8 +75,8 @@ export function LoginPage() {
       )}
       {methods.data?.password && (
         <form onSubmit={submit} className="space-y-4">
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">{t.signIn.email}</span>
+          <label className="block space-y-1.5">
+            <span className={cn(fieldLabel, 'block')}>{t.signIn.email}</span>
             <input
               name="email"
               type="email"
@@ -93,8 +85,8 @@ export function LoginPage() {
               className={inputClass}
             />
           </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">{t.signIn.password}</span>
+          <label className="block space-y-1.5">
+            <span className={cn(fieldLabel, 'block')}>{t.signIn.password}</span>
             <input
               name="password"
               type="password"
@@ -113,9 +105,7 @@ export function LoginPage() {
           </Button>
         </form>
       )}
-      {methods.data?.password && oidc && (
-        <p className="text-center text-sm text-muted-foreground">{t.signIn.or}</p>
-      )}
+      {methods.data?.password && oidc && <Or />}
       {oidc && (
         // A link, not a form: the provider's pages come after redirects,
         // which a form-action in the CSP would stop.
@@ -129,6 +119,6 @@ export function LoginPage() {
       {methods.data && !methods.data.password && !oidc && (
         <p className="text-muted-foreground">{t.signIn.noMethod}</p>
       )}
-    </main>
+    </AuthFrame>
   )
 }

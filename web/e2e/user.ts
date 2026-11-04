@@ -4,7 +4,8 @@ import { expect, type Locator, type Page } from '@playwright/test'
 export const user = { email: 'ana@example.com', password: 'only-for-the-e2e-tests' }
 
 // newUser is a second user it creates, who has given nothing yet, for the
-// first steps alone: no other test uses them.
+// first steps: their test alone changes what they have; the a11y checks
+// only look at them, and give their language back as they end.
 export const newUser = { email: 'iva@example.com', password: user.password }
 
 // signIn signs a user in from the sign-in page, the tests' own unless

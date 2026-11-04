@@ -1,10 +1,22 @@
 import { Menu } from '@base-ui/react/menu'
 import { Link, useLocation, useNavigate, useSearch } from '@tanstack/react-router'
-import { Check, ChevronDown, CookingPot, Plus, Search } from 'lucide-react'
+import {
+  Apple,
+  Archive,
+  Calculator,
+  Check,
+  ChevronDown,
+  CookingPot,
+  Plus,
+  Search,
+  SearchX,
+  type LucideIcon,
+} from 'lucide-react'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
 import { $api } from '@/api/client'
 import { useFindFoods, useFindOfList, useFoodList, type FoodFilter } from '@/api/foods'
+import { EmptyState } from '@/components/empty-state'
 import { eatenThisWeek } from '@/components/foods/eaten'
 import { FoodRow } from '@/components/foods/food-row'
 import { LoadError } from '@/components/load-error'
@@ -334,9 +346,9 @@ function Found({ query, filter, from }: { query: string; filter: FoodFilter; fro
   const foods = own === undefined ? (all.data?.foods ?? []) : (listed.data ?? [])
   if (foods.length === 0) {
     return filter === 'recipes' ? (
-      <Empty words={t.recipes.noMatch} from={from} recipe />
+      <Empty icon={SearchX} words={t.recipes.noMatch} from={from} recipe />
     ) : (
-      <Empty words={t.foods.noMatch} from={from} />
+      <Empty icon={SearchX} words={t.foods.noMatch} from={from} />
     )
   }
   return (
@@ -380,6 +392,7 @@ function Listed({ filter, order, from }: { filter: FoodFilter; order: Order; fro
     }
     return (
       <Empty
+        icon={{ inUse: Apple, archived: Archive, estimates: Calculator }[filter]}
         words={
           { inUse: t.foods.none, archived: t.foods.noneArchived, estimates: t.foods.noneEstimates }[
             filter
@@ -435,14 +448,16 @@ function Listed({ filter, order, from }: { filter: FoodFilter; order: Order; fro
   )
 }
 
-// Empty is what a list or a search without foods says, with the way to
-// add one, or a recipe.
+// Empty is what a list or a search without foods says, by its icon, with
+// the way to add one, or a recipe.
 function Empty({
+  icon,
   words,
   from,
   add = true,
   recipe = false,
 }: {
+  icon: LucideIcon
   words: string
   from: FoodsSearch
   add?: boolean
@@ -451,19 +466,23 @@ function Empty({
   const t = useMessages()
 
   return (
-    <div className="space-y-3 rounded-lg bg-card p-4 text-center shadow-card lg:p-6">
-      <p className="text-muted-foreground">{words}</p>
-      {add && (
-        <Link
-          to={recipe ? '/foods/new-recipe' : '/foods/new'}
-          search={from}
-          className={buttonVariants()}
-        >
-          <Plus aria-hidden />
-          {recipe ? t.recipes.new : t.foods.add}
-        </Link>
-      )}
-    </div>
+    <EmptyState
+      icon={icon}
+      action={
+        add && (
+          <Link
+            to={recipe ? '/foods/new-recipe' : '/foods/new'}
+            search={from}
+            className={buttonVariants()}
+          >
+            <Plus aria-hidden />
+            {recipe ? t.recipes.new : t.foods.add}
+          </Link>
+        )
+      }
+    >
+      {words}
+    </EmptyState>
   )
 }
 

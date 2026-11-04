@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Undo2 } from 'lucide-react'
+import { History, Undo2 } from 'lucide-react'
 import { useState, type RefObject } from 'react'
 
 import { $api } from '@/api/client'
@@ -8,6 +8,7 @@ import { sessionQuery } from '@/api/session'
 import { itemName } from '@/components/day/meal-entries'
 import { longName, namedBy } from '@/components/day/meal-slot'
 import { metricKinds, type MetricKind } from '@/components/day/metric-kinds'
+import { EmptyState } from '@/components/empty-state'
 import { LoadError } from '@/components/load-error'
 import { Sheet } from '@/components/sheet'
 import { Badge } from '@/components/ui/badge'
@@ -121,7 +122,11 @@ export function RecentChangesList() {
     return <LoadError error={changes.error} onRetry={() => void changes.refetch()} />
   }
   if (changes.data.changes.length === 0) {
-    return <p className="text-sm text-muted-foreground">{t.changes.none}</p>
+    return (
+      <EmptyState icon={History} bare>
+        {t.changes.none}
+      </EmptyState>
+    )
   }
   return (
     <ol className="-my-2 divide-y">

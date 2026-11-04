@@ -192,7 +192,7 @@ test('a wrong measurement is deleted', async () => {
   // The focus went with the card; the measurements have it, in the sheet.
   // (The toast is a dialog too.)
   const sheet = within(screen.getByRole('dialog', { name: 'Measurements' }))
-  expect(document.activeElement).toBe(sheet.getByText('None yet.').parentElement)
+  expect(document.activeElement).toBe(sheet.getByText('None yet.').closest('[tabindex="-1"]'))
 })
 
 test('a delete that failed says so', async () => {

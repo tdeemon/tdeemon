@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Utensils } from 'lucide-react'
 import { use, useEffect, useRef, useState } from 'react'
 
 import { $api } from '@/api/client'
@@ -13,7 +13,7 @@ import { DayNow } from '@/components/day/day-now'
 import { useDayReady } from '@/components/day/day-ready'
 import { DaySkeleton } from '@/components/day/day-skeleton'
 import { DaySummary } from '@/components/day/day-summary'
-import { FirstSteps } from '@/components/day/first-steps'
+import { FirstSteps, HowItWorks } from '@/components/day/first-steps'
 import { kcalLeft } from '@/components/day/left'
 import { MealList } from '@/components/day/meal-list'
 import { slotAt } from '@/components/day/meal-slot'
@@ -21,6 +21,7 @@ import { MorningLine, MorningSummary } from '@/components/day/morning-summary'
 import { QuickAdd } from '@/components/day/quick-add'
 import { QuickChips } from '@/components/day/quick-chips'
 import { WeekCard } from '@/components/day/week-card'
+import { EmptyState } from '@/components/empty-state'
 import { HouseholdNudge } from '@/components/household/household-nudge'
 import { LoadError } from '@/components/load-error'
 import { Skeleton } from '@/components/progress/skeleton'
@@ -31,6 +32,7 @@ import { useMessages } from '@/i18n/messages'
 import limits from '@/lib/limits.json'
 import { LogHereContext } from '@/lib/log-here'
 import { useDesktop } from '@/lib/media'
+import { useNow } from '@/lib/now'
 import { useShortcuts } from '@/lib/shortcuts'
 import { dateAt } from '@/lib/zoned'
 import type { DaySearch } from '@/router'
@@ -90,8 +92,8 @@ export function DayPage() {
   const desktop = useDesktop()
   const timeZone = session.data?.user.timezone ?? 'UTC'
   const today = me.data?.today
-  // When the page opened, for the meal of the hour to add.
-  const [now] = useState(Date.now)
+  // Now, as the clock goes on, for the meal of the hour to add.
+  const now = useNow()
   // The meal being logged, open, and the food it starts with; and what
   // opened it, which the focus goes back to.
   const [adding, setAdding] = useState<{ food?: Food } | undefined>(undefined)
@@ -378,7 +380,7 @@ export function DayPage() {
               )}
             </div>
             {day.data.meals.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t.day.noMeals}</p>
+              <EmptyState icon={Utensils}>{t.day.noMeals}</EmptyState>
             ) : (
               <MealList
                 day={day.data}
@@ -431,6 +433,8 @@ export function DayPage() {
           </section>
         </div>
         <div className="space-y-4 lg:col-span-5 xl:col-span-4">
+          {/* Beside a new user's first steps, how tdeemon works. */}
+          {desktop && <HowItWorks day={day.data} />}
           {desktop && week}
           {body}
           {checkIn}

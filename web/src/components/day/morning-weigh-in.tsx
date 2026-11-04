@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
 
 import { $api } from '@/api/client'
 import { sessionQuery } from '@/api/session'
@@ -8,6 +7,7 @@ import { usePreviousWeight } from '@/components/day/previous-weight'
 import { WeighIn } from '@/components/day/weigh-in'
 import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
+import { useNow } from '@/lib/now'
 import { hourAt } from '@/lib/zoned'
 
 // noon ends the morning, on the user's clock.
@@ -30,8 +30,8 @@ export function MorningWeighIn({ day }: { day: Day }) {
   const f = useFormat()
   const me = $api.useQuery('get', '/api/v1/me')
   const user = useQuery(sessionQuery).data?.user
-  // When the page opened.
-  const [now] = useState(Date.now)
+  // Now, as the clock goes on: a page left open stops asking at noon.
+  const now = useNow()
   const asks =
     me.data?.today === day.date &&
     !day.metrics.some((m) => m.kind === 'weight') &&

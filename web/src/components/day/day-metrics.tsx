@@ -1,3 +1,4 @@
+import { Ruler } from 'lucide-react'
 import { useRef, type Ref } from 'react'
 
 import type { Metric } from '@/api/types'
@@ -5,6 +6,7 @@ import { AddMetric } from '@/components/day/add-metric'
 import { MetricCard } from '@/components/day/metric-card'
 import { MetricForm } from '@/components/day/metric-form'
 import { metricKinds, type MetricKind } from '@/components/day/metric-kinds'
+import { EmptyState } from '@/components/empty-state'
 import { useMessages } from '@/i18n/messages'
 
 // DayMetrics are the measurements of day date, each in its unit, to
@@ -49,7 +51,9 @@ export function DayMetrics({
         </div>
       )}
       {metrics.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t.day.noMeasurements}</p>
+        <EmptyState icon={Ruler} bare>
+          {t.day.noMeasurements}
+        </EmptyState>
       ) : (
         <ul className="grid grid-cols-2 gap-2">
           {metrics.map((m) => (

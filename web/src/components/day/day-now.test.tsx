@@ -1,4 +1,4 @@
-import { cleanup, screen, within } from '@testing-library/react'
+import { act, cleanup, screen, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import type { components } from '@/api/schema'
@@ -139,4 +139,24 @@ test('before the evening, or while a proposal waits, the day says no end', async
   renderAt('/')
   expect(await screen.findByRole('link', { name: /^Claude proposes 1 plan change / })).toBeDefined()
   expect(screen.queryByRole('region', { name: 'How the day ends' })).toBeNull()
+})
+
+// A page left open, an installed app's, follows the clock: shown again
+// after 18:00, it turns to the evening.
+test('a page left open turns to the evening as it is shown again', async () => {
+  at(17)
+  serve()
+  renderAt('/')
+  expect(
+    await within(await screen.findByRole('navigation', { name: 'The week' })).findByRole('link', {
+      name: 'Tue 20: 1,960 of 2,000 kcal',
+    }),
+  ).toBeDefined()
+  expect(screen.queryByRole('region', { name: 'How the day ends' })).toBeNull()
+
+  at(19)
+  act(() => {
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  expect(await screen.findByRole('region', { name: 'How the day ends' })).toBeDefined()
 })
