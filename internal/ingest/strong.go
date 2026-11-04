@@ -20,10 +20,31 @@ var strongColumns = []string{"Date", "Workout Name", "Duration", "Exercise Name"
 
 // Workouts is what a Strong export gives tdeemon until the training
 // module: how many workouts it holds, and the days they were on, in
-// order.
+// order; after UpTo, the days after today it left out, in order too.
 type Workouts struct {
-	Count int
-	Days  []day.Date
+	Count  int
+	Days   []day.Date
+	Future []day.Date
+	// perDay is how many workouts each day holds.
+	perDay map[day.Date]int
+}
+
+// UpTo returns w with the days after today left out, as a measurement's
+// are (Result.UpTo): a clock set wrong, or a time zone, would put a
+// workout on a day to come, and make it a training day it is not. The
+// days left out are its Future, and their workouts are no longer counted.
+func (w Workouts) UpTo(today day.Date) Workouts {
+	out := Workouts{Days: []day.Date{}, perDay: map[day.Date]int{}}
+	for _, d := range w.Days {
+		if today.Before(d) {
+			out.Future = append(out.Future, d)
+			continue
+		}
+		out.Days = append(out.Days, d)
+		out.Count += w.perDay[d]
+		out.perDay[d] = w.perDay[d]
+	}
+	return out
 }
 
 // ParseStrong reads the Strong app's CSV export, one row a set, which
@@ -52,7 +73,7 @@ func ParseStrong(r io.Reader, cal day.Calendar) (Workouts, error) {
 		}
 	}
 	workouts := map[string]bool{}
-	days := map[day.Date]bool{}
+	days := map[day.Date]int{}
 	for line := 2; ; line++ {
 		row, err := cr.Read()
 		if errors.Is(err, io.EOF) {
@@ -70,10 +91,12 @@ func ParseStrong(r io.Reader, cal day.Calendar) (Workouts, error) {
 		if err != nil {
 			return Workouts{}, fmt.Errorf("strong export, line %d: %w", line, err)
 		}
-		workouts[start] = true
-		days[d] = true
+		if !workouts[start] {
+			workouts[start] = true
+			days[d]++
+		}
 	}
-	out := Workouts{Count: len(workouts), Days: make([]day.Date, 0, len(days))}
+	out := Workouts{Count: len(workouts), Days: make([]day.Date, 0, len(days)), perDay: days}
 	for d := range days {
 		out.Days = append(out.Days, d)
 	}

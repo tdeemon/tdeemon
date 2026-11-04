@@ -3,6 +3,7 @@ package ingest
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -102,5 +103,31 @@ func TestParseStrongRefuses(t *testing.T) {
 		if _, err := ParseStrong(strings.NewReader(c.csv), utc4(t)); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: %v, want %q", name, err, c.want)
 		}
+	}
+}
+
+// UpTo keeps the days up to today, today among them, and their workouts'
+// count; the days after it are its Future, in order.
+func TestWorkoutsUpTo(t *testing.T) {
+	t.Parallel()
+
+	const header = "Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Seconds\n"
+	w, err := ParseStrong(strings.NewReader(header+
+		"2026-10-20 07:00:00,Day A,1h,Squat,1,90,5,0\n"+
+		"2026-10-20 18:00:00,Day B,1h,Squat,1,90,5,0\n"+
+		"2026-10-21 07:00:00,Day C,1h,Squat,1,90,5,0\n"+
+		"2026-10-21 07:00:00,Day C,1h,Squat,2,90,5,0\n"+
+		"2026-10-22 07:00:00,Day A,1h,Squat,1,90,5,0\n"+
+		"2026-10-24 07:00:00,Day B,1h,Squat,1,90,5,0\n"), utc4(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := w.UpTo(day.Date{Year: 2026, Month: 10, Day: 21})
+	if got.Count != 3 || !slices.Equal(got.Days, []day.Date{{Year: 2026, Month: 10, Day: 20}, {Year: 2026, Month: 10, Day: 21}}) ||
+		!slices.Equal(got.Future, []day.Date{{Year: 2026, Month: 10, Day: 22}, {Year: 2026, Month: 10, Day: 24}}) {
+		t.Errorf("UpTo = %+v, want 3 workouts on the 20th and 21st, the 22nd and 24th to come", got)
+	}
+	if all := w.UpTo(day.Date{Year: 2026, Month: 10, Day: 30}); all.Count != 5 || len(all.Days) != 4 || len(all.Future) != 0 {
+		t.Errorf("UpTo a later day = %+v, want all 5 workouts", all)
 	}
 }

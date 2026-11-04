@@ -121,6 +121,7 @@ type strongBody struct {
 	Days     int      `json:"days" doc:"The days with a workout, all of them now."`
 	Added    []string `json:"added" nullable:"false" doc:"The days that became days with a workout."`
 	Removed  []string `json:"removed" nullable:"false" doc:"The days that no longer are: their workouts are gone from Strong."`
+	Future   []string `json:"future" nullable:"false" doc:"The days after the user's today that the export has workouts on, left out with their workouts: a clock set wrong, or a time zone."`
 }
 
 type strongOutput struct {
@@ -189,7 +190,8 @@ func (s *sessions) registerIngest(a huma.API) {
 		Summary:     "Import the days of workouts from a Strong export",
 		Description: "Strong's CSV export, the whole history, as the body or as the part file of a form: an API token with the ingest scope, not a web session. " +
 			"The day each workout starts in, by the user's day start hour, becomes a day with a workout, which makes it a training day unless the check-in's toggle says otherwise; " +
-			"the days of an earlier export that this one lacks are no longer. An export without a workout is refused. " +
+			"the days of an earlier export that this one lacks are no longer. A workout on a day after the user's today is left out, its day in the answer's future. " +
+			"An export without a workout up to today is refused. " +
 			"The body is archived as it came, and the latest export that read is kept for the training module.",
 		Tags:            []string{"ingest"},
 		MaxBodyBytes:    maxIngestBytes,
@@ -219,18 +221,24 @@ func (s *sessions) ingestStrong(ctx context.Context, in *ingestStrongInput) (*st
 	if err != nil {
 		return nil, huma.Error422UnprocessableEntity(err.Error())
 	}
+	// The days after the user's today are left out, as a measurement's
+	// are (store).
+	w = w.UpTo(cal.DayOf(s.now()))
 	// An export holds the whole history: one without a workout would
 	// wipe the days, and is more likely a wrong file than a fresh start.
 	if w.Count == 0 {
-		return nil, huma.Error422UnprocessableEntity("the export has no workout")
+		return nil, huma.Error422UnprocessableEntity("the export has no workout up to today")
 	}
 	added, removed, err := s.db.SetWorkoutDays(ctx, p.User.ID, event.Actor{Kind: event.Import, Client: "strong"}, store.Strong, w.Days, s.now())
 	if err != nil {
 		return nil, internalError("importing the workouts failed", err)
 	}
 	s.logger.InfoContext(ctx, "imported workouts", "user_id", p.User.ID.String(), "workouts", w.Count, "days", len(w.Days),
-		"added", len(added), "removed", len(removed))
-	return &strongOutput{Body: strongBody{Workouts: w.Count, Days: len(w.Days), Added: dateStrings(added), Removed: dateStrings(removed)}}, nil
+		"added", len(added), "removed", len(removed), "future", len(w.Future))
+	return &strongOutput{Body: strongBody{
+		Workouts: w.Count, Days: len(w.Days),
+		Added: dateStrings(added), Removed: dateStrings(removed), Future: dateStrings(w.Future),
+	}}, nil
 }
 
 func dateStrings(ds []day.Date) []string {

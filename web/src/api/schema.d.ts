@@ -591,7 +591,7 @@ export interface paths {
         put?: never;
         /**
          * Import the days of workouts from a Strong export
-         * @description Strong's CSV export, the whole history, as the body or as the part file of a form: an API token with the ingest scope, not a web session. The day each workout starts in, by the user's day start hour, becomes a day with a workout, which makes it a training day unless the check-in's toggle says otherwise; the days of an earlier export that this one lacks are no longer. An export without a workout is refused. The body is archived as it came, and the latest export that read is kept for the training module.
+         * @description Strong's CSV export, the whole history, as the body or as the part file of a form: an API token with the ingest scope, not a web session. The day each workout starts in, by the user's day start hour, becomes a day with a workout, which makes it a training day unless the check-in's toggle says otherwise; the days of an earlier export that this one lacks are no longer. A workout on a day after the user's today is left out, its day in the answer's future. An export without a workout up to today is refused. The body is archived as it came, and the latest export that read is kept for the training module.
          */
         post: operations["ingest-strong"];
         delete?: never;
@@ -3375,6 +3375,8 @@ export interface components {
              * @description The days with a workout, all of them now.
              */
             days: number;
+            /** @description The days after the user's today that the export has workouts on, left out with their workouts: a clock set wrong, or a time zone. */
+            future: string[];
             /** @description The days that no longer are: their workouts are gone from Strong. */
             removed: string[];
             /**

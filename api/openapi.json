@@ -4651,6 +4651,13 @@
             "format": "int64",
             "type": "integer"
           },
+          "future": {
+            "description": "The days after the user's today that the export has workouts on, left out with their workouts: a clock set wrong, or a time zone.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "removed": {
             "description": "The days that no longer are: their workouts are gone from Strong.",
             "items": {
@@ -4668,7 +4675,8 @@
           "workouts",
           "days",
           "added",
-          "removed"
+          "removed",
+          "future"
         ],
         "type": "object"
       },
@@ -9321,7 +9329,7 @@
     },
     "/api/v1/ingest/strong": {
       "post": {
-        "description": "Strong's CSV export, the whole history, as the body or as the part file of a form: an API token with the ingest scope, not a web session. The day each workout starts in, by the user's day start hour, becomes a day with a workout, which makes it a training day unless the check-in's toggle says otherwise; the days of an earlier export that this one lacks are no longer. An export without a workout is refused. The body is archived as it came, and the latest export that read is kept for the training module.",
+        "description": "Strong's CSV export, the whole history, as the body or as the part file of a form: an API token with the ingest scope, not a web session. The day each workout starts in, by the user's day start hour, becomes a day with a workout, which makes it a training day unless the check-in's toggle says otherwise; the days of an earlier export that this one lacks are no longer. A workout on a day after the user's today is left out, its day in the answer's future. An export without a workout up to today is refused. The body is archived as it came, and the latest export that read is kept for the training module.",
         "operationId": "ingest-strong",
         "requestBody": {
           "content": {

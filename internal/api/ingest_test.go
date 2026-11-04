@@ -493,6 +493,7 @@ type strongResponse struct {
 	Workouts, Days int
 	Added          []string `json:"added"`
 	Removed        []string `json:"removed"`
+	Future         []string `json:"future"`
 }
 
 // postStrong posts body to in's Strong import with tok and contentType,
@@ -525,6 +526,40 @@ func TestIngestStrong(t *testing.T) {
 	}
 	if again := postStrong(t, in, tok, strongExport(t), "application/octet-stream"); len(again.Added) != 0 || len(again.Removed) != 0 {
 		t.Errorf("the same export again = %+v", again)
+	}
+}
+
+// A workout after the user's today, on their clock and by their day's
+// start hour, is left out with its day, and said; an export of such
+// workouts alone is refused. The user's clock: 10:00 on 21 October in
+// Zagreb, whose day starts at 04:00.
+func TestIngestStrongFuture(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	tok := ingestToken(t, in, `"ingest"`)
+	const header = "Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Seconds\n"
+	got := postStrong(t, in, tok, header+
+		"2026-10-21 18:00:00,Day A,1h,Squat,1,90,5,0\n"+
+		// The 22nd's calendar date, before its day starts: the 21st's.
+		"2026-10-22 03:00:00,Day B,1h,Squat,1,90,5,0\n"+
+		"2026-10-22 05:00:00,Day C,1h,Squat,1,90,5,0\n"+
+		"2026-10-22 05:00:00,Day C,1h,Squat,2,90,5,0\n"+
+		"2026-10-30 07:00:00,Day A,1h,Squat,1,90,5,0\n", "text/csv")
+	if got.Workouts != 2 || got.Days != 1 || !slices.Equal(got.Added, []string{"2026-10-21"}) ||
+		!slices.Equal(got.Future, []string{"2026-10-22", "2026-10-30"}) {
+		t.Errorf("an export with workouts to come = %+v, want 2 workouts on the 21st and the 22nd and 30th left out", got)
+	}
+	days, err := in.db.WorkoutDays(t.Context(), in.user.ID, day.Date{Year: 2026, Month: 10, Day: 1}, day.Date{Year: 2026, Month: 11, Day: 30})
+	if err != nil || len(days) != 1 {
+		t.Errorf("the workout days = %v, %v; want the 21st alone", days, err)
+	}
+
+	h := maps.Clone(tok)
+	h["Content-Type"] = "text/csv"
+	rec := in.do(t, http.MethodPost, "/api/v1/ingest/strong", header+"2026-10-22 05:00:00,Day C,1h,Squat,1,90,5,0\n", nil, h)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("an export of workouts to come alone = %d %s, want 422", rec.Code, rec.Body.String())
 	}
 }
 

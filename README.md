@@ -635,8 +635,10 @@ curl -H 'Authorization: Bearer tdm_…' -H 'Content-Type: text/csv' \
 ```
 
 Each export replaces the days of the one before: a workout you deleted
-in Strong is no longer a day of a workout. An export without a workout
-is refused, so a wrong file cannot clear them.
+in Strong is no longer a day of a workout. A workout on a day after
+your today (a phone's clock set wrong, or a time zone) is left out, and
+the answer's `future` lists its day. An export without a workout up to
+today is refused, so a wrong file cannot clear them.
 
 ## Data
 
