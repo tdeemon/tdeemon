@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Prints the tags of a release's image, one a line: X.Y.Z, X.Y and
-# sha-<the commit's first 12 characters>, on ghcr.io/<the repository in
-# lower case>. The release workflow runs it; it runs on macOS's bash 3.2
+# Prints the tags of a release's image, one a line: X.Y.Z, X.Y, latest
+# and sha-<the commit's first 12 characters>, on ghcr.io/<the repository
+# in lower case>. The release workflow runs it; it runs on macOS's bash 3.2
 # too.
 #
 #   scripts/image-tags.sh v1.2.3 <commit> <owner/repo>
@@ -17,4 +17,6 @@ fi
 image=ghcr.io/$(printf '%s' "$3" | tr '[:upper:]' '[:lower:]')
 echo "$image:${1#v}"
 echo "$image:${BASH_REMATCH[1]}"
+# Releases are cut in order from main, so the newest is the latest.
+echo "$image:latest"
 echo "$image:sha-${2::12}"

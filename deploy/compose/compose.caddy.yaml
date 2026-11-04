@@ -1,0 +1,65 @@
+# Caddy in front of tdeemon, with HTTPS from Let's Encrypt for the host of
+# TDEEMON_BASE_URL (in .env), which must point at this machine, with ports
+# 80 and 443 open:
+#
+#   docker compose -f compose.yaml -f compose.caddy.yaml up -d --wait
+#
+# or, with COMPOSE_FILE=compose.yaml:compose.caddy.yaml in .env (see
+# .env.example), plain `docker compose up -d --wait`. Every later command,
+# an upgrade's too, must take both files, or tdeemon leaves Caddy's network.
+#
+# tdeemon then publishes no port: only Caddy reaches it, on a network of
+# their own, where Caddy has a fixed address tdeemon trusts to name the
+# client (TDEEMON_TRUSTED_PROXIES). Should that subnet clash with one of
+# yours, change both addresses below.
+services:
+  tdeemon:
+    ports: !reset []
+    environment:
+      TDEEMON_TRUSTED_PROXIES: 172.30.254.2
+    networks: [proxy]
+
+  caddy:
+    image: docker.io/library/caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    restart: unless-stopped
+    depends_on:
+      tdeemon:
+        condition: service_healthy
+    # The site's address is the base URL itself; Caddy reads it from the
+    # environment, and Compose takes it from .env. The secret key stays
+    # out of this container.
+    environment:
+      TDEEMON_BASE_URL: ${TDEEMON_BASE_URL:?set TDEEMON_BASE_URL in .env}
+    # Without a trailing slash, which tdeemon allows: as a site address,
+    # https://host/ would match the path / alone, and nothing else would
+    # reach tdeemon.
+    command:
+      - sh
+      - -c
+      - >-
+        export TDEEMON_BASE_URL="$${TDEEMON_BASE_URL%/}" &&
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      proxy:
+        ipv4_address: 172.30.254.2
+
+networks:
+  proxy:
+    ipam:
+      config:
+        # Docker hands out addresses from ip_range alone, so none takes
+        # Caddy's fixed one before it starts.
+        - subnet: 172.30.254.0/29
+          ip_range: 172.30.254.4/30
+
+volumes:
+  caddy-data:
+  caddy-config:

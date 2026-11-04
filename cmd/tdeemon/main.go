@@ -47,6 +47,9 @@ const usage = `Usage:
   tdeemon user set-locale [flags]   set a user's language
   tdeemon user delete [flags]       delete a user and all their data
   tdeemon user unlink [flags]       remove a user's single sign-on links
+  tdeemon healthcheck               ask the server on this machine for
+                                    /healthz (at TDEEMON_LISTEN): exit 0
+                                    when it answers, 1 when not
   tdeemon help                      show this help
 
 Flags of user create:
@@ -138,6 +141,8 @@ func run(ctx context.Context, args []string, lookup config.LookupFunc, in io.Rea
 		return err
 	case "user":
 		return userCommand(ctx, args[1:], lookup, in, out)
+	case "healthcheck":
+		return healthcheck(ctx, args[1:], lookup)
 	}
 	return fmt.Errorf("%w: unknown command %q", errUsage, args[0])
 }
