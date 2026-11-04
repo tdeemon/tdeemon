@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { LogOut, Share2, X } from 'lucide-react'
+import { LogOut, Share2, Users, X } from 'lucide-react'
 import { useId, useRef, useState, type SubmitEvent } from 'react'
 
 import { statusOf } from '@/api/errors'
 import { useShareRecipe, useStopSharing } from '@/api/recipe-shares'
 import { sessionQuery } from '@/api/session'
 import type { Food } from '@/api/types'
+import { EmptyState } from '@/components/empty-state'
 import { Sheet } from '@/components/sheet'
 import { Button } from '@/components/ui/button'
 import type { Messages } from '@/i18n/en'
@@ -94,7 +95,9 @@ export function RecipeSharing({ food, className }: { food: Food; className?: str
         </Button>
       </div>
       {members.length === 0 ? (
-        <p className="text-small text-muted-foreground">{t.sharing.none}</p>
+        <EmptyState icon={Users} bare>
+          {t.sharing.none}
+        </EmptyState>
       ) : (
         <ul aria-labelledby={`${id}-title`} className="divide-y">
           {members.map((m) => (

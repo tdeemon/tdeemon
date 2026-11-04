@@ -755,6 +755,17 @@ test("an own ingredient no longer the user's (a recipe they left) stands for its
   )
 })
 
+// A recipe of the user's alone says so as every place with nothing yet
+// does: an icon and a sentence, the Share button beside them.
+test('a recipe shared with no one says so as an empty state', async () => {
+  recipeServer(curry)
+  renderAt(`/foods/${curryId}`)
+
+  const page = await screen.findByRole('article', { name: 'Chicken curry' })
+  const none = await within(page).findByText(/^Only you have it\./)
+  expect(none.parentElement?.previousElementSibling?.querySelector('svg')).not.toBeNull()
+})
+
 test('a share with your own address says so', async () => {
   sharedServer({ [`POST /api/v1/recipes/${curryId}/shares`]: () => problem(422) })
   renderAt(`/foods/${curryId}`)

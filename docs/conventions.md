@@ -701,6 +701,10 @@ generator writes it.
   photographed as it runs (a phone's in Croatian, a desktop's in English,
   as the design has them), and CI keeps the photographs as the
   `e2e-screens` artifact.
+- **No end-to-end test stays narrowed.** A `.only`, or `screens`
+  filtered, sliced or picked, is for a run of one's own: a Vitest check
+  (`web/src/e2e-focus.test.ts`) fails on one left in `web/e2e`, so CI
+  never passes having checked less.
 
 ## Languages
 
