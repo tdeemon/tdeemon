@@ -121,33 +121,45 @@ test('the plan is changed in the app, each change a revision taken back', async 
     .getByRole('link', { name: 'Plan' })
     .click()
 
-  // A first target, by type of day.
-  const targets = page.getByRole('region', { name: 'Targets by type of day' })
+  // A first target: without training days, one, every day's.
+  const targets = page.getByRole('region', { name: 'Targets', exact: true })
   const sheet = page.getByRole('dialog', { name: 'Targets by type of day', exact: true })
   await targets.getByRole('button', { name: 'Edit targets' }).click()
-  const training = sheet.getByRole('group', { name: 'Training' })
-  await training.getByRole('textbox', { name: 'kcal' }).fill('2300')
-  await training.getByRole('textbox', { name: 'Protein, g' }).fill('160')
-  await training.getByRole('textbox', { name: 'Fat, g' }).fill('65')
-  const rest = sheet.getByRole('group', { name: 'Rest' })
-  await rest.getByRole('textbox', { name: 'kcal' }).fill('2000')
-  await rest.getByRole('textbox', { name: 'Protein, g' }).fill('160')
-  await rest.getByRole('textbox', { name: 'Fat, g' }).fill('65')
-  await expect(rest.getByText('Carbs follow: 194 g')).toBeVisible()
+  await expect(sheet.getByRole('group', { name: 'Training', exact: true })).toHaveCount(0)
+  const every = sheet.getByRole('group', { name: 'Every day' })
+  await every.getByRole('textbox', { name: 'kcal' }).fill('2000')
+  await every.getByRole('textbox', { name: 'Protein, g' }).fill('160')
+  await every.getByRole('textbox', { name: 'Fat, g' }).fill('65')
+  await expect(every.getByText('Carbs follow: 194 g')).toBeVisible()
   await sheet.getByRole('button', { name: 'Save' }).click()
   await expect(sheet).toBeHidden()
   await expect(targets.getByText('2,000 kcal', { exact: true })).toBeVisible()
 
   // Past the user's floor of kcal, the field says so; within it, saved.
   await targets.getByRole('button', { name: 'Edit targets' }).click()
-  await rest.getByRole('textbox', { name: 'kcal' }).fill('1300')
+  await every.getByRole('textbox', { name: 'kcal' }).fill('1300')
   await sheet.getByRole('button', { name: 'Save' }).click()
-  await expect(rest.getByText('At least 1500 kcal: your limit.')).toBeVisible()
+  await expect(every.getByText('At least 1500 kcal: your limit.')).toBeVisible()
   await expect(sheet.getByRole('link', { name: 'Loosen it in your limits' })).toBeVisible()
-  await rest.getByRole('textbox', { name: 'kcal' }).fill('1900')
+  await every.getByRole('textbox', { name: 'kcal' }).fill('1900')
   await sheet.getByRole('button', { name: 'Save' }).click()
   await expect(sheet).toBeHidden()
   await expect(targets.getByText('1,900 kcal', { exact: true })).toBeVisible()
+
+  // The training days, added in the targets' sheet.
+  await targets.getByRole('button', { name: 'Add training days' }).click()
+  const days = sheet.getByRole('group', { name: 'Training days' })
+  await days.getByText('Tue', { exact: true }).click()
+  await days.getByText('Thu', { exact: true }).click()
+  // The training days' own target, from the one of every day.
+  await expect(
+    sheet
+      .getByRole('group', { name: 'Training', exact: true })
+      .getByRole('textbox', { name: 'kcal' }),
+  ).toHaveValue('1900')
+  await sheet.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByText('Training days changed', { exact: true })).toBeVisible()
+  await expect(targets.getByRole('heading', { name: 'Training', level: 3 })).toBeVisible()
 
   // The phase, faster.
   const hero = page.getByRole('region', { name: 'Cut' })
@@ -159,22 +171,34 @@ test('the plan is changed in the app, each change a revision taken back', async 
   await expect(hero.getByText('-0.6% a week', { exact: true })).toBeVisible()
 
   // The history says each, the latest first, and takes it back.
-  const history = page.getByRole('region', { name: 'Plan history' })
-  const latest = history.getByRole('listitem').first()
+  await page.getByRole('link', { name: 'Plan history' }).click()
+  // Of this test's own, the latest first.
+  const rows = page.getByRole('link', { name: /, by you/ })
+  await expect(rows.nth(0)).toContainText('Phase from')
+  await expect(rows.nth(1)).toContainText('Training days: Tue, Thu')
+  await expect(rows.nth(2)).toContainText('Every day 2,000 → 1,900 kcal')
+  await rows.nth(0).click()
+  const latest = page.getByRole('region', { name: /, by you$/ })
   await expect(latest.getByText('Changed in the app.')).toBeVisible()
-  await expect(latest.getByText(/, by you$/)).toBeVisible()
   await expect(latest.getByText('-0.5% → -0.6% a week')).toBeVisible()
-  await expect(history.getByText('Rest days: 2,000 → 1,900 kcal · C 194 → 169 g')).toBeVisible()
   await latest.getByRole('button', { name: 'Take back' }).click()
   await latest.getByRole('button', { name: 'Take back' }).click()
-  await expect(
-    history.getByRole('listitem').first().getByText('Taken back in the app.'),
-  ).toBeVisible()
+  await expect(page.getByText('Change taken back', { exact: true })).toBeVisible()
+  await page.getByRole('link', { name: 'All changes' }).click()
+  await expect(rows.nth(1)).toContainText('Phase from')
+  await page
+    .getByRole('navigation', { name: 'Sections' })
+    .getByRole('link', { name: 'Plan' })
+    .click()
   await expect(hero.getByText('-0.5% a week', { exact: true })).toBeVisible()
 
   // No plan again, and nothing it needed, for the other tests.
   const cleared = await page.request.post('/api/v1/plan/changes', {
-    data: { phases: [{ start: today, delete: true }], targets: [{ from: today, delete: true }] },
+    data: {
+      phases: [{ start: today, delete: true }],
+      targets: [{ from: today, delete: true }],
+      training_weekdays: [],
+    },
   })
   expect(cleared.ok()).toBe(true)
   expect((await page.request.put('/api/v1/profile', { data: {} })).ok()).toBe(true)

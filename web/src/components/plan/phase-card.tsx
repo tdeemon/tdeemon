@@ -6,12 +6,13 @@ import { EditPhase } from '@/components/plan/edit-phase'
 import { PhaseTimeline } from '@/components/plan/phase-timeline'
 import { spansOf, type Span } from '@/components/plan/phases'
 import { useDate } from '@/components/plan/proposal-text'
-import { daysBetween, useFormat } from '@/i18n/format'
+import { addDays, daysBetween, useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
 
 type Plan = components['schemas']['PlanBody']
 type Verdict = components['schemas']['VerdictBody']
+type Phase = components['schemas']['PhaseBody']
 
 // The dot beside the rate measured: the brand's in range, the warning's
 // out of it; the words beside it say which.
@@ -23,10 +24,12 @@ const dots: Record<Verdict['rate'], string> = {
 }
 
 // PhaseCard is the plan's hero: the phase today is in, its type, its
-// target rate with the range calibration holds it to and what that is in
-// kg, the rate measured, its week, how far it has come to its planned end
-// and to its goal; then the phases on a timeline, past, today's and to
-// come. Without a phase today, the next one. The user edits the phase it
+// week, its target rate and what that is in kg, with the range
+// calibration holds it to and the rate measured; the way from where the
+// trend stood as it began to its goal, as a bar (the trend now, the
+// milestone, the goal), or without a goal how far it has come to its
+// planned end; then the phases on a timeline, past, today's and to come.
+// Without a phase today, the next one. The user edits the phase it
 // shows, and plans the next.
 export function PhaseCard({ plan }: { plan: Plan }) {
   const t = useMessages()
@@ -88,70 +91,124 @@ function Now({ span, today, titleId }: { span: Span; today: string; titleId: str
 
   return (
     <>
-      <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-small text-muted-foreground">{p.current(date(phase.start))}</p>
-          <h2 id={titleId} className="text-title">
+      <header className="space-y-1">
+        <div className="flex items-center justify-between gap-3">
+          <p className="min-w-0 text-small text-muted-foreground">{p.current(date(phase.start))}</p>
+          <span className="shrink-0 rounded-sm bg-primary-soft px-2 py-0.5 text-caption font-semibold text-primary">
+            {weeks === undefined ? p.week(week) : p.weekOf(Math.min(week, weeks), weeks)}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-baseline gap-x-3">
+          <h2 id={titleId} className="text-display">
             {t.plan.change.types[phase.type]}
           </h2>
+          <p className="text-small text-muted-foreground">
+            <span className="font-semibold text-foreground">{t.plan.change.rate(pct(rate))}</span>
+            {trend !== undefined && rate !== 0 && ` · ${p.kg(f.signed((rate / 100) * trend, 2))}`}
+          </p>
         </div>
-        <span className="shrink-0 rounded-full bg-primary-soft px-3 py-1 text-small text-primary">
-          {weeks === undefined ? p.week(week) : p.weekOf(Math.min(week, weeks), weeks)}
-        </span>
       </header>
-      <dl className="grid grid-cols-2 gap-3">
-        <div className="space-y-0.5 rounded-md bg-surface-2 p-3">
-          <dt className="text-small text-muted-foreground">{p.pace}</dt>
-          <dd className="text-h3">{t.plan.change.rate(pct(rate))}</dd>
-          {trend !== undefined && rate !== 0 && (
-            <dd className="text-caption text-muted-foreground">
-              {p.kg(f.signed((rate / 100) * trend, 2))}
-            </dd>
+      {phase.goal_weight !== undefined && trend !== undefined ? (
+        <GoalBar phase={phase} goal={phase.goal_weight} trend={trend} today={today} />
+      ) : (
+        <>
+          {last !== undefined && <Progress start={phase.start} last={last} today={today} />}
+          {/* A goal, and a milestone before it; or a milestone alone. */}
+          {phase.goal_weight === undefined && phase.milestone_weight !== undefined && (
+            <p className="text-small">{p.milestoneAlone(f.number(phase.milestone_weight, 1))}</p>
           )}
-          {tolerance !== undefined && (
-            <dd className="text-caption text-muted-foreground">
-              {p.band(pct(rate - tolerance), pct(rate + tolerance))}
-            </dd>
+          {phase.goal_weight !== undefined && (
+            <p className="text-small">
+              {p.goal(f.number(phase.goal_weight, 1))}
+              {phase.milestone_weight !== undefined && (
+                <span className="text-muted-foreground">
+                  {' · '}
+                  {p.milestone(f.number(phase.milestone_weight, 1))}
+                </span>
+              )}
+            </p>
           )}
-        </div>
-        <div className="space-y-0.5 rounded-md bg-surface-2 p-3">
-          <dt className="text-small text-muted-foreground">{p.measured}</dt>
-          {measured === undefined || verdict === undefined ? (
-            <dd className="text-small text-muted-foreground">{p.notMeasured}</dd>
-          ) : (
-            <>
-              <dd className="text-h3">{t.plan.change.rate(pct(measured))}</dd>
-              <dd className="flex items-center gap-1.5 text-caption text-muted-foreground">
-                <span aria-hidden className={cn('size-2 rounded-full', dots[verdict.rate])} />
-                {p.rates[verdict.rate]}
-              </dd>
-            </>
-          )}
-        </div>
-      </dl>
-      {last !== undefined && <Progress start={phase.start} last={last} today={today} />}
-      {/* A goal, and a milestone before it; or a milestone alone. */}
-      {phase.goal_weight === undefined && phase.milestone_weight !== undefined && (
-        <p className="text-small">{p.milestoneAlone(f.number(phase.milestone_weight, 1))}</p>
+        </>
       )}
-      {phase.goal_weight !== undefined && (
-        <p className="text-small">
-          {p.goal(f.number(phase.goal_weight, 1))}
-          {phase.milestone_weight !== undefined && (
-            <span className="text-muted-foreground">
-              {' · '}
-              {p.milestone(f.number(phase.milestone_weight, 1))}
-            </span>
-          )}
-          {trend !== undefined && (
-            <span className="text-muted-foreground">
-              {' · '}
-              {p.trend(f.number(trend, 1), f.number(Math.abs(trend - phase.goal_weight), 1))}
-            </span>
-          )}
-        </p>
-      )}
+      <p className="flex flex-wrap items-center gap-x-1.5 text-small text-muted-foreground">
+        {measured === undefined || verdict === undefined ? (
+          p.notMeasured
+        ) : (
+          <>
+            <span aria-hidden className={cn('size-2 rounded-full', dots[verdict.rate])} />
+            {p.measuredRate(t.plan.change.rate(pct(measured)), p.rates[verdict.rate])}
+          </>
+        )}
+        {tolerance !== undefined && (
+          <span>· {p.band(pct(rate - tolerance), pct(rate + tolerance))}</span>
+        )}
+      </p>
     </>
+  )
+}
+
+// GoalBar is the way from where the trend stood as the phase began to its
+// goal: how far the trend has come, a mark at the trend now and one at
+// the milestone, with the trend, the milestone and the goal under it.
+// Before the trend of the phase's first days came, or with none, it
+// starts at the trend now.
+function GoalBar({
+  phase,
+  goal,
+  trend,
+  today,
+}: {
+  phase: Phase
+  goal: number
+  trend: number
+  today: string
+}) {
+  const t = useMessages()
+  const f = useFormat()
+  const p = t.plan.phase
+  // The trend of the phase's first fortnight, its first day's or the
+  // first after it there is, up to today.
+  const fortnight = addDays(phase.start, 13)
+  const first = $api.useQuery('get', '/api/v1/history', {
+    params: { query: { from: phase.start, to: fortnight < today ? fortnight : today } },
+  })
+  const start = first.data?.days.find((d) => d.trend_kg !== undefined)?.trend_kg ?? trend
+  const way = start - goal
+  const share = (kg: number) =>
+    way === 0 ? 100 : Math.min(Math.max(((start - kg) / way) * 100, 0), 100)
+  const done = share(trend)
+  const milestone = phase.milestone_weight
+  const left = Math.abs(trend - goal)
+
+  return (
+    <div className="space-y-1.5">
+      <div className="relative h-7">
+        <progress
+          aria-label={p.toGoal}
+          aria-valuetext={p.trend(f.number(trend, 1), f.number(left, 1))}
+          max={100}
+          value={done}
+          className="absolute inset-x-0 top-2.5 block h-2 w-full appearance-none overflow-hidden rounded-full bg-surface-2 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-primary [&::-webkit-progress-bar]:bg-surface-2 [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
+        />
+        <span
+          aria-hidden
+          className="absolute top-0.5 h-6 w-0.5 -translate-x-1/2 rounded-full bg-foreground"
+          style={{ left: `${String(done)}%` }}
+        />
+        {milestone !== undefined && (
+          <span
+            aria-hidden
+            className="absolute top-1.5 h-4 w-0.5 -translate-x-1/2 rounded-full bg-muted-foreground"
+            style={{ left: `${String(share(milestone))}%` }}
+          />
+        )}
+      </div>
+      <p className="flex justify-between gap-2 text-caption text-muted-foreground">
+        <span>{p.trendNow(f.number(trend, 1))}</span>
+        {milestone !== undefined && <span>{p.milestone(f.number(milestone, 1))}</span>}
+        <span className="text-right">{p.goal(f.number(goal, 1))}</span>
+      </p>
+    </div>
   )
 }
 

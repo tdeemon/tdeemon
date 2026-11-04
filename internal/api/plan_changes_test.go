@@ -117,6 +117,29 @@ func TestChangePlanPhases(t *testing.T) {
 	}
 }
 
+// The training weekdays are changed from the app too, alone, and taken
+// away with [].
+func TestChangePlanTrainingWeekdays(t *testing.T) {
+	t.Parallel()
+
+	in, session := signedIn(t)
+	saveCoach(t, in)
+	a := changePlan(t, in, session, `{"training_weekdays": ["tuesday", "thursday"]}`)
+	w := a.Proposal.Changes.TrainingWeekdays
+	if w == nil || !slices.Equal(w.After, []string{"tuesday", "thursday"}) || len(a.Proposal.Changes.Targets) != 0 {
+		t.Errorf("the revision's changes = %+v", a.Proposal.Changes)
+	}
+	if got := getPlan(t, in, []*http.Cookie{session}, nil).TrainingWeekdays; !slices.Equal(got, []string{"tuesday", "thursday"}) {
+		t.Errorf("the training weekdays = %v", got)
+	}
+	if rec := in.do(t, http.MethodPost, "/api/v1/plan/changes", `{"training_weekdays": []}`, []*http.Cookie{session}, nil); rec.Code != http.StatusOK {
+		t.Fatalf("none: %d %s", rec.Code, rec.Body.String())
+	}
+	if got := getPlan(t, in, []*http.Cookie{session}, nil).TrainingWeekdays; len(got) != 0 {
+		t.Errorf("the training weekdays taken away = %v", got)
+	}
+}
+
 // What the limits refuse, or the change's own rules, changes nothing: the
 // proposal that waited waits on. Only a web session changes the plan so.
 func TestChangePlanRefuses(t *testing.T) {

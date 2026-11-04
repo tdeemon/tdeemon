@@ -69,24 +69,41 @@ test('a proposed change is accepted in the app, and taken back from its history'
   await expect(card.getByText(rationale)).toBeVisible()
   await expect(card.getByText(/^Proposed by Claude \(claude-opus-5-5\) · /)).toBeVisible()
   await expect(card.getByText('expires in 7 days')).toBeVisible()
-  await expect(card.getByText(/^New target from/)).toBeVisible()
+  // What it changes, now → new.
+  await expect(card.getByRole('row', { name: /^Every day kcal .* 2,100/ })).toBeVisible()
   await card.getByRole('button', { name: 'Accept' }).click()
   await expect(card).toBeHidden()
+  await expect(page.getByText('Proposal accepted', { exact: true })).toBeVisible()
   // The plan has its target, from tomorrow.
-  const targets = page.getByRole('region', { name: 'Targets by type of day' })
+  const targets = page.getByRole('region', { name: 'Targets', exact: true })
   await expect(targets.getByText('No target yet.')).toBeVisible()
   await expect(
     targets.getByRole('listitem').filter({ hasText: /^From .*: 2,100 kcal/ }),
   ).toBeVisible()
 
-  const history = page.getByRole('region', { name: 'Plan history' })
-  const revision = history.getByRole('listitem').filter({ hasText: rationale })
-  await expect(revision).toBeVisible()
+  // Its history, a page of its own, takes it back.
+  await page.getByRole('link', { name: 'Plan history' }).click()
+  await page
+    .getByRole('link', { name: /, by Claude/ })
+    .first()
+    .click()
+  const revision = page.getByRole('region', { name: /, by Claude/ })
+  await expect(revision.getByText(rationale)).toBeVisible()
   await revision.getByRole('button', { name: 'Take back' }).click()
   await revision.getByRole('button', { name: 'Take back' }).click()
-  await expect(revision.getByText(/Taken back$/)).toBeVisible()
+  await expect(page.getByText('Change taken back', { exact: true })).toBeVisible()
+  await expect(revision.getByText('Taken back', { exact: true })).toBeVisible()
   // The revision that took it back says so in the app's words.
-  await expect(history.getByText('Taken back in the app.').first()).toBeVisible()
+  await page.getByRole('link', { name: 'All changes' }).click()
+  await page
+    .getByRole('link', { name: /, by you/ })
+    .first()
+    .click()
+  await expect(page.getByText('Taken back in the app.')).toBeVisible()
+  await page
+    .getByRole('navigation', { name: 'Sections' })
+    .getByRole('link', { name: 'Plan' })
+    .click()
   await expect(page.getByRole('region', { name: 'No plan yet' })).toBeVisible()
 
   // What the plan needed cleared again, for the other tests.
@@ -112,8 +129,11 @@ test('a proposed change of the limits is accepted in the app, once the user loos
     .click()
 
   const card = page.getByRole('region', { name: 'A proposed change' })
-  await expect(card.getByText('Limit: Fastest loss in a cut, BMI under 30')).toBeVisible()
-  await expect(card.getByText('0.7% a week → 1% a week, loosened')).toBeVisible()
+  await expect(
+    card.getByRole('row', {
+      name: 'Fastest loss in a cut, BMI under 30 0.7% a week 1% a week loosened',
+    }),
+  ).toBeVisible()
   await card.getByRole('button', { name: 'Accept' }).click()
   await card.getByRole('button', { name: 'Loosen' }).click()
   await expect(card).toBeHidden()
@@ -130,4 +150,77 @@ test('a proposed change of the limits is accepted in the app, once the user loos
   expect(
     (await page.request.put('/api/v1/limits', { data: { limits: { cut_rate: -0.7 } } })).ok(),
   ).toBe(true)
+})
+
+// On a phone, the decision is in reach (U2 PL1): a proposal of two
+// periods and both types of day, below the resting burn on each, says
+// the warning once, and its buttons come within the card's first 600 px.
+test.describe('at 390 px', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('a proposal warns once and keeps its buttons near its top', async ({ page }) => {
+    await signIn(page)
+    const api = page.request
+    expect(
+      (
+        await api.put('/api/v1/profile', {
+          data: { sex: 'male', birth_date: '1990-06-15', height_cm: 180 },
+        })
+      ).ok(),
+    ).toBe(true)
+    expect((await api.put('/api/v1/days/today/metrics/weight', { data: { value: 85 } })).ok()).toBe(
+      true,
+    )
+    const me: unknown = await (await api.get('/api/v1/me')).json()
+    const today = typeof me === 'object' && me !== null && 'today' in me ? String(me.today) : ''
+    const day = (n: number) => {
+      const d = new Date(`${today}T00:00:00Z`)
+      d.setUTCDate(d.getUTCDate() + n)
+      return d.toISOString().slice(0, 10)
+    }
+    const made = await api.post('/api/v1/proposals', {
+      data: {
+        rationale:
+          'Two lower targets, made up for the end-to-end tests: a week of one, then the other, each low on both types of day, so the limits warn of each.',
+        model: 'claude-opus-5-5',
+        targets: [
+          {
+            from: day(1),
+            training: { kcal: 1700, protein: 150, fat: 55 },
+            rest: { kcal: 1600, protein: 150, fat: 45 },
+          },
+          {
+            from: day(8),
+            training: { kcal: 1650, protein: 150, fat: 55 },
+            rest: { kcal: 1550, protein: 150, fat: 45 },
+          },
+        ],
+      },
+    })
+    expect(made.status()).toBe(201)
+    try {
+      await page.goto('/plan')
+      const card = page.getByRole('region', { name: 'A proposed change' })
+      const warning = card.getByRole('button', { name: /guardrail warning/ })
+      await expect(warning).toContainText('1 guardrail warning · both day types, both periods')
+      await expect(card.getByText(/resting burn/)).toHaveCount(1)
+      const top = (await card.boundingBox())?.y ?? 0
+      const boxes = await Promise.all(
+        ['Accept', 'Reject'].map((name) => card.getByRole('button', { name }).boundingBox()),
+      )
+      for (const box of boxes) {
+        expect((box?.y ?? Infinity) + (box?.height ?? 0) - top).toBeLessThanOrEqual(600)
+      }
+    } finally {
+      // Nothing of it left, for the other tests.
+      const plan: unknown = await (await api.get('/api/v1/plan')).json()
+      const pending =
+        typeof plan === 'object' && plan !== null && 'pending' in plan ? plan.pending : undefined
+      if (typeof pending === 'object' && pending !== null && 'id' in pending) {
+        await api.post(`/api/v1/proposals/${String(pending.id)}/reject`)
+      }
+      expect((await api.put('/api/v1/profile', { data: {} })).ok()).toBe(true)
+      expect((await api.delete('/api/v1/days/today/metrics/weight')).ok()).toBe(true)
+    }
+  })
 })

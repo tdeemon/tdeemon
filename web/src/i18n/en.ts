@@ -95,6 +95,10 @@ export const en = {
     remove: 'Delete the meal',
     inLog: 'In Log a meal',
     logIt: 'Log the meal',
+    // The keys of a proposal that waits, on a desktop's plan.
+    onPlan: 'On the plan',
+    accept: 'Accept the proposal',
+    reject: 'Reject the proposal',
   },
   soon: 'This part is on its way.',
   unreachable: 'The server cannot be reached.',
@@ -1660,8 +1664,9 @@ export const en = {
       weekOf: (n: number, of: number) => `Week ${String(n)} of ${String(of)}`,
       pace: 'Target pace',
       kg: (kg: string) => `≈ ${kg} kg a week`,
-      band: (from: string, to: string) => `in range from ${from} to ${to}`,
+      band: (from: string, to: string) => `target range ${from} to ${to}`,
       measured: 'Measured',
+      measuredRate: (rate: string, said: string) => `Measured ${rate}, ${said}`,
       notMeasured: 'Not measured yet',
       rates: { none: '', on_target: 'in range', below: 'below range', above: 'above range' },
       progress: 'Days of the phase',
@@ -1676,19 +1681,25 @@ export const en = {
       // A milestone with no goal after it.
       milestoneAlone: (kg: string) => `Milestone ${kg} kg`,
       trend: (kg: string, toGo: string) => `trend ${kg} kg, ${toGo} kg to go`,
+      // The bar from where the trend stood as the phase began to its goal.
+      toGoal: 'The way to the goal',
+      trendNow: (kg: string) => `${kg} kg trend`,
       timeline: 'Phases',
       states: { past: 'Past', now: 'Now', planned: 'Planned' },
     },
     targets: {
-      title: 'Targets by type of day',
+      title: 'Targets',
       since: (date: string) => `since ${date}`,
       from: (date: string) => `From ${date}`,
       training: 'Training',
       rest: 'Rest',
       trainingDays: 'Training days',
       days: (n: number) => `${String(n)} ${plural('en', n, { one: 'day', other: 'days' })} a week`,
-      everyDay: 'every day',
-      noDay: 'no day',
+      // The one target of a plan of no training days, and the way to add
+      // them.
+      everyDay: 'Every day',
+      allDays: 'every day',
+      addDays: 'Add training days',
       none: 'No target yet.',
       average: 'Weekly average',
       perDay: (kcal: string) => `${kcal} kcal a day`,
@@ -1720,20 +1731,24 @@ export const en = {
       window: (from: string, to: string) => `Drawn from the days ${from} to ${to}.`,
       expiresIn: (days: number) =>
         `expires in ${String(days)} ${plural('en', days, { one: 'day', other: 'days' })}`,
+      // What the data say, in a line: the TDEE, the pace measured against
+      // the phase's range, and the rate the proposal would make.
       data: {
-        title: 'What the data say',
+        title: 'The data:',
         rate: {
           on_target: (pct: string, from: string, to: string) =>
-            `Calibration measures ${pct} a week, within the phase's range (${from} to ${to}).`,
+            `pace ${pct} a week, in range (${from} to ${to})`,
           below: (pct: string, from: string, to: string) =>
-            `Calibration measures ${pct} a week, below the phase's range (${from} to ${to}).`,
+            `pace ${pct} a week, below range (${from} to ${to})`,
           above: (pct: string, from: string, to: string) =>
-            `Calibration measures ${pct} a week, above the phase's range (${from} to ${to}).`,
+            `pace ${pct} a week, above range (${from} to ${to})`,
         },
-        noVerdict: 'Calibration has no verdict on the phase yet.',
-        trusted: (kcal: string, pm: string) => `Its TDEE, ${kcal} ± ${pm} kcal, is reliable.`,
-        notTrusted: (kcal: string) => `Its TDEE, about ${kcal} kcal, is not reliable yet.`,
-        noTdee: 'No TDEE measured yet.',
+        noVerdict: 'no pace measured yet',
+        trusted: (kcal: string, pm: string) => `TDEE ${kcal} ± ${pm} kcal`,
+        notTrusted: (kcal: string) => `TDEE ≈ ${kcal} kcal, not reliable yet`,
+        noTdee: 'no TDEE measured yet',
+        nothing: 'nothing measured yet',
+        expected: (pct: string, kg: string) => `with this ${pct} a week (${kg} kg)`,
         inRange: "The pace is in range, so the data alone don't ask for this change.",
         more: 'The data point the other way: they ask for more kcal, not fewer.',
         fewer: 'The data point the other way: they ask for fewer kcal, not more.',
@@ -1747,9 +1762,39 @@ export const en = {
       stale: "It can't be applied anymore, as it would now start before today. Ask for a new one.",
       limitsHere:
         'A change of your limits is accepted only here, in the app, never by your AI coach.',
-      average: (from: string, kcal: string) => `From ${from}: ${kcal} kcal a day on average`,
-      rate: (pct: string, kg: string) => `, ${pct} a week (${kg} kg)`,
+      // The rationale cut to three lines, and the rest of it.
+      more: 'More',
+      less: 'Less',
+      // The toasts of an answer.
+      accepted: 'Proposal accepted',
+      rejected: 'Proposal rejected',
     },
+    // A change of the plan as a table: each value now and new, and the
+    // difference.
+    diff: {
+      from: (date: string) => `From ${date}`,
+      now: 'Now',
+      next: 'New',
+      before: 'Before',
+      after: 'After',
+      deltaName: 'Change',
+      none: '—',
+      days: { training: 'Training', rest: 'Rest', every: 'Every day' },
+      what: { kcal: 'kcal' },
+      row: (days: string, what: string) => `${days} ${what}`,
+    },
+    // What the limits found of a proposal, each rule once.
+    checks: {
+      count: (n: number) =>
+        `${String(n)} ${plural('en', n, { one: 'guardrail warning', other: 'guardrail warnings' })}`,
+      refused: 'The limits would refuse it:',
+      bothTypes: 'both day types',
+      types: { training: 'training days', rest: 'rest days', every: 'every day' },
+      periods: (n: number) => (n === 2 ? 'both periods' : `${String(n)} periods`),
+      from: (date: string) => `From ${date}:`,
+    },
+    // A desktop's header, while a proposal waits: the keys that answer it.
+    keys: { waits: 'A proposal waits', accept: 'accept', reject: 'reject' },
     change: {
       newPhase: (from: string) => `New phase from ${from}`,
       phase: (from: string) => `Phase from ${from}`,
@@ -1849,11 +1894,24 @@ export const en = {
       },
       refused: 'The limits do not allow it.',
       loosen: 'Loosen it in your limits',
-      saved: { phase: 'Phase changed', next: 'Next phase planned', targets: 'Targets changed' },
+      // The training days, in the targets' sheet.
+      daysHint: 'The other days are rest days.',
+      noDaysHint: 'No training days: one target for every day.',
+      saved: {
+        phase: 'Phase changed',
+        next: 'Next phase planned',
+        targets: 'Targets changed',
+        days: 'Training days changed',
+      },
     },
     revisions: {
       title: 'Plan history',
       none: 'No change of the plan yet.',
+      count: (n: number) =>
+        `${String(n)} ${plural('en', n, { one: 'revision', other: 'revisions' })}`,
+      all: (n: number) => `All ${String(n)}`,
+      allShort: 'All changes',
+      done: 'Change taken back',
       applied: (date: string, who: string) => `${date}, by ${who}`,
       reverted: 'Taken back',
       revert: 'Take back',

@@ -71,8 +71,9 @@ type changePlanInput struct {
 // changePlanBody is the user's own change of the plan, in the app: the
 // phases and the targets as a proposal sets them.
 type changePlanBody struct {
-	Phases  []phaseChangeIn  `json:"phases,omitempty"`
-	Targets []targetChangeIn `json:"targets,omitempty"`
+	Phases           []phaseChangeIn  `json:"phases,omitempty"`
+	Targets          []targetChangeIn `json:"targets,omitempty"`
+	TrainingWeekdays []string         `json:"training_weekdays,omitempty" enum:"sunday,monday,tuesday,wednesday,thursday,friday,saturday" doc:"From now on; [] for none; left out, as they are."`
 }
 
 type proposalIDInput struct {
@@ -301,7 +302,9 @@ func (s *sessions) changePlan(ctx context.Context, in *changePlanInput) (*propos
 	if err != nil {
 		return nil, err
 	}
-	d, err := proposeInputBody{Rationale: proposal.ChangedInTheApp, Phases: in.Body.Phases, Targets: in.Body.Targets}.draft()
+	d, err := proposeInputBody{
+		Rationale: proposal.ChangedInTheApp, Phases: in.Body.Phases, Targets: in.Body.Targets, TrainingWeekdays: in.Body.TrainingWeekdays,
+	}.draft()
 	if err != nil {
 		return nil, err
 	}

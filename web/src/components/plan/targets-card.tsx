@@ -1,10 +1,12 @@
-import { useId } from 'react'
+import { Pencil, Plus } from 'lucide-react'
+import { useId, useRef, useState } from 'react'
 
 import { $api } from '@/api/client'
 import type { components } from '@/api/schema'
-import { EditTargets } from '@/components/plan/edit-targets'
+import { TargetsSheet } from '@/components/plan/edit-targets'
 import { targetNow, weekdays, weeklyAverage } from '@/components/plan/phases'
 import { useDate, usePlanWords } from '@/components/plan/proposal-text'
+import { Button } from '@/components/ui/button'
 import { InfoTip } from '@/components/ui/info-tip'
 import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
@@ -14,36 +16,61 @@ type DayTarget = components['schemas']['DayTargetBody']
 
 // TargetsCard is what the plan sets a day to eat by its type, training
 // and rest: the kcal and the macros of each, and the days of the week
-// each is; the weekly average they come to over the training days,
+// each is; without training days, one target, every day's, and a way to
+// add them; the weekly average they come to over the training days,
 // against the TDEE calibration measures; and the targets to come. The
-// user edits them from today on, or, before the plan's first target,
-// that one from its day.
+// user edits them and the training days from today on, or, before the
+// plan's first target, that one from its day, in a sheet.
 export function TargetsCard({ plan }: { plan: Plan }) {
   const t = useMessages()
   const date = useDate()
   const words = usePlanWords()
   const id = useId()
   const summary = $api.useQuery('get', '/api/v1/summary')
+  const [open, setOpen] = useState(false)
+  // The button that opened the sheet, which the focus goes back to.
+  const editor = useRef<HTMLButtonElement>(null)
+  const adder = useRef<HTMLButtonElement>(null)
+  const [opener, setOpener] = useState<'edit' | 'days'>('edit')
   const g = t.plan.targets
   const target = targetNow(plan.targets, plan.today)
   const ahead = plan.targets.filter((tg) => tg.effective_from > plan.today)
   const training = weekdays.filter((d) => plan.training_weekdays.includes(d))
   const rest = weekdays.filter((d) => !plan.training_weekdays.includes(d))
+  const edit = (from: 'edit' | 'days') => {
+    setOpener(from)
+    setOpen(true)
+  }
 
   return (
-    <section aria-labelledby={id} className="space-y-3 rounded-lg border bg-card p-4 lg:p-5">
-      <header className="flex items-center justify-between gap-2">
-        <h2 id={id} className="text-h3">
-          {g.title}
-        </h2>
-        <div className="flex items-center gap-1">
+    <section
+      aria-labelledby={id}
+      className="space-y-3 rounded-lg border bg-card p-4 shadow-card lg:p-5"
+    >
+      <header className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 id={id} className="text-h2">
+            {g.title}
+          </h2>
           {target !== undefined && (
-            <span className="text-small text-muted-foreground">
+            <p className="text-small text-muted-foreground">
               {g.since(date(target.effective_from))}
-            </span>
+            </p>
           )}
-          <EditTargets plan={plan} />
         </div>
+        <Button
+          ref={editor}
+          variant="ghost"
+          size="sm"
+          className="-mr-2 text-primary"
+          aria-label={t.plan.edit.targetsLabel}
+          onClick={() => {
+            edit('edit')
+          }}
+        >
+          <Pencil aria-hidden />
+          {t.plan.edit.targets}
+        </Button>
       </header>
       {target === undefined ? (
         <>
@@ -55,15 +82,32 @@ export function TargetsCard({ plan }: { plan: Plan }) {
         </>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <DayTile name={g.training} day={target.training} days={training} />
-            <DayTile name={g.rest} day={target.rest} days={rest} />
-          </div>
+          {training.length === 0 ? (
+            <DayTile name={g.everyDay} day={target.rest} />
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <DayTile name={g.training} day={target.training} days={training} />
+              <DayTile name={g.rest} day={target.rest} days={rest} />
+            </div>
+          )}
           <Average
             kcal={weeklyAverage(target.training.kcal, target.rest.kcal, training.length)}
             tdee={summary.data?.tdee}
           />
         </>
+      )}
+      {training.length === 0 && (
+        <Button
+          ref={adder}
+          variant="ghost"
+          className="-ml-3 text-primary"
+          onClick={() => {
+            edit('days')
+          }}
+        >
+          <Plus aria-hidden />
+          {g.addDays}
+        </Button>
       )}
       {ahead.length > 0 && (
         <ul className="space-y-1 border-t pt-3 text-small">
@@ -75,12 +119,18 @@ export function TargetsCard({ plan }: { plan: Plan }) {
           ))}
         </ul>
       )}
+      <TargetsSheet
+        plan={plan}
+        open={open}
+        onOpenChange={setOpen}
+        finalFocus={opener === 'days' ? adder : editor}
+      />
     </section>
   )
 }
 
 // DayTile is a type of day's target: its kcal, its macros, and the days
-// of the week it is.
+// of the week it is (none for every day's alone).
 function DayTile({
   name,
   day,
@@ -88,7 +138,7 @@ function DayTile({
 }: {
   name: string
   day: DayTarget
-  days: readonly (typeof weekdays)[number][]
+  days?: readonly (typeof weekdays)[number][]
 }) {
   const t = useMessages()
   const f = useFormat()
@@ -97,20 +147,18 @@ function DayTile({
   const s = t.day.short
 
   return (
-    <div className="min-w-0 space-y-1 rounded-md bg-surface-2 p-3">
-      <h3 className="text-small text-muted-foreground">{name}</h3>
-      <p className="text-h2">{t.unit.kcal(f.number(day.kcal))}</p>
+    <div className="min-w-0 space-y-0.5 rounded-md bg-surface-2 p-3">
+      <h3 className="text-caption text-muted-foreground">{name}</h3>
+      <p className="text-h2 tabular-nums">{t.unit.kcal(f.number(day.kcal))}</p>
       <p className="text-caption">
         {s.protein} {f.grams(day.protein)} · {s.carbs} {f.grams(day.carbs)} · {s.fat}{' '}
         {f.grams(day.fat)} g
       </p>
-      <p className="text-caption text-muted-foreground">
-        {days.length === 7
-          ? g.everyDay
-          : days.length === 0
-            ? g.noDay
-            : `${g.days(days.length)} · ${words.days([...days])}`}
-      </p>
+      {days !== undefined && (
+        <p className="text-caption text-muted-foreground">
+          {days.length === 7 ? g.allDays : `${g.days(days.length)} · ${words.days([...days])}`}
+        </p>
+      )}
     </div>
   )
 }

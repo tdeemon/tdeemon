@@ -887,7 +887,7 @@ export interface paths {
         put?: never;
         /**
          * Change your plan
-         * @description Needs a web session: the user's own change of the phases and the targets, in the app. It is a proposal of the user's, made and applied at once: a revision of the plan, which the history shows and a revert takes back, its rationale the code `changed in the app`. The limits hold it as they hold any proposal: one past them is refused (422), each violation an error detail as propose_changes gives it, and so is a change of the past or of nothing. It supersedes the proposal that waits, as any change of the plan does. The answer holds the revision, and what the limits checked, with their warnings.
+         * @description Needs a web session: the user's own change of the phases, the targets and the training weekdays, in the app. It is a proposal of the user's, made and applied at once: a revision of the plan, which the history shows and a revert takes back, its rationale the code `changed in the app`. The limits hold it as they hold any proposal: one past them is refused (422), each violation an error detail as propose_changes gives it, and so is a change of the past or of nothing. It supersedes the proposal that waits, as any change of the plan does. The answer holds the revision, and what the limits checked, with their warnings.
          */
         post: operations["change-plan"];
         delete?: never;
@@ -1497,6 +1497,8 @@ export interface components {
         ChangePlanBody: {
             phases?: components["schemas"]["PhaseChangeIn"][] | null;
             targets?: components["schemas"]["TargetChangeIn"][] | null;
+            /** @description From now on; [] for none; left out, as they are. */
+            training_weekdays?: ("sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday")[] | null;
         };
         ChangeUserInputBody: {
             /** @description false deactivates the user: they cannot sign in, their sessions end and their API tokens are refused, and their data stay; true activates them again. */
