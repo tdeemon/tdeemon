@@ -289,7 +289,7 @@ test("a desktop's day is in two columns, its meals a table with their total, the
   const meals = page.getByRole('region', { name: 'Meals' })
   await expect(meals.getByRole('article').filter({ hasText: 'Tuna salad' })).toBeVisible()
   const columns = await meals.evaluate((section) => {
-    const heads = section.querySelector('[aria-hidden="true"]')
+    const heads = section.querySelector('div[aria-hidden="true"]')
     const total = Array.from(section.querySelectorAll('p')).find(
       (p) => p.firstElementChild?.textContent === 'Total',
     )

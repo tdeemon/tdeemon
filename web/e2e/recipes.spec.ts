@@ -113,7 +113,7 @@ test('a share of a recipe is logged as a fraction, and read so in the day', asyn
   // From the recipe's page, Log a meal opens on its amount.
   await page.goto(`/foods/${recipeId}`)
   await page.getByRole('main').getByRole('button', { name: 'Log it' }).click()
-  const fromPage = page.getByRole('dialog', { name: 'New meal' })
+  const fromPage = page.getByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
   await expect(fromPage.getByLabel(`Amount: Dal ${tag}`)).toBeFocused()
   await expect(fromPage.getByLabel(`Amount: Dal ${tag}`)).toHaveValue('1')
   await expect(fromPage.getByLabel(`Unit: Dal ${tag}`)).toHaveValue('serving:portion')
@@ -123,11 +123,12 @@ test('a share of a recipe is logged as a fraction, and read so in the day', asyn
   // Found in a day's Log a meal, a tenth of it typed.
   await page.goto(`/?date=${shareDay}`)
   await page.getByRole('main').getByRole('button', { name: 'Log a meal' }).click()
-  const sheet = page.getByRole('dialog', { name: 'New meal' })
+  const sheet = page.getByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
   await sheet.getByLabel('Find a food or a meal').fill(`dal ${tag}`)
   const found = sheet.getByRole('button', { name: new RegExp(`^Dal ${tag}`) })
   await expect(found).toContainText('recipe')
-  await expect(found).toContainText('340 kcal per portion')
+  // Its + adds a portion, which its row says.
+  await expect(found).toContainText('1 portion · 340 kcal')
   await found.click()
   const amount = sheet.getByLabel(`Amount: Dal ${tag}`)
   await sheet.getByRole('button', { name: '1/… of the recipe: type the denominator' }).click()
@@ -137,9 +138,10 @@ test('a share of a recipe is logged as a fraction, and read so in the day', asyn
   // A share is exact; the grams of a dish not weighed are not.
   await expect(sheet.getByText('= 136 kcal · P 4 · C 8 · F 2 · ≈ 40 g')).toBeVisible()
   await amount.press('Enter')
+  await sheet.getByRole('button', { name: 'Edit amounts' }).click()
   const meal = sheet.getByRole('list', { name: 'In the meal' })
   await expect(meal).toContainText(`Dal ${tag} · ⅒ of the recipe · 136 kcal`)
-  await sheet.getByRole('button', { name: 'Log 1 item · 136 kcal' }).click()
+  await sheet.getByRole('button', { name: /^Log \w+ · 136 kcal$/ }).click()
   await expect(sheet).toBeHidden()
 
   const logged = page.getByRole('article').filter({ hasText: `Dal ${tag}` })

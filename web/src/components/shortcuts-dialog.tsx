@@ -22,8 +22,8 @@ function go(letter: string, what: string): Shortcut {
 }
 
 // ShortcutsDialog lists the keyboard's shortcuts (?), each with its keys:
-// those of anywhere, the sections' (G, then a letter) and a day's, its
-// meals' among them. Escape closes it, and the focus goes back where it
+// those of anywhere, the sections' (G, then a letter), a day's, its
+// meals' among them, and Log a meal's. Escape closes it, and the focus goes back where it
 // was.
 export function ShortcutsDialog({
   open,
@@ -65,6 +65,10 @@ export function ShortcutsDialog({
         { keys: ['R'], what: s.repeat },
         { keys: ['Delete'], what: s.remove },
       ],
+    },
+    {
+      title: s.inLog,
+      shortcuts: [{ keys: [apple() ? '⌘' : 'Ctrl', 'Enter'], join: '+', what: s.logIt }],
     },
   ]
 

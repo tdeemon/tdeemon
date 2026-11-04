@@ -92,7 +92,7 @@ test("the meals of the meal of the day come first, the most eaten first, and the
     'old',
     'today',
   ])
-  expect(ranked.ofSlot).toBe(3)
+  expect(ranked.fresh).toBe(5)
   // At lunch, the lunch alone; the day's still last.
   const lunch = suggestMeals(meals, { ...dinner, slot: 'lunch' })
   expect(lunch.meals.map((m) => m.id)).toEqual([
@@ -103,7 +103,7 @@ test("the meals of the meal of the day come first, the most eaten first, and the
     'old',
     'today',
   ])
-  expect(lunch.ofSlot).toBe(1)
+  expect(lunch.fresh).toBe(5)
   // A day before, the meals of the 22nd were had, not today's.
   const before = suggestMeals(meals, { ...dinner, date: '2026-10-22' })
   expect(before.meals.map((m) => m.id)).toEqual([

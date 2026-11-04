@@ -93,6 +93,8 @@ export const en = {
     change: 'Change the meal',
     repeat: 'Repeat the meal today',
     remove: 'Delete the meal',
+    inLog: 'In Log a meal',
+    logIt: 'Log the meal',
   },
   soon: 'This part is on its way.',
   unreachable: 'The server cannot be reached.',
@@ -339,6 +341,8 @@ export const en = {
     short: { protein: 'P', carbs: 'C', fat: 'F' },
     meals: 'Meals',
     mealsTotal: (n: number, kcal: string) => `${String(n)} · ${kcal} kcal`,
+    // The keys of the meals' table, said beside its heading on a desktop.
+    mealKeys: '↑↓ move · Enter edit · R repeat · ⌫ delete',
     noMeals: 'Nothing logged yet.',
     portions: (n: string, count: number) =>
       `${n} ${plural('en', count, { one: 'portion', other: 'portions' })}`,
@@ -529,11 +533,11 @@ export const en = {
       dinner: 'Add dinner',
     },
     left: (kcal: string) => `${kcal} kcal left`,
-    title: 'New meal',
-    // When the meal is: "Snack · today at 16:10".
-    when: (slot: string, day: string, time: string) => `${slot} · ${day} at ${time}`,
+    // When the meal is, under its title (the meal of the day): "today at
+    // 16:10".
+    at: (day: string, time: string) => `${day} at ${time}`,
     today: 'today',
-    change: 'Change',
+    change: 'change',
     changeOf: 'Change the name and time',
     description: 'What it was',
     descriptionHint: 'Breakfast, a snack…',
@@ -545,11 +549,20 @@ export const en = {
     search: 'Find a food or a meal',
     noFood: 'No food of yours matches. Add it as an estimate.',
     nothing: 'Nothing matches. Add an estimate, or make a new food.',
-    none: 'Nothing added yet. Find a food, or add an estimate.',
+    // The lists have nothing yet: no food of the user's has been eaten.
+    none: 'No foods of yours yet. Find one, or add an estimate.',
     lists: 'Show',
     list: { all: 'All', recent: 'Recent', frequent: 'Frequent', meals: 'Meals' },
     results: 'What there is to add',
-    lastAmount: (amount: string) => `last ${amount}`,
+    clear: 'Clear the search',
+    // The heading of the foods under the meals to repeat.
+    foodsAndRecipes: 'Foods and recipes',
+    // The meals eaten lately at the meal of the day, as cards.
+    picks: 'Meals to repeat',
+    // The chip of a quick estimate, kcal alone, and the name it gets
+    // when none is given.
+    quickKcal: 'An estimate in kcal',
+    quickName: 'Quick kcal',
     // A food of the instance's catalog, which an admin entered.
     catalog: 'catalog',
     addOf: (name: string) => `Add: ${name}`,
@@ -559,6 +572,9 @@ export const en = {
     mealLine: (when: string, items: string, kcal: string) => `${when} · ${items} · ${kcal}`,
     repeat: 'Repeat',
     repeatOf: (name: string) => `Repeat: ${name}`,
+    // A meal of before's items put in the meal being logged.
+    addMeal: 'Add',
+    addMealOf: (name: string) => `Add to the meal: ${name}`,
     // The meals eaten lately at the meal of the day being logged.
     forSlot: {
       breakfast: 'For breakfast',
@@ -577,11 +593,20 @@ export const en = {
       portion: 'Eaten now (portions)',
     },
     basket: 'In the meal',
-    empty: 'Pick a food, or repeat a meal.',
+    // The tray of what is in the meal: its items and their amounts,
+    // which open for a change, and the button that logs it.
+    editAmounts: 'Edit amounts',
+    amountIn: (name: string) => `Amount in the meal: ${name}`,
+    unitIn: (name: string) => `Unit in the meal: ${name}`,
+    logSlot: {
+      breakfast: 'Log breakfast',
+      lunch: 'Log lunch',
+      snack: 'Log snack',
+      dinner: 'Log dinner',
+    },
+    logAs: (slot: string, kcal: string) => `${slot} · ${kcal} kcal`,
     after: (kcal: string) => `after: ${kcal} kcal left`,
     afterOver: (kcal: string) => `after: ${kcal} kcal over`,
-    logItems: (n: number, kcal: string) =>
-      `Log ${String(n)} ${plural('en', n, { one: 'item', other: 'items' })} · ${kcal} kcal`,
     estimate: 'Add an estimate',
     estimateName: 'What it is',
     amount: (name: string) => `Amount: ${name}`,
@@ -605,7 +630,6 @@ export const en = {
         kcal: (n: string) => `At most ${n} kcal.`,
       },
     },
-    save: 'Log the meal',
     cancel: 'Cancel',
     refused: (detail: string) => `The server did not take this meal: ${detail}`,
   },

@@ -118,7 +118,11 @@ const logMeal =
   /^(Log a meal|Upiši obrok|Add (breakfast|lunch|a snack|dinner)|Dodaj (doručak|ručak|užinu|večeru))/
 
 // find opens the meal to log, searches, and picks the food named name.
-async function find(name: string, title = 'New meal', search = 'Find a food or a meal') {
+async function find(
+  name: string,
+  title = /^(Breakfast|Lunch|Snack|Dinner)$/,
+  search = 'Find a food or a meal',
+) {
   const main = within(await screen.findByRole('main'))
   fireEvent.click(await main.findByRole('button', { name: logMeal }))
   const sheet = within(await screen.findByRole('dialog', { name: title }))
@@ -127,10 +131,15 @@ async function find(name: string, title = 'New meal', search = 'Find a food or a
   return sheet
 }
 
+// basket is what the meal holds, in the tray opened for its amounts.
 function basket(sheet: Sheet) {
+  const toggle = sheet.getByRole('button', { name: 'Edit amounts' })
+  if (toggle.getAttribute('aria-expanded') !== 'true') {
+    fireEvent.click(toggle)
+  }
   return within(sheet.getByRole('list', { name: 'In the meal' }))
     .getAllByRole('listitem')
-    .map((li) => li.textContent.replace('×', ''))
+    .map((li) => li.querySelector('span')?.textContent ?? '')
 }
 
 const options = (select: HTMLElement) =>
@@ -142,11 +151,14 @@ test('a recipe found is marked, a portion its energy, and opens at a portion; �
 
   const main = within(await screen.findByRole('main'))
   fireEvent.click(await main.findByRole('button', { name: logMeal }))
-  const sheet = within(await screen.findByRole('dialog', { name: 'New meal' }))
+  const sheet = within(
+    await screen.findByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ }),
+  )
   fireEvent.change(sheet.getByLabelText('Find a food or a meal'), { target: { value: 'cur' } })
   const row = await sheet.findByRole('button', { name: /^Chicken curry/ })
   expect(within(row).getByText('recipe')).toBeDefined()
-  expect(row.textContent).toContain('500 kcal per portion')
+  // What its + adds: a portion.
+  expect(row.textContent).toContain('1 portion · 500 kcal · 38 g P')
   fireEvent.click(row)
 
   // Never eaten: a portion.
@@ -185,7 +197,7 @@ test('a recipe found is marked, a portion its energy, and opens at a portion; �
   fireEvent.click(sheet.getByRole('button', { name: 'Add: Chicken curry' }))
 
   expect(basket(sheet)).toEqual(['Chicken curry · ⅓ of the recipe · 667 kcal'])
-  fireEvent.click(sheet.getByRole('button', { name: 'Log 1 item · 667 kcal' }))
+  fireEvent.click(sheet.getByRole('button', { name: /^Log \w+ · 667 kcal$/ }))
   expect(await screen.findByText(/^Logged: /)).toBeDefined()
   expect(server.sent).toEqual([
     {
@@ -209,8 +221,9 @@ test('a recipe not weighed opens at a quarter, takes a fraction typed, and its g
 
   const sheet = await find('Bean stew')
   const row = sheet.getByRole('button', { name: /^Bean stew/ })
-  // Per 100 g, about so.
-  expect(row.textContent).toContain('≈ 150 kcal per 100 g')
+  // A quarter, whose kcal are no less sure for its grams not weighed.
+  expect(row.textContent).toContain('¼ of the recipe · 300 kcal')
+  expect(row.textContent).not.toContain('≈')
   const amount = sheet.getByLabelText('Amount: Bean stew')
   const unit = sheet.getByLabelText('Unit: Bean stew')
   // Not divided: a quarter of it.
@@ -251,7 +264,7 @@ test('a recipe not weighed opens at a quarter, takes a fraction typed, and its g
   fireEvent.change(amount, { target: { value: '200' } })
   fireEvent.click(sheet.getByRole('button', { name: 'Add: Bean stew' }))
   expect(basket(sheet)).toEqual(['Bean stew · 200 g · 300 kcal'])
-  fireEvent.click(sheet.getByRole('button', { name: 'Log 1 item · 300 kcal' }))
+  fireEvent.click(sheet.getByRole('button', { name: /^Log \w+ · 300 kcal$/ }))
   expect(await screen.findByText(/^Logged: /)).toBeDefined()
   expect(server.sent).toEqual([
     {
@@ -278,13 +291,14 @@ test('a recipe eaten before opens as it was eaten last, its share every decimal 
   renderAt('/')
 
   const sheet = await find('Chicken curry')
+  // Its + adds it so.
   expect(sheet.getByRole('button', { name: /^Chicken curry/ }).textContent).toContain(
-    'last ⅓ of the recipe',
+    '⅓ of the recipe · 667 kcal',
   )
   expect(sheet.getByLabelText('Amount: Chicken curry')).toHaveProperty('value', '1/3')
   expect(sheet.getByLabelText('Unit: Chicken curry')).toHaveProperty('value', 'serving:recipe')
   fireEvent.click(sheet.getByRole('button', { name: 'Add: Chicken curry' }))
-  fireEvent.click(sheet.getByRole('button', { name: 'Log 1 item · 667 kcal' }))
+  fireEvent.click(sheet.getByRole('button', { name: /^Log \w+ · 667 kcal$/ }))
   expect(await screen.findByText(/^Logged: /)).toBeDefined()
   expect(server.sent).toEqual([
     {
@@ -309,7 +323,11 @@ test("a recipe's portions eaten last are said in Croatian, with its chips", asyn
   setLocale('hr')
   renderAt('/')
 
-  const sheet = await find('Chicken curry', 'Novi obrok', 'Pronađi namirnicu ili obrok')
+  const sheet = await find(
+    'Chicken curry',
+    /^(Doručak|Ručak|Užina|Večera)$/,
+    'Pronađi namirnicu ili obrok',
+  )
   expect(sheet.getByRole('button', { name: /^Chicken curry/ }).textContent).toContain('2 porcije')
   expect(sheet.getByLabelText('Količina: Chicken curry')).toHaveProperty('value', '2')
   expect(options(sheet.getByLabelText('Jedinica: Chicken curry'))).toEqual([
@@ -338,16 +356,18 @@ test("Log on a recipe's page opens Log a meal on its amount, to choose a portion
 
   const page = await screen.findByRole('article', { name: 'Bean stew' })
   fireEvent.click(await within(page).findByRole('button', { name: 'Log it' }))
-  const sheet = within(await screen.findByRole('dialog', { name: 'New meal' }))
+  const sheet = within(
+    await screen.findByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ }),
+  )
   const amount = sheet.getByLabelText('Amount: Bean stew')
   expect(amount).toHaveProperty('value', '1/4')
   await waitFor(() => {
     expect(document.activeElement).toBe(amount)
   })
-  // First, above the meals of before.
+  // First of the foods, under the meals of before.
+  await sheet.findByRole('button', { name: /^Repeat: / })
   const results = within(await sheet.findByRole('list', { name: 'What there is to add' }))
-  await results.findByRole('button', { name: /^Repeat: / })
-  expect(results.getAllByRole('listitem')[0]?.textContent).toMatch(/^BSBean stew/)
+  expect(results.getAllByRole('listitem')[0]?.textContent).toMatch(/^Bean stew/)
   // Not in the meal until it is added.
   expect(sheet.queryByRole('list', { name: 'In the meal' })).toBeNull()
   fireEvent.click(sheet.getByRole('button', { name: '⅓ of the recipe' }))
@@ -448,4 +468,18 @@ test("a meal's share of a recipe opens in its editor as a fraction, and one type
       ],
     },
   ])
+})
+
+test("a recipe not weighed, eaten last in grams, says its row's grams are about so", async () => {
+  recipeServer([eatenAs(stew, { amount: 200, unit: 'g' }, 200)])
+  renderAt('/')
+
+  const main = within(await screen.findByRole('main'))
+  fireEvent.click(await main.findByRole('button', { name: logMeal }))
+  const sheet = within(
+    await screen.findByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ }),
+  )
+  fireEvent.change(sheet.getByLabelText('Find a food or a meal'), { target: { value: 'bea' } })
+  const row = await sheet.findByRole('button', { name: /^Bean stew/ })
+  expect(row.textContent).toContain('≈ 200 g · 300 kcal')
 })

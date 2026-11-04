@@ -19,8 +19,9 @@ type Format = ReturnType<typeof useFormat>
 
 // An entry is an item of a meal being logged, as typed: a food of the
 // user's, or of the catalog (catalog), in an amount and a unit of it, or
-// an estimate of a whole plate. Logged, a food of the catalog is copied
-// into the user's foods.
+// an estimate of a whole plate, or an item of a meal of before (item),
+// as it is logged again (inputOf), with its values as they were. Logged,
+// a food of the catalog is copied into the user's foods.
 // Its key is the item's id too, so a meal sent again is the same. A
 // food's exact is the amount a unit chosen worked out, before it was
 // rounded to be shown, until the amount is typed: it is what is sent.
@@ -42,6 +43,13 @@ export type Entry =
       protein: string
       carbs: string
       fat: string
+    }
+  | {
+      key: string
+      kind: 'item'
+      name: string
+      input: ItemInput
+      values: Values
     }
 
 // A food entry is an entry of a food of the user's.
@@ -263,6 +271,9 @@ export function entryValues(
     const n = entryAmount(entry, parse)
     return n === undefined ? undefined : nutrientsIn(entry.food, entry.unit, n)
   }
+  if (entry.kind === 'item') {
+    return entry.values
+  }
   const kcal = parse(entry.kcal)
   const protein = parse(entry.protein)
   const carbs = parse(entry.carbs)
@@ -364,6 +375,9 @@ export function entryWrong(
     const n = entryAmount(entry, parse)
     return n === undefined ? { kind: 'number' } : amountWrong(entry.food, entry.unit, n)
   }
+  if (entry.kind === 'item') {
+    return undefined
+  }
   if (entry.name.trim() === '') {
     return { kind: 'name' }
   }
@@ -392,6 +406,9 @@ export function entryItem(
   const wrong = entryWrong(entry, parse)
   if (wrong !== undefined) {
     return { wrong }
+  }
+  if (entry.kind === 'item') {
+    return { item: { ...entry.input, id: entry.key } }
   }
   if (entry.kind === 'food') {
     const n = entryAmount(entry, parse)
@@ -513,6 +530,24 @@ export function inputOf(item: Item): ItemInput {
     : { food_id: item.food_id, amount: item.amount, unit: item.unit, ...note }
 }
 
+// itemEntries are a meal of before's items as entries of a meal being
+// logged, each as it is logged again (inputOf), named as the app names
+// it.
+export function itemEntries(meal: Meal, t: Messages): Entry[] {
+  return meal.items.map((item) => ({
+    key: uuidv7(),
+    kind: 'item',
+    name: itemName(item, t),
+    input: inputOf(item),
+    values: {
+      kcal: item.nutrients.kcal,
+      protein: item.nutrients.protein,
+      carbs: item.nutrients.carbs,
+      fat: item.nutrients.fat,
+    },
+  }))
+}
+
 // repeatOf is a meal logged again, today at this time: its items as
 // inputOf has them, its description and its note, under an id made now,
 // so each repeat is a meal of its own.
@@ -534,6 +569,28 @@ export function servingsOf(n: string, servings: number, serving: string): string
     return `${n} ${serving}`
   }
   return servings === 1 ? serving : `${n} × ${serving}`
+}
+
+// entryAmountLabel is how much of a food an entry has, as its field says
+// so: a serving's by servingsOf, a recipe's as a meal's item says so by
+// recipeQuantity (⅓ of the recipe). An amount that is no number is as
+// typed.
+export function entryAmountLabel(entry: FoodEntry, t: Messages, f: Format): string {
+  const serving = servingOf(entry.unit)
+  const n = entryAmount(entry, f.parse)
+  const ofRecipe =
+    serving === undefined || n === undefined
+      ? undefined
+      : recipeQuantity(entry.food.source, { servings: n, serving }, t, f.number)
+  if (ofRecipe !== undefined) {
+    return ofRecipe
+  }
+  if (entry.unit === 'portion') {
+    return `${entry.amount} ${t.log.portions(f.parse(entry.amount) ?? Number.NaN)}`
+  }
+  return serving === undefined
+    ? `${entry.amount} ${entry.unit}`
+    : servingsOf(entry.amount, f.parse(entry.amount) ?? Number.NaN, serving)
 }
 
 // lastAmountOf is how much of a food was eaten last, as it was given: "2

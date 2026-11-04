@@ -14,7 +14,7 @@ test('a barcode nobody has is a new food of it, and the next scan finds that foo
       .getByRole('navigation', { name: 'Sections' })
       .getByRole('button', { name: 'Log a meal' })
       .click()
-    const sheet = page.getByRole('dialog', { name: 'New meal' })
+    const sheet = page.getByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
     await sheet.getByRole('button', { name: 'Scan a barcode' }).click()
     await sheet.getByLabel('Or type the digits under the bars').fill('4006381333931')
     await sheet.getByRole('button', { name: 'Look up the code' }).click()
@@ -30,7 +30,7 @@ test('a barcode nobody has is a new food of it, and the next scan finds that foo
   await sheet.getByLabel('Fat (g)', { exact: true }).fill('0')
   await sheet.getByLabel('Eaten now (g)').fill('5')
   await sheet.getByRole('button', { name: 'Add to meal' }).click()
-  await sheet.getByRole('button', { name: 'Log 1 item · 8 kcal' }).click()
+  await sheet.getByRole('button', { name: /^Log \w+ · 8 kcal$/ }).click()
   await expect(page.getByText(/^Logged: Spearmint gum · 8 kcal/)).toBeVisible()
 
   sheet = await open()

@@ -74,9 +74,9 @@ test('a recipe shared with another user is theirs at once: its members, its ingr
 
   // A portion logged, as any recipe of hers.
   await hers.getByRole('button', { name: /^Log/ }).click()
-  const meal = mia.getByRole('dialog', { name: 'New meal' })
+  const meal = mia.getByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })
   await meal.getByRole('button', { name: `Add: Goulash ${tag}` }).click()
-  await meal.getByRole('button', { name: /^Log 1 item · / }).click()
+  await meal.getByRole('button', { name: /^Log \w+ · / }).click()
   await expect(mia.getByText(/^Logged: /)).toBeVisible()
   await theirs.close()
 })
