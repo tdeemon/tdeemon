@@ -60,7 +60,7 @@ shortcuts (a skip to the content, G and a letter to a section, ⌘Z or
 Ctrl+Z to undo the latest change), a light and a dark theme,
 each change said in a toast whose Undo takes it back, clear of a
 sheet's buttons, a delete's for 10 s, and after it the recent changes
-in a sheet (from the settings, or the undo's toast), by whom, with
+(a page of the settings, or a sheet from the undo's toast), by whom, with
 Undo on the next, each number of
 calibration's an ⓘ away from what it is, a page that loads a skeleton
 of its shape under its header, one that did not load saying so there
@@ -165,7 +165,9 @@ a row to its page: the profile, the limits in groups that open, a wrong
 one focused at its field, the autopilot's settings (asking before it is
 turned on, the review's weekday, what it may and never changes and when
 it waits), the notes for a coach) and the settings as a
-list (the theme, the account with a time zone found by its name, its
+list under the account's card, beside the page open of it on a desktop,
+signing out last and the version and the export at its foot (the
+theme, the account with a time zone found by its name, its
 data exported as a ZIP and the account deleted once its address is typed,
 the admin's users (someone invited in a sheet whose link is shown once,
 the invites waiting, each revoked, the accounts deactivated, made an admin
@@ -181,7 +183,8 @@ and commands, Health Auto Export's checklist) and its first call seen
 as it comes, the notifications (this device's turned on at a tap, or
 why it cannot, an iPhone's way to the app installed among them, the
 devices notified, each removed apart, a test; the service worker shows
-them and a tap opens their page), the recent changes, signing out),
+them and a tap opens their page), the recent changes, a page of their
+own, signing out),
 each screen checked for
 access (axe, a finger's targets, the focus, less motion) on a phone and
 a desktop, in

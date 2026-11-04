@@ -108,7 +108,7 @@ export const en = {
     submit: 'Sign in',
     submitting: 'Signing in…',
     or: 'or',
-    with: (provider: string) => `Sign in with ${provider}`,
+    with: (provider: string) => `Continue with ${provider}`,
     wrong: 'Wrong email or password.',
     tooMany: (seconds: number) => `Too many failed sign-ins. Try again in ${wait(seconds)}.`,
     busy: (seconds: number) => `The server is busy. Try again in ${wait(seconds)}.`,
@@ -1367,8 +1367,12 @@ export const en = {
     revoked: (n: number) =>
       `${String(n)} ${plural('en', n, { one: 'access key', other: 'access keys' })} revoked.`,
     signOut: 'Sign out',
-    signedInAs: (name: string, email: string) => `Signed in as ${name} (${email}).`,
     signOutFailed: 'Signing out failed. Try again.',
+    // The account's card over the list, and the list's foot: the
+    // server's name and version, whose data it is, and a copy of it.
+    yourServer: 'your server',
+    yourData: 'your data, your server',
+    exportZip: 'Export ZIP',
     // The account's data: a copy of it all, and the account deleted.
     data: {
       title: 'Your data',

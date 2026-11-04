@@ -307,9 +307,8 @@ test('the recent changes list a step as by Autopilot, and the change of its sett
         ],
       }),
   })
-  renderAt('/settings')
-  fireEvent.click(await screen.findByRole('button', { name: 'Recent changes' }))
-  const sheet = within(await screen.findByRole('dialog', { name: 'Recent changes' }))
+  renderAt('/settings/changes')
+  const sheet = within(await screen.findByRole('main'))
   const rows = await sheet.findAllByRole('listitem')
   expect(rows.map((r) => r.textContent)).toEqual([
     'A proposal applied9:00 AM · Autopilot',

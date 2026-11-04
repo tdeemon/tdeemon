@@ -78,7 +78,8 @@ function said(change: Change, t: Messages): string {
   }
 }
 
-// RecentChanges is the user's latest changes, in a sheet: what each did
+// RecentChanges is the user's latest changes, in a sheet (and a page of
+// the settings'): what each did
 // and of what, when and through whom (you, your AI coach, a device, the
 // autopilot), and
 // whether an undo took it back; with Undo on the one undo takes back
@@ -98,12 +99,14 @@ export function RecentChanges({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title={t.changes.title} finalFocus={finalFocus}>
-      <List />
+      <RecentChangesList />
     </Sheet>
   )
 }
 
-function List() {
+// RecentChangesList is the list of them alone, for the sheet and for the
+// settings' page of them.
+export function RecentChangesList() {
   const t = useMessages()
   const changes = $api.useQuery('get', '/api/v1/changes', {
     params: { query: { limit: listed } },

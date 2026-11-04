@@ -11,7 +11,11 @@ test('a user signs in, moves between the sections and signs out', async ({ page 
   await page.getByRole('button', { name: 'Sign in' }).click()
 
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
-  await expect(page.getByText(`Signed in as Ana (${user.email}).`)).toBeVisible()
+  // Whose they are: the account's card, and signing out as whom.
+  await expect(page.getByRole('main').getByText('Ana', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sign out' })).toHaveAccessibleDescription(
+    user.email,
+  )
   const sections = page.getByRole('navigation', { name: 'Sections' })
   await sections.getByRole('link', { name: 'Foods' }).click()
   await expect(page.getByRole('heading', { name: 'Foods' })).toBeVisible()

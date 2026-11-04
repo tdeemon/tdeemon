@@ -19,6 +19,7 @@ import { AppError } from '@/pages/app-error'
 import { AppLayout } from '@/pages/app-layout'
 import { AppearancePage } from '@/pages/appearance'
 import { AutopilotPage } from '@/pages/autopilot'
+import { ChangesPage } from '@/pages/changes'
 import { DayPage } from '@/pages/day'
 import { DevicesPage } from '@/pages/devices'
 import { FoodPage } from '@/pages/food'
@@ -36,7 +37,7 @@ import { NotificationsPage } from '@/pages/notifications'
 import { PlanPage } from '@/pages/plan'
 import { ProfilePage } from '@/pages/profile'
 import { RootLayout } from '@/pages/root-layout'
-import { SettingsPage } from '@/pages/settings'
+import { SettingsIndexPage, SettingsPage } from '@/pages/settings'
 import { UsersPage } from '@/pages/users'
 
 // Routes are declared in code, not generated from files: the app has few
@@ -237,29 +238,36 @@ const notesRoute = createRoute({
   path: '/plan/notes',
   component: NotesPage,
 })
-// The settings, as a list, and a page each: the theme, the account, and
-// the devices and AI clients.
+// The settings, as a list, and a page each: the theme, the account, the
+// devices and AI clients, the notifications, the household, the admin's
+// users and the recent changes. On a desktop the list stays beside the
+// page open of them (SettingsPage); on a phone one or the other.
 const settingsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/settings',
   component: SettingsPage,
 })
+const settingsIndexRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/',
+  component: SettingsIndexPage,
+})
 const appearanceRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/settings/appearance',
+  getParentRoute: () => settingsRoute,
+  path: 'appearance',
   component: AppearancePage,
 })
 const accountRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/settings/account',
+  getParentRoute: () => settingsRoute,
+  path: 'account',
   component: AccountPage,
 })
 // connect opens the way to connect an AI coach (coach, the plan's Connect
 // an AI coach), a phone (phone), or either (choose, today's first steps),
 // which takes it out of the address once open.
 const devicesRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/settings/devices',
+  getParentRoute: () => settingsRoute,
+  path: 'devices',
   validateSearch: (
     search: Record<string, unknown>,
   ): { connect?: 'coach' | 'phone' | 'choose' | undefined } => ({
@@ -271,21 +279,27 @@ const devicesRoute = createRoute({
   component: DevicesPage,
 })
 const notificationsRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/settings/notifications',
+  getParentRoute: () => settingsRoute,
+  path: 'notifications',
   component: NotificationsPage,
 })
 // The admin's users and invites; anyone else is told it is the admin's.
 const usersRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/settings/users',
+  getParentRoute: () => settingsRoute,
+  path: 'users',
   component: UsersPage,
 })
 // The user's household, which its notifications open.
 const householdRoute = createRoute({
-  getParentRoute: () => appRoute,
-  path: '/settings/household',
+  getParentRoute: () => settingsRoute,
+  path: 'household',
   component: HouseholdPage,
+})
+// The latest changes, by whom, with Undo on the next.
+const changesRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: 'changes',
+  component: ChangesPage,
 })
 // The addresses of before, the charts' and the plan's under the settings,
 // lead where they are now.
@@ -317,13 +331,16 @@ const routeTree = rootRoute.addChildren([
     limitsRoute,
     notesRoute,
     autopilotRoute,
-    settingsRoute,
-    appearanceRoute,
-    accountRoute,
-    devicesRoute,
-    notificationsRoute,
-    usersRoute,
-    householdRoute,
+    settingsRoute.addChildren([
+      settingsIndexRoute,
+      appearanceRoute,
+      accountRoute,
+      devicesRoute,
+      notificationsRoute,
+      usersRoute,
+      householdRoute,
+      changesRoute,
+    ]),
   ]),
   loginRoute,
   inviteRoute,

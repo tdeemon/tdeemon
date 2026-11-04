@@ -1523,10 +1523,18 @@ the first spec.
     over the screen shown, which stays as it was, and the toast of the meal
     logged leads to the day; on today's page it is the page's own, so the
     meal's row takes the focus. On a phone the settings are the user's
-    mark at the end of a page's header (an avatar); they are a list,
-    each row with its value in short and a page of its own, as is what a
-    plan rests on of the user's (the profile, the limits, the notes for a
-    coach), under the plan. The keyboard has shortcuts (`?` lists
+    mark at the end of a page's header (an avatar), so a setting is two
+    taps from any page; they are a list under the account's card (the
+    avatar, the name, the address and "your server"), each row with its
+    value in short and a page of its own (the appearance, the account,
+    the devices and AI coaches, the notifications, the household, the
+    admin's users and the recent changes), signing out last, with no
+    chevron, and under it the server's version, "your data, your server"
+    and the data's export as a ZIP. From 1024 px the list stays at the
+    left and the page open of it beside it (master-detail), the first's
+    at first. What a plan rests on of the user's (the profile, the
+    limits, the notes for a coach) is a list of pages too, under the
+    plan. The keyboard has shortcuts (`?` lists
     them): N logs a meal, / finds a food, ⌘Z or Ctrl+Z outside a field
     takes back the latest change (made anywhere, which its toast says),
     G and a letter goes to a section (D, F, P, L, S, which the sidebar
@@ -1542,23 +1550,23 @@ the first spec.
     takes back that change only (`last`, §5); a delete asks nothing first,
     and its toast stays 10 s, as one that warns, 6 s the others; none goes
     while the pointer or the focus is on the toasts, or a finger touched
-    them last. After the toast, the recent changes (a sheet from the
-    settings, and from an undo's toast) list the latest changes, made by the
-    user, their AI coach or a device, each said as its toast said it, with
-    Undo on the one undo takes back next. The toasts are over a sheet too,
-    so a change made in one is taken back there, and clear of its buttons,
-    which a tap under them would miss: at the top of a phone, beside the
-    panel on a desktop; F6 takes the focus to them from a sheet, which
-    keeps Tab within it. A sheet is Base UI's Drawer: from the bottom on a
-    phone, with a handle, dragged down to close (from anywhere its list is
-    at its top), and at the right on a desktop, dragged away by its title;
-    its × stays, for the keyboard and a screen reader. What a finger taps
-    is 44 px or more either way, but a link in a sentence. A sheet has one
-    primary button at a time: the quick add's new food (in short, its other
-    fields under More and on its page) and its estimate are a step of their
-    own, in the search's place, with Add to meal alone. The quick add's
-    search takes the focus as it opens, but on a touch screen (`pointer:
-    coarse`), whose keyboard would cover what it lists, only when tapped.
+    them last. After the toast, the recent changes (a page of the settings, and
+    a sheet from an undo's toast) list the latest changes, made by the user,
+    their AI coach or a device, each said as its toast said it, with Undo on the
+    one undo takes back next. The toasts are over a sheet too, so a change made
+    in one is taken back there, and clear of its buttons, which a tap under them
+    would miss: at the top of a phone, beside the panel on a desktop; F6 takes
+    the focus to them from a sheet, which keeps Tab within it. A sheet is Base
+    UI's Drawer: from the bottom on a phone, with a handle, dragged down to
+    close (from anywhere its list is at its top), and at the right on a desktop,
+    dragged away by its title; its × stays, for the keyboard and a screen
+    reader. What a finger taps is 44 px or more either way, but a link in a
+    sentence. A sheet has one primary button at a time: the quick add's new food
+    (in short, its other fields under More and on its page) and its estimate are
+    a step of their own, in the search's place, with Add to meal alone. The
+    quick add's search takes the focus as it opens, but on a touch screen
+    (`pointer: coarse`), whose keyboard would cover what it lists, only when
+    tapped.
   - The day's header is one row at every width: ‹ its title › (Today,
     its date under it, or another day's date), a Today pill back to
     today on another day, and the user's mark, to the settings, where a
