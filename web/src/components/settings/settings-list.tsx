@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { Bell, Globe, History, House, LogOut, Palette, Smartphone, Users } from 'lucide-react'
-import { useState } from 'react'
+import { Bell, Globe, History, House, KeyRound, LogOut, Palette, Users } from 'lucide-react'
 
 import { $api, fetchClient } from '@/api/client'
 import { HttpError } from '@/api/errors'
@@ -10,7 +9,6 @@ import { pushDeviceQuery } from '@/api/push'
 import { sessionQuery } from '@/api/session'
 import { ListGroup } from '@/components/list-group'
 import { ListRow } from '@/components/list-row'
-import { RecentChanges } from '@/components/recent-changes'
 import type { Messages } from '@/i18n/en'
 import { locales } from '@/i18n/locale'
 import { useMessages } from '@/i18n/messages'
@@ -30,21 +28,20 @@ function householdSummary(s: Messages['settings'], household: Household): string
 // SettingsList is the user's settings, each a row to its page with its
 // value in short: this browser's theme, the account's language, time zone
 // and day's start, the devices and AI clients with a token, the
-// household; for the admin, the users; the recent changes, in a sheet;
-// then signing out, as whom, and what the server is. The settings' page
-// is its title.
-export function SettingsList() {
+// notifications, the household; for the admin, the users; the recent
+// changes; and last signing out, as whom, a button with no chevron.
+// Beside the page open of them (a desktop's, beside), a row has no
+// chevron, and the open one is marked. The settings' page is its title.
+export function SettingsList({ beside = false }: { beside?: boolean }) {
   const t = useMessages()
   const theme = useTheme()
   const session = useQuery(sessionQuery)
   const user = session.data?.user
   const tokens = $api.useQuery('get', '/api/v1/tokens')
   const notified = $api.useQuery('get', '/api/v1/push/subscriptions')
-  const info = $api.useQuery('get', '/api/v1/info')
   const household = useQuery(householdQuery)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [changes, setChanges] = useState(false)
   const signOut = useMutation({
     // This device's notifications end first, in the session that ends.
     mutationFn: async () => {
@@ -61,39 +58,30 @@ export function SettingsList() {
     },
   })
   const s = t.settings
+  const chevron = !beside
 
   return (
     <ListGroup
       foot={
-        <div className="space-y-1 px-1 text-small">
-          {signOut.isError && (
-            <p role="alert" className="text-destructive">
-              {s.signOutFailed}
-            </p>
-          )}
-          <p className="text-muted-foreground">
-            {info.isPending && t.connecting}
-            {info.isError && t.unreachable}
-            {info.data && (
-              <>
-                <span data-testid="server-name">{info.data.name}</span>{' '}
-                <span data-testid="server-version">{info.data.version}</span>
-              </>
-            )}
+        signOut.isError && (
+          <p role="alert" className="px-1 text-small text-destructive">
+            {s.signOutFailed}
           </p>
-        </div>
+        )
       }
     >
       <ListRow
         icon={Palette}
         title={s.appearance}
         to="/settings/appearance"
+        chevron={chevron}
         summary={s.themes[theme]}
       />
       <ListRow
         icon={Globe}
         title={s.account}
         to="/settings/account"
+        chevron={chevron}
         summary={
           user &&
           s.accountSummary(
@@ -104,39 +92,46 @@ export function SettingsList() {
         }
       />
       <ListRow
-        icon={Smartphone}
+        icon={KeyRound}
         title={s.devices}
         to="/settings/devices"
+        chevron={chevron}
         summary={tokens.data && s.devicesSummary(tokens.data.tokens.length)}
       />
       <ListRow
         icon={Bell}
         title={s.notifications.title}
         to="/settings/notifications"
+        chevron={chevron}
         summary={notified.data && s.notifications.summary(notified.data.subscriptions.length)}
       />
       <ListRow
         icon={House}
         title={s.household}
         to="/settings/household"
+        chevron={chevron}
         summary={household.data && householdSummary(s, household.data)}
       />
       {user?.role === 'admin' && (
-        <ListRow icon={Users} title={s.users} to="/settings/users" summary={s.usersSummary} />
+        <ListRow
+          icon={Users}
+          title={s.users}
+          to="/settings/users"
+          chevron={chevron}
+          summary={s.usersSummary}
+        />
       )}
       <ListRow
         icon={History}
         title={t.changes.title}
+        to="/settings/changes"
+        chevron={chevron}
         summary={t.changes.summary}
-        onClick={() => {
-          setChanges(true)
-        }}
       />
-      <RecentChanges open={changes} onOpenChange={setChanges} />
       <ListRow
         icon={LogOut}
         title={s.signOut}
-        summary={user && s.signedInAs(user.name, user.email)}
+        summary={user?.email}
         disabled={signOut.isPending}
         onClick={() => {
           signOut.mutate()

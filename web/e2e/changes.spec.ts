@@ -26,11 +26,13 @@ test('a meal deleted comes back from the recent changes, after its toast is gone
   await toasts.getByLabel('Close').click()
   await expect(toasts.getByRole('button', { name: 'Undo' })).toHaveCount(0)
 
-  // The recent changes, from the settings: the delete, by you, and its
-  // Undo, the latest's alone.
+  // The recent changes, a page of the settings: the delete, by you, and
+  // its Undo, the latest's alone.
   await toSettings(page)
-  await page.getByRole('button', { name: 'Recent changes' }).click()
-  const sheet = page.getByRole('dialog', { name: 'Recent changes' })
+  await page.getByRole('link', { name: 'Recent changes' }).click()
+  await expect(page.getByRole('heading', { name: 'Recent changes', level: 1 })).toBeVisible()
+  await expect(page).toHaveURL('/settings/changes')
+  const sheet = page.getByRole('main')
   const rows = sheet.getByRole('listitem')
   await expect(rows.first()).toContainText(`Deleted: ${name}`)
   await expect(rows.first()).toContainText('· you')
@@ -42,7 +44,6 @@ test('a meal deleted comes back from the recent changes, after its toast is gone
   await expect(rows.first()).toContainText('Undone')
   // The list follows: the meal's log is the next to take back.
   await expect(sheet.getByRole('button', { name: `Undo: Logged: ${name}` })).toBeVisible()
-  await page.keyboard.press('Escape')
   await page.goto('/')
   await expect(meal).toHaveCount(1)
 })

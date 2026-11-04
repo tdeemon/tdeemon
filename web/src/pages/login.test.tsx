@@ -61,7 +61,7 @@ test("the provider's sign-in is a link that brings the browser back", async () =
 
   renderAt('/progress')
 
-  const link = await screen.findByRole('link', { name: 'Sign in with Authentik' })
+  const link = await screen.findByRole('link', { name: 'Continue with Authentik' })
   expect(link.getAttribute('href')).toBe('/api/v1/auth/oidc/login?return_to=%2Fprogress')
 })
 
@@ -70,7 +70,7 @@ test('a target off the app is the start page after signing in', async () => {
   const router = renderAt('/login?redirect=%2F%2Fevil.example%2F')
 
   expect(
-    (await screen.findByRole('link', { name: 'Sign in with Authentik' })).getAttribute('href'),
+    (await screen.findByRole('link', { name: 'Continue with Authentik' })).getAttribute('href'),
   ).toBe('/api/v1/auth/oidc/login?return_to=%2F')
   await signIn()
 
@@ -121,7 +121,7 @@ test('the wait is said in the language of the app', async () => {
   server(() => problem(429, { 'Retry-After': '120' }))
   renderAt('/')
 
-  fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'a@example.com' } })
+  fireEvent.change(await screen.findByLabelText('E-mail'), { target: { value: 'a@example.com' } })
   fireEvent.change(screen.getByLabelText('Lozinka'), { target: { value: 'x' } })
   fireEvent.click(screen.getByRole('button', { name: 'Prijavi se' }))
 
@@ -139,7 +139,7 @@ test('a server with only a provider offers no password', async () => {
 
   renderAt('/')
 
-  expect(await screen.findByRole('link', { name: 'Sign in with Authentik' })).toBeDefined()
+  expect(await screen.findByRole('link', { name: 'Continue with Authentik' })).toBeDefined()
   expect(screen.queryByLabelText('Password')).toBeNull()
   expect(screen.queryByText('or')).toBeNull()
 })
@@ -178,9 +178,10 @@ test('signing out ends the session and forgets it, so the next visit signs in ag
     },
   })
   const router = renderAt('/settings')
-  expect(await screen.findByText('Signed in as Ana (ana@example.com).')).toBeDefined()
-
-  fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+  // Signing out says as whom.
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Sign out', description: 'ana@example.com' }),
+  )
 
   // The sign-in page asks the server again: a session kept in the app
   // would send the browser back to the sections.

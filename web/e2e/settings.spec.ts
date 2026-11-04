@@ -22,7 +22,7 @@ test("the account's name and time zone are saved, and come back", async ({ page 
 
   // The list says them.
   await page.getByRole('main').getByRole('link', { name: 'Settings' }).click()
-  await expect(page.getByText('Signed in as Ana M.')).toBeVisible()
+  await expect(page.getByRole('main').getByText('Ana M.', { exact: true })).toBeVisible()
   await expect(page.getByText('English · Europe/Kyiv · the day from 04:00')).toBeVisible()
 
   // As they were, for the other tests.

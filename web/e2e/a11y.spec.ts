@@ -417,6 +417,7 @@ const screens: Screen[] = [
     '/settings/notifications',
     '/settings/users',
     '/settings/household',
+    '/settings/changes',
   ].map((path) => ({
     name: path.slice(1).replace('/', '-'),
     open: async (page: Page) => {

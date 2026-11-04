@@ -133,6 +133,16 @@ function asked(fetch: ReturnType<typeof fakeServer>, key: string): number {
   }).length
 }
 
+// desktop makes the window a desktop's width, as matchMedia says.
+function desktop() {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query === '(min-width: 64rem)',
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }))
+}
+
 // summaryOf is what a row of a list says of its value.
 function summaryOf(row: HTMLElement): string | null | undefined {
   return document.getElementById(row.getAttribute('aria-describedby') ?? '')?.textContent
@@ -170,10 +180,23 @@ test('the settings are rows that say their value, each leading to its page and b
   await waitFor(() => {
     expect(summaryOf(devices)).toBe('2 access keys')
   })
-  expect(summaryOf(screen.getByRole('button', { name: 'Sign out' }))).toBe(
-    'Signed in as Ana (ana@example.com).',
+  // Whose they are, over them; signing out last, as whom, with no
+  // chevron of a page.
+  expect(within(screen.getByRole('main')).getByText('Ana', { exact: true })).toBeDefined()
+  expect(screen.getByText('your server')).toBeDefined()
+  const rows = within(within(screen.getByRole('main')).getByRole('list')).getAllByRole('listitem')
+  const signOut = within(rows.at(-1) ?? document.body).getByRole('button', { name: 'Sign out' })
+  expect(summaryOf(signOut)).toBe('ana@example.com')
+  expect(summaryOf(screen.getByRole('link', { name: 'Recent changes' }))).toBe(
+    'What you and your AI coach changed lately, and its undo',
   )
+  // Under them, the server's version, whose the data are and a copy of
+  // them.
   expect((await screen.findByTestId('server-version')).textContent).toBe('v0.9.0')
+  expect(screen.getByText(/your data, your server/)).toBeDefined()
+  expect(screen.getByRole('link', { name: 'Export ZIP' }).getAttribute('href')).toBe(
+    '/api/v1/account/export',
+  )
 
   fireEvent.click(devices)
   expect(await screen.findByRole('heading', { name: 'Devices and AI coaches' })).toBeDefined()
@@ -188,6 +211,32 @@ test('the settings are rows that say their value, each leading to its page and b
   fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Settings' }))
   await screen.findByRole('heading', { name: 'Settings', level: 1 })
   expect(router.state.location.pathname).toBe('/settings')
+})
+
+test('on a desktop the list stays beside the page open of it, the first open at first', async () => {
+  desktop()
+  settingsServer()
+  const router = renderAt('/settings')
+
+  // The settings' title, the list, and the first's page beside it.
+  expect(await screen.findByRole('heading', { name: 'Settings', level: 1 })).toBeDefined()
+  expect(await screen.findByRole('heading', { name: 'Appearance', level: 2 })).toBeDefined()
+  expect(router.state.location.pathname).toBe('/settings/appearance')
+  expect(screen.getByRole('link', { name: 'Appearance' }).getAttribute('aria-current')).toBe('page')
+  // Another row opens its page there; the list stays, and the page has
+  // no way back to it.
+  fireEvent.click(screen.getByRole('link', { name: 'Devices and AI coaches' }))
+  expect(
+    await screen.findByRole('heading', { name: 'Devices and AI coaches', level: 2 }),
+  ).toBeDefined()
+  expect(router.state.location.pathname).toBe('/settings/devices')
+  expect(
+    screen.getByRole('link', { name: 'Devices and AI coaches' }).getAttribute('aria-current'),
+  ).toBe('page')
+  expect(screen.getByRole('link', { name: 'Appearance' }).getAttribute('aria-current')).toBeNull()
+  expect(within(screen.getByRole('main')).queryByRole('link', { name: 'Settings' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'Sign out' })).toBeDefined()
+  expect((await screen.findByTestId('server-version')).textContent).toBe('v0.9.0')
 })
 
 test("the user's name, language, time zone and day's start are changed, and the app follows", async () => {
@@ -225,9 +274,7 @@ test("the account's settings are saved, and the page and the list have them back
   fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Settings' }))
   const row = await screen.findByRole('link', { name: 'Account, language and day' })
   expect(summaryOf(row)).toBe('English · Europe/London · the day from 05:00')
-  expect(summaryOf(screen.getByRole('button', { name: 'Sign out' }))).toBe(
-    'Signed in as Ana M. (ana@example.com).',
-  )
+  expect(within(screen.getByRole('main')).getByText('Ana M.', { exact: true })).toBeDefined()
   fireEvent.click(row)
   const again = await account()
   expect(again.getByLabelText('Name')).toHaveProperty('value', 'Ana M.')

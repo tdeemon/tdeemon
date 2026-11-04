@@ -16,13 +16,17 @@ export type RowPath =
   | '/settings/notifications'
   | '/settings/users'
   | '/settings/household'
+  | '/settings/changes'
 
+// A link to the page open beside its list (a desktop's settings) is in
+// the brand's soft colour, as the mockup's master-detail has it.
 const rowClass =
-  'flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset lg:px-5'
+  'group flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset aria-[current=page]:bg-primary-soft aria-[current=page]:text-primary lg:px-5'
 
 // ListRow is a row of a list of settings, as a whole a link to its page
 // (to) or a button (onClick): an icon, a name, the summary of its value
-// under it, cut to two lines, and, for a link, a chevron. Its name is its
+// under it, cut to two lines, and, for a link, a chevron (but beside the
+// page it opens: chevron false). Its name is its
 // title, from its words (the summary hidden from them), and the summary
 // describes it: so the name holds what it shows, as one is labelled. It is 56 px high at least, a
 // thumb's target with room. A summary that warns (a profile a plan still
@@ -32,12 +36,14 @@ export function ListRow({
   title,
   summary,
   warn = false,
+  chevron = true,
   ...action
 }: {
   icon: LucideIcon
   title: string
   summary?: ReactNode
   warn?: boolean
+  chevron?: boolean
 } & (
   | { to: RowPath; onClick?: never; disabled?: never }
   | { to?: never; onClick: () => void; disabled?: boolean }
@@ -50,7 +56,7 @@ export function ListRow({
     <>
       <span
         aria-hidden
-        className="flex size-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-muted-foreground"
+        className="flex size-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-muted-foreground group-aria-[current=page]:bg-card group-aria-[current=page]:text-primary"
       >
         <Icon strokeWidth={1.75} className="size-4.5" />
       </span>
@@ -62,7 +68,9 @@ export function ListRow({
             aria-hidden
             className={cn(
               'line-clamp-2 block text-small',
-              warn ? 'text-warning' : 'text-muted-foreground',
+              warn
+                ? 'text-warning'
+                : 'text-muted-foreground group-aria-[current=page]:text-primary',
             )}
           >
             {summary}
@@ -87,7 +95,9 @@ export function ListRow({
       ) : (
         <Link to={action.to} {...named} className={rowClass}>
           {content}
-          <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          {chevron && (
+            <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          )}
         </Link>
       )}
     </li>

@@ -79,16 +79,18 @@ function serve(changes: () => Change[], undo: Handler) {
   return undos
 }
 
-test('the settings list the recent changes, each said with when and by whom', async () => {
+test('the settings lead to the recent changes, each said with when and by whom', async () => {
   serve(
     () => latest,
     () => problem(500),
   )
   renderAt('/settings')
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Recent changes' }))
+  // The settings' row of them leads to their page.
+  fireEvent.click(await screen.findByRole('link', { name: 'Recent changes' }))
 
-  const sheet = within(await screen.findByRole('dialog', { name: 'Recent changes' }))
+  await screen.findByRole('heading', { name: 'Recent changes', level: 1 })
+  const sheet = within(screen.getByRole('main'))
   const rows = await sheet.findAllByRole('listitem')
   expect(rows.map((r) => r.textContent)).toEqual([
     'Deleted: Skyr bowl1:14 PM · youUndo',
@@ -128,10 +130,8 @@ test('the next change is taken back from the list, after its toast is gone, and 
       })
     },
   )
-  renderAt('/settings')
-
-  fireEvent.click(await screen.findByRole('button', { name: 'Recent changes' }))
-  const sheet = within(await screen.findByRole('dialog', { name: 'Recent changes' }))
+  renderAt('/settings/changes')
+  const sheet = within(await screen.findByRole('main'))
   fireEvent.click(await sheet.findByRole('button', { name: 'Undo: Deleted: Skyr bowl' }))
 
   expect(await screen.findByText('Undone: a meal deleted.')).toBeDefined()
@@ -194,8 +194,10 @@ test('an undo is said though its row went before the page came again', async () 
   })
   renderAt('/settings')
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Recent changes' }))
-  const sheet = within(await screen.findByRole('dialog', { name: 'Recent changes' }))
+  // The settings' row of them leads to their page.
+  fireEvent.click(await screen.findByRole('link', { name: 'Recent changes' }))
+  await screen.findByRole('heading', { name: 'Recent changes', level: 1 })
+  const sheet = within(screen.getByRole('main'))
   fireEvent.click(await sheet.findByRole('button', { name: 'Undo: Deleted: Skyr bowl' }))
   expect(await sheet.findByRole('button', { name: 'Undo: Logged: Oats + 2' })).toBeDefined()
   for (const release of waiting) {
@@ -213,8 +215,10 @@ test('an undo another change came before says so, in Croatian too', async () => 
   })
   renderAt('/settings')
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Zadnje promjene' }))
-  const sheet = within(await screen.findByRole('dialog', { name: 'Zadnje promjene' }))
+  // The settings' row of them leads to their page.
+  fireEvent.click(await screen.findByRole('link', { name: 'Zadnje promjene' }))
+  await screen.findByRole('heading', { name: 'Zadnje promjene', level: 1 })
+  const sheet = within(screen.getByRole('main'))
   expect((await sheet.findAllByRole('listitem')).map((r) => r.textContent)).toContain(
     'Upisano: Oats + 213:14 · AI trener',
   )
@@ -230,9 +234,7 @@ test('with no change yet, the list says so', async () => {
     () => [],
     () => problem(404),
   )
-  renderAt('/settings')
-
-  fireEvent.click(await screen.findByRole('button', { name: 'Recent changes' }))
-  const sheet = within(await screen.findByRole('dialog', { name: 'Recent changes' }))
+  renderAt('/settings/changes')
+  const sheet = within(await screen.findByRole('main'))
   expect(await sheet.findByText('No changes yet.')).toBeDefined()
 })

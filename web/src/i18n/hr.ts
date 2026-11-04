@@ -87,13 +87,13 @@ export const hr: Messages = {
   close: 'Zatvori',
   signIn: {
     title: 'Prijava',
-    email: 'Email',
+    email: 'E-mail',
     password: 'Lozinka',
     submit: 'Prijavi se',
     submitting: 'Prijava…',
     or: 'ili',
-    with: (provider: string) => `Prijavi se putem usluge ${provider}`,
-    wrong: 'Pogrešan email ili lozinka.',
+    with: (provider: string) => `Nastavi putem usluge ${provider}`,
+    wrong: 'Pogrešan e-mail ili lozinka.',
     tooMany: (seconds: number) =>
       `Previše neuspjelih prijava. Pokušaj ponovno za ${wait(seconds)}.`,
     busy: (seconds: number) => `Server je zauzet. Pokušaj ponovno za ${wait(seconds)}.`,
@@ -1206,8 +1206,10 @@ export const hr: Messages = {
     revoked: (n: number) =>
       `${plural('hr', n, { one: 'Opozvan', few: 'Opozvana', other: 'Opozvano' })} ${String(n)} ${plural('hr', n, { one: 'pristupni ključ', few: 'pristupna ključa', other: 'pristupnih ključeva' })}.`,
     signOut: 'Odjavi se',
-    signedInAs: (name: string, email: string) => `Prijavljeni račun: ${name} (${email}).`,
     signOutFailed: 'Odjava nije uspjela. Pokušaj ponovno.',
+    yourServer: 'tvoj server',
+    yourData: 'tvoji podaci, tvoj server',
+    exportZip: 'Izvoz ZIP',
     data: {
       title: 'Tvoji podaci',
       export: 'Izvezi svoje podatke',
@@ -1236,7 +1238,7 @@ export const hr: Messages = {
     hint: 'Tko smije koristiti ovaj server.',
     notAdmin: 'Korisnicima upravlja samo admin.',
     invite: 'Pozovi nekoga',
-    email: 'Email',
+    email: 'E-mail',
     role: 'Uloga',
     roles: { user: 'Korisnik', admin: 'Admin' },
     makeLink: 'Napravi poveznicu pozivnice',
