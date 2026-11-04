@@ -706,7 +706,9 @@ day had already, as the meal logged a minute ago is not the next; with
 nothing searched for, the first meals (two on a phone, three on a
 desktop) are cards on top of the first list, named by the meal of the
 day ("For a snack"), and a food that is a card's only one is not listed
-again under them; Meals lists them all.
+again under them; Meals lists them all. While the meal being logged
+has items, a meal of before's Repeat is Add, which puts its items in
+it, not logs it alone.
 The slot and the order are the app's: the server says only when.
 The charts read
 `GET /api/v1/history?from=&to=&granularity=day|week`, the tool
@@ -1565,8 +1567,8 @@ the first spec.
     at its top), and at the right on a desktop, 440 px wide (Esc said in
     its head), dragged away by its title; its × stays, for the keyboard
     and a screen reader. What a finger taps is 44 px or more either way,
-    but a link in a sentence. A sheet has one primary button at a time,
-    and none waits disabled for what it needs. Log a meal is titled by
+    but a link in a sentence. A sheet has one primary button at a time;
+    Log a meal's never waits disabled for what it needs. Log a meal is titled by
     the meal of the day of its time ("Snack"), the time under it with a
     way to change it and the meal's name. A food's + puts it in the meal
     in the amount its row says (the last eaten, or its default, with its

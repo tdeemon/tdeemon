@@ -106,6 +106,7 @@ export function Tray({
           <Button
             variant="ghost"
             size="sm"
+            data-edit=""
             className="shrink-0 text-primary"
             aria-expanded={open}
             aria-controls={`${id}-items`}
@@ -184,6 +185,7 @@ function TrayItem({
         <Button
           variant="ghost"
           size="icon-sm"
+          data-remove=""
           className="-my-1 shrink-0"
           aria-label={t.log.remove(name)}
           disabled={held}

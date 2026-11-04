@@ -572,6 +572,9 @@ export const en = {
     mealLine: (when: string, items: string, kcal: string) => `${when} · ${items} · ${kcal}`,
     repeat: 'Repeat',
     repeatOf: (name: string) => `Repeat: ${name}`,
+    // A meal of before's items put in the meal being logged.
+    addMeal: 'Add',
+    addMealOf: (name: string) => `Add to the meal: ${name}`,
     // The meals eaten lately at the meal of the day being logged.
     forSlot: {
       breakfast: 'For breakfast',

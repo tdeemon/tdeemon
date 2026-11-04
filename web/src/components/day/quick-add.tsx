@@ -11,6 +11,7 @@ import {
   entryValues,
   entryWrong,
   foodEntry,
+  itemEntries,
   itemOf,
   repeatOf,
   type Entry,
@@ -277,7 +278,13 @@ function Composer({
     send({ id: uuidv7(), ...(what ? { description: what } : {}), ...when, items })
   }
 
+  // repeat logs a meal of before again, or, while the meal being logged
+  // has items, puts its items in it.
   function repeat(meal: Meal) {
+    if (entries.length > 0) {
+      setEntries((es) => [...es, ...itemEntries(meal, t)])
+      return
+    }
     const when = eatenAt()
     if (when !== undefined) {
       repeating.current = true
@@ -325,9 +332,21 @@ function Composer({
         setEntries((es) => es.map((e) => (e.key === entry.key ? entry : e)))
         setWrongs(({ [entry.key]: _was, ...rest }) => rest)
       }}
+      // The focus goes to the next item's ×, or the one before, or Edit
+      // amounts; with the tray gone, to the search.
       onRemove={(key) => {
-        setEntries((es) => es.filter((e) => e.key !== key))
-        setWrongs(({ [key]: _was, ...rest }) => rest)
+        const index = entries.findIndex((e) => e.key === key)
+        flushSync(() => {
+          setEntries((es) => es.filter((e) => e.key !== key))
+          setWrongs(({ [key]: _was, ...rest }) => rest)
+        })
+        const foot = keys.current?.querySelector('[data-tray]')
+        const removes = [...(foot?.querySelectorAll<HTMLElement>('[data-remove]') ?? [])]
+        const next =
+          removes[Math.min(index, removes.length - 1)] ??
+          foot?.querySelector<HTMLElement>('[data-edit]') ??
+          search.current
+        next?.focus()
       }}
       after={
         after === undefined
@@ -382,6 +401,7 @@ function Composer({
     onKey.current = (e: KeyboardEvent) => {
       if (
         e.key === 'Enter' &&
+        !e.isComposing &&
         (e.metaKey || e.ctrlKey) &&
         making === undefined &&
         entries.length > 0 &&
@@ -534,6 +554,7 @@ function Composer({
               }
             }}
             stay
+            filling={entries.length > 0}
             onMake={(m, button) => {
               maker.current = button
               setMaking(m)

@@ -1,6 +1,15 @@
 import { Tabs } from '@base-ui/react/tabs'
 import { Check, Plus, Repeat2, ScanBarcode, Search, X } from 'lucide-react'
-import { Fragment, useEffect, useId, useRef, useState, type RefObject } from 'react'
+import {
+  createContext,
+  Fragment,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react'
 import { flushSync } from 'react-dom'
 
 import { $api } from '@/api/client'
@@ -62,7 +71,8 @@ const firstFoods = 12
 // tap on it takes it out again (onUnchoose). A new food, an estimate (its
 // kcal chip) or a barcode is the sheet's next step (onMake, with the
 // button that asks for it). onAdd takes an entry, checked; onRepeat a
-// meal to log again. search is the field the sheet's focus goes to. With
+// meal to log again, or, while the meal has items (filling), to add to it.
+// search is the field the sheet's focus goes to. With
 // stay, the search stays as it was once a food is added, for the next of
 // the same results, its words selected: a keystroke types anew. For a
 // recipe's ingredients (ingredient), it finds foods alone, never the
@@ -84,6 +94,7 @@ export function Finder({
   onUnchoose,
   onLog,
   stay = false,
+  filling = false,
 }: {
   search: RefObject<HTMLInputElement | null>
   query: string
@@ -99,6 +110,9 @@ export function Finder({
   onUnchoose?: (food: Food) => void
   onLog?: (entry: Entry) => void
   stay?: boolean
+  // Whether the meal being logged has items, which a meal of before's
+  // button adds to rather than logs alone.
+  filling?: boolean
 }) {
   const t = useMessages()
   const f = useFormat()
@@ -300,142 +314,176 @@ export function Finder({
   )
 
   return (
-    <div ref={results} className="space-y-3">
-      {/* The search, and beside it a barcode's: the camera, or its digits. */}
-      <div className="flex h-12 items-center rounded-lg border border-control-border bg-card pr-0.5 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
-        <label className="flex h-full min-w-0 flex-1 items-center gap-2.5 pl-3.5">
-          <Search aria-hidden className="size-4.5 shrink-0 text-muted-foreground" />
-          <span className="sr-only">{t.log.search}</span>
-          <input
-            ref={search}
-            type="search"
-            value={query}
-            placeholder={t.log.findHint}
-            autoComplete="off"
-            className="h-full min-w-0 flex-1 bg-transparent text-base outline-none [&::-webkit-search-cancel-button]:hidden"
-            onChange={(e) => {
-              stale.current = false
-              onQuery(e.currentTarget.value)
-            }}
-            onFocus={(e) => {
-              if (stale.current) {
+    <IntoMeal.Provider value={filling}>
+      <div ref={results} className="space-y-3">
+        {/* The search, and beside it a barcode's: the camera, or its digits. */}
+        <div className="flex h-12 items-center rounded-lg border border-control-border bg-card pr-0.5 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
+          <label className="flex h-full min-w-0 flex-1 items-center gap-2.5 pl-3.5">
+            <Search aria-hidden className="size-4.5 shrink-0 text-muted-foreground" />
+            <span className="sr-only">{t.log.search}</span>
+            <input
+              ref={search}
+              type="search"
+              value={query}
+              placeholder={t.log.findHint}
+              autoComplete="off"
+              className="h-full min-w-0 flex-1 bg-transparent text-base outline-none [&::-webkit-search-cancel-button]:hidden"
+              onChange={(e) => {
                 stale.current = false
-                e.currentTarget.select()
-              }
-            }}
-            onKeyDown={(e) => {
-              // Enter opens the first food found, for its amount; it sends
-              // nothing.
-              if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
-                e.preventDefault()
-                const first = shown[list].foods[0]
-                if (first !== undefined) {
-                  pick(first)
+                onQuery(e.currentTarget.value)
+              }}
+              onFocus={(e) => {
+                if (stale.current) {
+                  stale.current = false
+                  e.currentTarget.select()
                 }
-              }
-            }}
-          />
-        </label>
-        {query !== '' && (
+              }}
+              onKeyDown={(e) => {
+                // Enter opens the first food found, for its amount; it sends
+                // nothing.
+                if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
+                  e.preventDefault()
+                  const first = shown[list].foods[0]
+                  if (first !== undefined) {
+                    pick(first)
+                  }
+                }
+              }}
+            />
+          </label>
+          {query !== '' && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 text-muted-foreground"
+              aria-label={t.log.clear}
+              onClick={() => {
+                stale.current = false
+                onQuery('')
+                search.current?.focus()
+              }}
+            >
+              <X aria-hidden />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
-            className="shrink-0 text-muted-foreground"
-            aria-label={t.log.clear}
-            onClick={() => {
-              stale.current = false
-              onQuery('')
-              search.current?.focus()
+            className="shrink-0"
+            aria-label={t.scan.title}
+            onClick={(e) => {
+              onMake('scan', e.currentTarget)
             }}
           >
-            <X aria-hidden />
+            <ScanBarcode aria-hidden />
           </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0"
-          aria-label={t.scan.title}
-          onClick={(e) => {
-            onMake('scan', e.currentTarget)
+        </div>
+        <Tabs.Root
+          value={list}
+          onValueChange={(value) => {
+            if (isList(value)) {
+              setList(value)
+            }
           }}
         >
-          <ScanBarcode aria-hidden />
+          {/* The lists, and an estimate's kcal at the end of their row. */}
+          <div className="flex flex-wrap gap-x-1.5 gap-y-3">
+            <Tabs.List aria-label={t.log.lists} className="flex flex-wrap gap-x-1.5 gap-y-3">
+              {shownLists.map((l) => (
+                <Tabs.Tab key={l} value={l} className={cn(chipClass, activeChip)}>
+                  {l === list && <Check aria-hidden className="size-4 shrink-0" />}
+                  {l === 'all' && ingredient === undefined ? t.log.forSlot[at.slot] : t.log.list[l]}
+                </Tabs.Tab>
+              ))}
+            </Tabs.List>
+            {ingredient === undefined && (
+              <button
+                type="button"
+                aria-label={t.log.quickKcal}
+                className={cn(
+                  chipClass,
+                  'hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                )}
+                onClick={(e) => {
+                  onMake('estimate', e.currentTarget)
+                }}
+              >
+                <Plus aria-hidden className="size-4 shrink-0" />
+                kcal
+              </button>
+            )}
+          </div>
+          {shownLists.map((l) => (
+            <Tabs.Panel
+              key={l}
+              value={l}
+              className="space-y-3 rounded-md pt-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {l === 'all' && suggested.length > 0 && (
+                <>
+                  <ul
+                    aria-label={t.log.picks}
+                    className={cn('grid gap-2', cards === 3 ? 'grid-cols-3' : 'grid-cols-2')}
+                  >
+                    {suggested.map((meal) => (
+                      <Suggestion key={meal.id} meal={meal} onRepeat={repeat} />
+                    ))}
+                  </ul>
+                  {shown.all.foods.length > 0 && (
+                    <h3 className="text-caption font-semibold tracking-wide text-muted-foreground uppercase">
+                      {t.log.foodsAndRecipes}
+                    </h3>
+                  )}
+                </>
+              )}
+              {resultsOf(l)}
+            </Tabs.Panel>
+          ))}
+        </Tabs.Root>
+        <Button
+          variant="outline"
+          className="h-auto min-h-11 w-full border-dashed py-2 whitespace-normal"
+          onClick={(e) => {
+            onMake('food', e.currentTarget)
+          }}
+        >
+          <Plus aria-hidden />
+          {t.log.newFood}
         </Button>
       </div>
-      <Tabs.Root
-        value={list}
-        onValueChange={(value) => {
-          if (isList(value)) {
-            setList(value)
-          }
-        }}
-      >
-        {/* The lists, and an estimate's kcal at the end of their row. */}
-        <div className="flex flex-wrap gap-x-1.5 gap-y-3">
-          <Tabs.List aria-label={t.log.lists} className="flex flex-wrap gap-x-1.5 gap-y-3">
-            {shownLists.map((l) => (
-              <Tabs.Tab key={l} value={l} className={cn(chipClass, activeChip)}>
-                {l === list && <Check aria-hidden className="size-4 shrink-0" />}
-                {l === 'all' && ingredient === undefined ? t.log.forSlot[at.slot] : t.log.list[l]}
-              </Tabs.Tab>
-            ))}
-          </Tabs.List>
-          {ingredient === undefined && (
-            <button
-              type="button"
-              aria-label={t.log.quickKcal}
-              className={cn(
-                chipClass,
-                'hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-              )}
-              onClick={(e) => {
-                onMake('estimate', e.currentTarget)
-              }}
-            >
-              <Plus aria-hidden className="size-4 shrink-0" />
-              kcal
-            </button>
-          )}
-        </div>
-        {shownLists.map((l) => (
-          <Tabs.Panel
-            key={l}
-            value={l}
-            className="space-y-3 rounded-md pt-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {l === 'all' && suggested.length > 0 && (
-              <>
-                <ul
-                  aria-label={t.log.picks}
-                  className={cn('grid gap-2', cards === 3 ? 'grid-cols-3' : 'grid-cols-2')}
-                >
-                  {suggested.map((meal) => (
-                    <Suggestion key={meal.id} meal={meal} onRepeat={repeat} />
-                  ))}
-                </ul>
-                {shown.all.foods.length > 0 && (
-                  <h3 className="text-caption font-semibold tracking-wide text-muted-foreground uppercase">
-                    {t.log.foodsAndRecipes}
-                  </h3>
-                )}
-              </>
-            )}
-            {resultsOf(l)}
-          </Tabs.Panel>
-        ))}
-      </Tabs.Root>
-      <Button
-        variant="outline"
-        className="h-auto min-h-11 w-full border-dashed py-2 whitespace-normal"
-        onClick={(e) => {
-          onMake('food', e.currentTarget)
-        }}
-      >
-        <Plus aria-hidden />
-        {t.log.newFood}
-      </Button>
-    </div>
+    </IntoMeal.Provider>
+  )
+}
+
+// IntoMeal tells the meals of before that the meal being logged has
+// items: their button adds theirs to it, not logs them alone.
+const IntoMeal = createContext(false)
+
+// RepeatButton is a meal of before's button, named by the meal (name):
+// Repeat, which logs it again, or, while the meal being logged has items
+// (IntoMeal), Add, which puts its items in it.
+function RepeatButton({
+  name,
+  className,
+  onClick,
+}: {
+  name: string
+  className: string
+  onClick: () => void
+}) {
+  const t = useMessages()
+  const into = useContext(IntoMeal)
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className={cn('text-primary', className)}
+      aria-label={into ? t.log.addMealOf(name) : t.log.repeatOf(name)}
+      onClick={onClick}
+    >
+      {into ? <Plus aria-hidden /> : <Repeat2 aria-hidden />}
+      {into ? t.log.addMeal : t.log.repeat}
+    </Button>
   )
 }
 
@@ -453,18 +501,13 @@ function Suggestion({ meal, onRepeat }: { meal: RecentMeal; onRepeat: (meal: Mea
       <span className="text-caption text-muted-foreground">
         {[t.unit.kcal(f.number(meal.total.kcal)), t.meal.items(meal.items.length)].join(' · ')}
       </span>
-      <Button
-        variant="outline"
-        size="sm"
-        className="mt-auto w-full text-primary"
-        aria-label={t.log.repeatOf(name)}
+      <RepeatButton
+        name={name}
+        className="mt-auto w-full"
         onClick={() => {
           onRepeat(meal)
         }}
-      >
-        <Repeat2 aria-hidden />
-        {t.log.repeat}
-      </Button>
+      />
     </li>
   )
 }
@@ -935,18 +978,13 @@ function MealResult({
           )}
         </span>
       </span>
-      <Button
-        variant="outline"
-        size="sm"
-        className="shrink-0 text-primary"
-        aria-label={t.log.repeatOf(name)}
+      <RepeatButton
+        name={name}
+        className="shrink-0"
         onClick={() => {
           onRepeat(meal)
         }}
-      >
-        <Repeat2 aria-hidden />
-        {t.log.repeat}
-      </Button>
+      />
     </li>
   )
 }

@@ -123,15 +123,15 @@ export function NewEntry({
             className="space-y-2"
             onSubmit={(e) => {
               e.preventDefault()
+              // Logged at once, but by Add to meal: this once, wrong or not.
+              const add = adding.current
+              adding.current = false
               const filled = quickFilled(estimate, t.log.quickName)
               const why = entryWrong(filled, f.parse)
               if (why !== undefined) {
                 setWrong(why)
                 return
               }
-              // Logged at once, but by Add to meal.
-              const add = adding.current
-              adding.current = false
               if (onLog !== undefined && !add) {
                 onLog(filled)
               } else {

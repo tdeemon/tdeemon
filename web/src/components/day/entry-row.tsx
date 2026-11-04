@@ -84,6 +84,10 @@ export function EntryRow({
       </li>
     )
   }
+  // An item of a meal of before is Log a meal's alone.
+  if (entry.kind === 'item') {
+    return null
+  }
   return (
     <li className="py-2">
       <EstimateFields

@@ -1875,3 +1875,60 @@ test("⌘↵ in a food's amount that cannot log yet leaves the focus in the shee
   expect(server.sent).toEqual([])
   expect(document.activeElement).toBe(sheet.getByRole('button', { name: /^Log lunch · / }))
 })
+
+test("with items in the meal, a meal of before's button adds its items, and logs nothing alone", async () => {
+  const server = logServer()
+  renderAt('/')
+
+  const sheet = await openSheet()
+  await sheet.findByRole('button', { name: 'Repeat: Porridge' })
+  await giveEstimate(sheet, 'Tea', '5')
+  const add = sheet.getByRole('button', { name: 'Add to the meal: Porridge' })
+  fireEvent.click(add)
+
+  expect(server.sent).toEqual([])
+  expect(basket(sheet)).toEqual(['Tea · 5 kcal', 'Rye bread · 207 kcal'])
+  fireEvent.click(sheet.getByRole('button', { name: 'Log snack · 212 kcal' }))
+  await waitFor(() => {
+    expect(server.sent).toHaveLength(1)
+  })
+  expect(server.sent[0]).toMatchObject({
+    items: [{ name: 'Tea' }, { food_id: bread.id, serving: 'slice', servings: 2 }],
+  })
+})
+
+test('an estimate given up once by Add to meal is logged by Enter after', async () => {
+  const server = logServer()
+  renderAt('/')
+
+  const sheet = await openSheet()
+  fireEvent.click(sheet.getByRole('button', { name: 'An estimate in kcal' }))
+  fireEvent.click(sheet.getByRole('button', { name: 'Add to meal' }))
+  expect(sheet.getByRole('alert').textContent).toBe('Write a number, such as 72.5.')
+  const kcal = sheet.getByLabelText('Energy (kcal)')
+  fireEvent.change(kcal, { target: { value: '300' } })
+  const form = kcal.closest('form')
+  if (form === null) {
+    throw new Error('no form')
+  }
+  // Enter in a field: the form sent by its primary, Log.
+  fireEvent.submit(form)
+
+  await waitFor(() => {
+    expect(server.sent).toHaveLength(1)
+  })
+})
+
+test('an item taken out of the tray gives the focus to the next, then to the search', async () => {
+  logServer()
+  renderAt('/')
+
+  const sheet = await openSheet()
+  await giveEstimate(sheet, 'Tea', '5')
+  await giveEstimate(sheet, 'Jam', '40')
+  basket(sheet)
+  fireEvent.click(sheet.getByRole('button', { name: 'Remove: Tea' }))
+  expect(document.activeElement).toBe(sheet.getByRole('button', { name: 'Remove: Jam' }))
+  fireEvent.click(sheet.getByRole('button', { name: 'Remove: Jam' }))
+  expect(document.activeElement).toBe(sheet.getByLabelText('Find a food or a meal'))
+})

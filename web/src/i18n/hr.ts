@@ -478,7 +478,7 @@ export const hr: Messages = {
     results: 'Što se može dodati',
     clear: 'Očisti pretragu',
     foodsAndRecipes: 'Namirnice i recepti',
-    picks: 'Obroci za ponoviti',
+    picks: 'Obroci za ponavljanje',
     quickKcal: 'Procjena u kcal',
     quickName: 'Brzi unos kcal',
     catalog: 'katalog',
@@ -487,6 +487,8 @@ export const hr: Messages = {
     mealLine: (when: string, items: string, kcal: string) => `${when} · ${items} · ${kcal}`,
     repeat: 'Ponovi',
     repeatOf: (name: string) => `Ponovi: ${name}`,
+    addMeal: 'Dodaj',
+    addMealOf: (name: string) => `Dodaj u obrok: ${name}`,
     forSlot: {
       breakfast: 'Za doručak',
       lunch: 'Za ručak',
