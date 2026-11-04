@@ -6,9 +6,9 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
-	"github.com/zarnautovic/tdeemon/internal/domain/meal"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/domain/meal"
 )
 
 // A version 7 id carries the millisecond it was made; any other id

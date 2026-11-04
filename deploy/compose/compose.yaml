@@ -10,10 +10,10 @@ name: tdeemon
 
 services:
   tdeemon:
-    # The newest release. Pin a version (ghcr.io/zarnautovic/tdeemon:X.Y.Z)
+    # The newest release. Pin a version (ghcr.io/tdeemon/tdeemon:X.Y.Z)
     # to upgrade only when you choose; TDEEMON_IMAGE names another image,
     # such as one you built.
-    image: ${TDEEMON_IMAGE:-ghcr.io/zarnautovic/tdeemon:latest}
+    image: ${TDEEMON_IMAGE:-ghcr.io/tdeemon/tdeemon:latest}
     restart: unless-stopped
     # The settings, the secret key among them, come from .env (mode 0600),
     # never from environment: here, where `docker inspect` and this file's

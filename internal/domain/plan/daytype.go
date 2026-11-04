@@ -5,7 +5,7 @@ import (
 	"math/bits"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
 )
 
 // DayType is the type of a day a target is given for.

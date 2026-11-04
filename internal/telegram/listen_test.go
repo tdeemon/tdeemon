@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/telegram"
+	"github.com/tdeemon/tdeemon/internal/telegram"
 )
 
 // Updates asks getUpdates for the messages from the offset on, waiting,

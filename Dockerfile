@@ -45,7 +45,7 @@ FROM gcr.io/distroless/static-debian13:nonroot@sha256:516757106de35205efb70b91ba
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="tdeemon" \
       org.opencontainers.image.description="Self-hosted, AI-first nutrition tracking with an adaptive TDEE" \
-      org.opencontainers.image.source="https://github.com/zarnautovic/tdeemon" \
+      org.opencontainers.image.source="https://github.com/tdeemon/tdeemon" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.version="${VERSION}"
 COPY --from=build /out/tdeemon /tdeemon

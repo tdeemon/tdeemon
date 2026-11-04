@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/domain/plan"
-	"github.com/zarnautovic/tdeemon/internal/domain/profile"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/domain/plan"
+	"github.com/tdeemon/tdeemon/internal/domain/profile"
 )
 
 // The plan the verdicts are judged on: 2400 kcal on training days, 2200

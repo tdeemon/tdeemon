@@ -8,7 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/zarnautovic/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/auth"
 )
 
 // A tool names the scopes of the tokens that may call it: one that does

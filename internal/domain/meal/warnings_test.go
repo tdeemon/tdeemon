@@ -7,7 +7,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
 )
 
 func codes(ws []Warning) string {

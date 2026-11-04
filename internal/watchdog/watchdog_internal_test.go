@@ -3,7 +3,7 @@ package watchdog
 import (
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
 )
 
 // Every language a user can have has the alarms' phrases, so a language

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
-	"github.com/zarnautovic/tdeemon/internal/domain/meal"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/domain/meal"
 )
 
 var (

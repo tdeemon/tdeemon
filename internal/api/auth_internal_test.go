@@ -15,10 +15,10 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/zarnautovic/tdeemon/internal/auth"
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
-	"github.com/zarnautovic/tdeemon/internal/store"
-	"github.com/zarnautovic/tdeemon/internal/store/storetest"
+	"github.com/tdeemon/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/store/storetest"
 )
 
 // newTestSessions is the sessions of a plain-HTTP instance at now.

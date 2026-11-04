@@ -3,11 +3,11 @@ package autopilot
 import (
 	"slices"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/event"
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/domain/plan"
-	"github.com/zarnautovic/tdeemon/internal/domain/proposal"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/event"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/domain/plan"
+	"github.com/tdeemon/tdeemon/internal/domain/proposal"
 )
 
 // By is who applied a revision of the plan, as the autopilot's history

@@ -1,7 +1,7 @@
 package demo
 
 import (
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
 )
 
 // name is a text in each language the app speaks.

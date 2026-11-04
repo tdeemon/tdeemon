@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/metric"
+	"github.com/tdeemon/tdeemon/internal/domain/metric"
 )
 
 // The payloads in testdata/hae have the shape of what Health Auto Export

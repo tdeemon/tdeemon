@@ -9,7 +9,7 @@ import (
 	"embed"
 	"strings"
 
-	"github.com/zarnautovic/tdeemon/docs"
+	"github.com/tdeemon/tdeemon/docs"
 )
 
 // A Session is a coaching session: a review the user asks for, in steps.

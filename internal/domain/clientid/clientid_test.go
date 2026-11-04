@@ -6,7 +6,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/clientid"
+	"github.com/tdeemon/tdeemon/internal/domain/clientid"
 )
 
 // A new id is a version 7 id near the clock, and a refusal names what

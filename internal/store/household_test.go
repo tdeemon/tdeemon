@@ -7,7 +7,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 // invite is inviter's invite of invited's address into their household,

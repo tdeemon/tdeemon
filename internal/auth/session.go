@@ -9,7 +9,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
 )
 
 // SessionLifetime is how long a web session lasts from sign-in, however

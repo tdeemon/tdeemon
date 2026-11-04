@@ -10,7 +10,7 @@ import (
 	"golang.org/x/text/language"
 	"modernc.org/sqlite"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
 )
 
 // A list of names in order is in the order of the user's language: in

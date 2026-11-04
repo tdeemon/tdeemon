@@ -8,10 +8,10 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/clientid"
-	"github.com/zarnautovic/tdeemon/internal/domain/event"
-	"github.com/zarnautovic/tdeemon/internal/domain/meal"
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/domain/clientid"
+	"github.com/tdeemon/tdeemon/internal/domain/event"
+	"github.com/tdeemon/tdeemon/internal/domain/meal"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 // An undo sent again under its id is the same undo: it answers with the

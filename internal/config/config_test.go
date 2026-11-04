@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/config"
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/config"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
 )
 
 // env returns a LookupFunc backed by m instead of the process environment,

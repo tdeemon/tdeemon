@@ -8,10 +8,10 @@ import (
 	"strings"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/event"
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
-	"github.com/zarnautovic/tdeemon/internal/domain/metric"
-	"github.com/zarnautovic/tdeemon/internal/domain/recipe"
+	"github.com/tdeemon/tdeemon/internal/domain/event"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/domain/metric"
+	"github.com/tdeemon/tdeemon/internal/domain/recipe"
 )
 
 // MaxRecentChanges bounds RecentChanges.

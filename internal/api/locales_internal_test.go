@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
 )
 
 // Every language a user can have has the morning summary's phrases and

@@ -24,12 +24,12 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
-	"github.com/zarnautovic/tdeemon/internal/auth"
-	"github.com/zarnautovic/tdeemon/internal/config"
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/off"
-	"github.com/zarnautovic/tdeemon/internal/push"
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/config"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/off"
+	"github.com/tdeemon/tdeemon/internal/push"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 // Version is the version of the JSON API: part of every path and the

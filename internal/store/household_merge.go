@@ -15,9 +15,9 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
-	"github.com/zarnautovic/tdeemon/internal/domain/meal"
-	"github.com/zarnautovic/tdeemon/internal/domain/recipe"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/domain/meal"
+	"github.com/tdeemon/tdeemon/internal/domain/recipe"
 )
 
 // The merge of two kitchens (story 408), when a user (U) accepts an

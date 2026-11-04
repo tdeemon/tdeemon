@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/api"
-	"github.com/zarnautovic/tdeemon/internal/auth"
-	"github.com/zarnautovic/tdeemon/internal/domain/event"
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/domain/profile"
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/api"
+	"github.com/tdeemon/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/domain/event"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/domain/profile"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 // sessionOf returns a session of in's user, straight from the store.

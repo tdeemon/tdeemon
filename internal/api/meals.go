@@ -12,11 +12,11 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/zarnautovic/tdeemon/internal/auth"
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
-	"github.com/zarnautovic/tdeemon/internal/domain/meal"
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/domain/meal"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 // clientOf is what a meal of the request of p is logged through: the web

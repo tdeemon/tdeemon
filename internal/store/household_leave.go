@@ -10,8 +10,8 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/event"
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/domain/event"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
 )
 
 // A member leaves their household (story 408), and no one else takes

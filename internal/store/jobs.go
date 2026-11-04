@@ -7,7 +7,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
 )
 
 // Users returns every user, deactivated ones too, in the order they were

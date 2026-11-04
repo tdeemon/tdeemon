@@ -16,17 +16,17 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/event"
-	"github.com/zarnautovic/tdeemon/internal/domain/metric"
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
-	"github.com/zarnautovic/tdeemon/internal/notify"
-	"github.com/zarnautovic/tdeemon/internal/push"
-	"github.com/zarnautovic/tdeemon/internal/scheduler"
-	"github.com/zarnautovic/tdeemon/internal/store"
-	"github.com/zarnautovic/tdeemon/internal/store/storetest"
-	"github.com/zarnautovic/tdeemon/internal/telegram"
-	"github.com/zarnautovic/tdeemon/internal/watchdog"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/event"
+	"github.com/tdeemon/tdeemon/internal/domain/metric"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/notify"
+	"github.com/tdeemon/tdeemon/internal/push"
+	"github.com/tdeemon/tdeemon/internal/scheduler"
+	"github.com/tdeemon/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/store/storetest"
+	"github.com/tdeemon/tdeemon/internal/telegram"
+	"github.com/tdeemon/tdeemon/internal/watchdog"
 )
 
 var actor = event.Actor{Kind: event.User, Client: "web"}

@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/plan"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/plan"
 )
 
 func TestMeasureASpan(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"math"
 	"slices"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
 )
 
 // Point is the trend weight on a day.

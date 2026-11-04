@@ -15,8 +15,8 @@ import (
 	"time"
 	_ "time/tzdata" // TZ must resolve even in images without system tzdata.
 
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/off"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/off"
 )
 
 // Prefix is prepended to the name of every variable Load reads, except TZ.

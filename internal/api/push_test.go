@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/api"
+	"github.com/tdeemon/tdeemon/internal/api"
 )
 
 type pushSubscriptionAnswer struct {

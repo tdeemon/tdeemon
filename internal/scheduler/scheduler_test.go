@@ -13,10 +13,10 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
-	"github.com/zarnautovic/tdeemon/internal/scheduler"
-	"github.com/zarnautovic/tdeemon/internal/store"
-	"github.com/zarnautovic/tdeemon/internal/store/storetest"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/scheduler"
+	"github.com/tdeemon/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/store/storetest"
 )
 
 func newUser(t *testing.T, db *store.DB, email, tz string) {

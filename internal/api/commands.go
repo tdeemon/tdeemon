@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
-	"github.com/zarnautovic/tdeemon/internal/telegram"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/telegram"
 )
 
 // commandAge is how old a command may be and still be answered: one

@@ -7,8 +7,8 @@ package recovery
 import (
 	"math"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/metric"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/metric"
 )
 
 // Flags of a recovery that falls short.

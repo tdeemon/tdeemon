@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
 )
 
 // Mode is how far the user lets the autopilot go.

@@ -6,7 +6,7 @@ import (
 	"math"
 	"slices"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
 )
 
 // Kcal a gram of protein, carbs and fat gives, the Atwater factors.

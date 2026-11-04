@@ -10,11 +10,11 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
-	"github.com/zarnautovic/tdeemon/internal/notify"
-	"github.com/zarnautovic/tdeemon/internal/push"
-	"github.com/zarnautovic/tdeemon/internal/server"
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/notify"
+	"github.com/tdeemon/tdeemon/internal/push"
+	"github.com/tdeemon/tdeemon/internal/server"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 // A household (story 408): users of the instance who keep one kitchen,

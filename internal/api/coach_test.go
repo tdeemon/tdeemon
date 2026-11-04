@@ -10,12 +10,12 @@ import (
 	"testing"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/domain/metric"
-	"github.com/zarnautovic/tdeemon/internal/domain/plan"
-	"github.com/zarnautovic/tdeemon/internal/domain/profile"
-	"github.com/zarnautovic/tdeemon/internal/domain/proposal"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/domain/metric"
+	"github.com/tdeemon/tdeemon/internal/domain/plan"
+	"github.com/tdeemon/tdeemon/internal/domain/profile"
+	"github.com/tdeemon/tdeemon/internal/domain/proposal"
 )
 
 // planOutcome is what a target's days came to, as the tests read it.

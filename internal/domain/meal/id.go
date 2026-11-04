@@ -5,7 +5,7 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/clientid"
+	"github.com/tdeemon/tdeemon/internal/domain/clientid"
 )
 
 // How near the clock a new meal's id must be (DESIGN.md §9), as for any

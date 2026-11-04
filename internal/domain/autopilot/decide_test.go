@@ -4,11 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/calibration"
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/domain/plan"
-	"github.com/zarnautovic/tdeemon/internal/domain/profile"
+	"github.com/tdeemon/tdeemon/internal/domain/calibration"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/domain/plan"
+	"github.com/tdeemon/tdeemon/internal/domain/profile"
 )
 
 // The made-up user the reviews are of: 180 cm, 90 kg (a BMI of 27.8),

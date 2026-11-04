@@ -6,9 +6,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/event"
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/event"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 var checkInDay = day.Date{Year: 2026, Month: 10, Day: 21}

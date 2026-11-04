@@ -8,16 +8,16 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/auth"
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/domain/proposal"
-	"github.com/zarnautovic/tdeemon/internal/store/storetest"
+	"github.com/tdeemon/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/domain/proposal"
+	"github.com/tdeemon/tdeemon/internal/store/storetest"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/autopilot"
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
-	"github.com/zarnautovic/tdeemon/internal/push"
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/domain/autopilot"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/push"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 // A review of Monday, November 2: a cut losing 0.31 % a week against

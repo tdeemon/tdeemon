@@ -9,12 +9,12 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/event"
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/domain/plan"
-	"github.com/zarnautovic/tdeemon/internal/domain/profile"
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/event"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/domain/plan"
+	"github.com/tdeemon/tdeemon/internal/domain/profile"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 func date(t *testing.T, s string) day.Date {

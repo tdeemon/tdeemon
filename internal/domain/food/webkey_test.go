@@ -15,7 +15,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
 )
 
 var update = flag.Bool("update", false, "rewrite the web app's table of Key and its cases from food.Key")

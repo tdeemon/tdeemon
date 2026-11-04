@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/metric"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/metric"
 )
 
 // ErrNotHAE reports a body that is no Health Auto Export payload: no

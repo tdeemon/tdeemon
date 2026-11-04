@@ -1,7 +1,7 @@
 package calibration
 
 import (
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
 )
 
 // Body is what a window says of the body besides the weight: the data of

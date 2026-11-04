@@ -21,7 +21,7 @@ import (
 	"unicode/utf8"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
 )
 
 // DefaultBaseURL is the world's Open Food Facts.

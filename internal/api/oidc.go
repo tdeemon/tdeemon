@@ -20,10 +20,10 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"golang.org/x/oauth2"
 
-	"github.com/zarnautovic/tdeemon/internal/auth"
-	"github.com/zarnautovic/tdeemon/internal/config"
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/config"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 // The browser flow of an OpenID Connect sign-in (authorization code with

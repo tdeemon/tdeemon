@@ -12,19 +12,19 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/zarnautovic/tdeemon/internal/auth"
-	"github.com/zarnautovic/tdeemon/internal/domain/autopilot"
-	"github.com/zarnautovic/tdeemon/internal/domain/calibration"
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/event"
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/domain/plan"
-	"github.com/zarnautovic/tdeemon/internal/domain/proposal"
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
-	"github.com/zarnautovic/tdeemon/internal/notify"
-	"github.com/zarnautovic/tdeemon/internal/scheduler"
-	"github.com/zarnautovic/tdeemon/internal/store"
-	"github.com/zarnautovic/tdeemon/internal/telegram"
+	"github.com/tdeemon/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/domain/autopilot"
+	"github.com/tdeemon/tdeemon/internal/domain/calibration"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/event"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/domain/plan"
+	"github.com/tdeemon/tdeemon/internal/domain/proposal"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/notify"
+	"github.com/tdeemon/tdeemon/internal/scheduler"
+	"github.com/tdeemon/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/telegram"
 )
 
 // reviewProposals is how many of a user's latest proposals the review

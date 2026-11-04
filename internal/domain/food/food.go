@@ -19,7 +19,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/text"
+	"github.com/tdeemon/tdeemon/internal/domain/text"
 )
 
 // Basis is what a food's nutrients refer to.

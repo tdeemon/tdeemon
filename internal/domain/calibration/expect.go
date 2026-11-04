@@ -3,8 +3,8 @@ package calibration
 import (
 	"math"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/plan"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/plan"
 )
 
 // Expected reads how often the user logged and weighed in over the

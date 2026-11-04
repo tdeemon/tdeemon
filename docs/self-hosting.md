@@ -78,7 +78,7 @@ docker compose up -d --wait
   `COMPOSE_FILE=compose.yaml:compose.caddy.yaml` in `.env`, so that every
   `docker compose` command, an upgrade's too, takes both files; then
   `docker compose up -d --wait` as above.
-- The image is `ghcr.io/zarnautovic/tdeemon:latest`, the newest
+- The image is `ghcr.io/tdeemon/tdeemon:latest`, the newest
   release; pin `:X.Y.Z` in `compose.yaml` to upgrade when you choose.
   `docker compose pull && docker compose up -d --wait` upgrades.
 - Its health check is `tdeemon healthcheck`: it asks the server's
@@ -96,7 +96,7 @@ docker compose up -d --wait
 The image holds one static binary with the web app inside, on distroless,
 and runs as an unprivileged user (uid 65532). Everything it writes goes to
 one volume at `/data`, so the root filesystem can be read-only. Each
-release publishes it as `ghcr.io/zarnautovic/tdeemon:X.Y.Z` (also `:X.Y` and
+release publishes it as `ghcr.io/tdeemon/tdeemon:X.Y.Z` (also `:X.Y` and
 `:latest`),
 for linux/amd64 and linux/arm64; or build it yourself:
 
@@ -696,8 +696,8 @@ To restore a snapshot:
 ## Upgrade
 
 Each merge that changes behaviour is a release: a `vX.Y.Z` tag, its
-notes on the [releases page](https://github.com/zarnautovic/tdeemon/releases),
-and the image `ghcr.io/zarnautovic/tdeemon:X.Y.Z`, also tagged `X.Y` and
+notes on the [releases page](https://github.com/tdeemon/tdeemon/releases),
+and the image `ghcr.io/tdeemon/tdeemon:X.Y.Z`, also tagged `X.Y` and
 `latest`.
 
 1. Read the notes of the releases since yours: a **BREAKING** entry says

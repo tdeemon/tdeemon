@@ -1,4 +1,4 @@
-module github.com/zarnautovic/tdeemon
+module github.com/tdeemon/tdeemon
 
 go 1.27.3
 

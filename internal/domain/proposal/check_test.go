@@ -4,9 +4,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/limits"
-	"github.com/zarnautovic/tdeemon/internal/domain/plan"
-	"github.com/zarnautovic/tdeemon/internal/domain/profile"
+	"github.com/tdeemon/tdeemon/internal/domain/limits"
+	"github.com/tdeemon/tdeemon/internal/domain/plan"
+	"github.com/tdeemon/tdeemon/internal/domain/profile"
 )
 
 // checkState is a man of 85 kg at 180 cm, in a cut since 2026-09-07,

@@ -53,7 +53,7 @@ With Docker and Compose, on the machine that will run it:
 
 ```sh
 mkdir tdeemon && cd tdeemon
-base=https://raw.githubusercontent.com/zarnautovic/tdeemon/main/deploy/compose
+base=https://raw.githubusercontent.com/tdeemon/tdeemon/main/deploy/compose
 curl -fsSLO "$base/compose.yaml" -O "$base/compose.caddy.yaml" -O "$base/Caddyfile" -O "$base/.env.example"
 
 # The address it will have, such as https://tdeemon.example.com;

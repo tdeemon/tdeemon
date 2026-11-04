@@ -14,7 +14,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 // exportFormat names the shape of tdeemon.json in an export: its tables

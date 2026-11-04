@@ -15,10 +15,10 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/zarnautovic/tdeemon/internal/api"
+	"github.com/tdeemon/tdeemon/internal/api"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/day"
-	"github.com/zarnautovic/tdeemon/internal/domain/meal"
+	"github.com/tdeemon/tdeemon/internal/domain/day"
+	"github.com/tdeemon/tdeemon/internal/domain/meal"
 )
 
 // bearerTransport sends every request with token.

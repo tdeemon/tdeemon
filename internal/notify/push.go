@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/user"
-	"github.com/zarnautovic/tdeemon/internal/push"
-	"github.com/zarnautovic/tdeemon/internal/store"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/push"
+	"github.com/tdeemon/tdeemon/internal/store"
 )
 
 // Pushed is what Push did with each of a user's subscriptions.

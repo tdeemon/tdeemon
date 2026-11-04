@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zarnautovic/tdeemon/internal/config"
+	"github.com/tdeemon/tdeemon/internal/config"
 )
 
 // healthcheckTimeout bounds a health check: a server that does not answer

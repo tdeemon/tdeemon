@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	"github.com/zarnautovic/tdeemon/internal/coaching"
+	"github.com/tdeemon/tdeemon/internal/coaching"
 )
 
 // coachingGuideInput names the session whose guide is asked for. Its enum

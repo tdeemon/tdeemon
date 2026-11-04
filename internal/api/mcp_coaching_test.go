@@ -7,8 +7,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/zarnautovic/tdeemon/docs"
-	"github.com/zarnautovic/tdeemon/internal/coaching"
+	"github.com/tdeemon/tdeemon/docs"
+	"github.com/tdeemon/tdeemon/internal/coaching"
 )
 
 // The coaching sessions are MCP's prompts, which a client shows as

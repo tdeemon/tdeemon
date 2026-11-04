@@ -21,7 +21,7 @@ esac
 
 # Paths are relative to the repository root, wherever this is run from.
 cd "$(dirname "$0")/.."
-repo="${GITHUB_REPOSITORY:-zarnautovic/tdeemon}"
+repo="${GITHUB_REPOSITORY:-tdeemon/tdeemon}"
 ruleset=.github/rulesets/main.json
 
 # Everything is read and checked before the first write, so a failure

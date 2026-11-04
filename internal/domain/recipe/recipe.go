@@ -16,8 +16,8 @@ import (
 	"strconv"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
-	"github.com/zarnautovic/tdeemon/internal/domain/meal"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/domain/meal"
 )
 
 // Limits on a recipe.

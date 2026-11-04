@@ -32,5 +32,5 @@ enough to show the problem.
 tdeemon has one maintainer, so a fix comes as soon as it can, the most
 serious first.
 
-[releases]: https://github.com/zarnautovic/tdeemon/releases/latest
-[report]: https://github.com/zarnautovic/tdeemon/security/advisories/new
+[releases]: https://github.com/tdeemon/tdeemon/releases/latest
+[report]: https://github.com/tdeemon/tdeemon/security/advisories/new

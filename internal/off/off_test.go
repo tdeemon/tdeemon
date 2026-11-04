@@ -10,8 +10,8 @@ import (
 	"testing"
 	"uuid"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/food"
-	"github.com/zarnautovic/tdeemon/internal/off"
+	"github.com/tdeemon/tdeemon/internal/domain/food"
+	"github.com/tdeemon/tdeemon/internal/off"
 )
 
 // server is an Open Food Facts that answers with answer, status and the

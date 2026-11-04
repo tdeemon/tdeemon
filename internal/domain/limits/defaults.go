@@ -3,7 +3,7 @@ package limits
 import (
 	"math"
 
-	"github.com/zarnautovic/tdeemon/internal/domain/plan"
+	"github.com/tdeemon/tdeemon/internal/domain/plan"
 )
 
 // DefaultRate returns the rate, in % of the trend weight a week, a phase
