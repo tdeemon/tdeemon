@@ -27,8 +27,8 @@ export function PlanHistoryPage() {
   const { rev } = useSearch({ from: '/app/plan/history' })
   const plan = $api.useQuery('get', '/api/v1/plan')
   const r = t.plan.revisions
-  // The revision taken back here last, and the one that took it back.
-  const [takenBack, setTakenBack] = useState<{ from: string; by: string } | undefined>(undefined)
+  // Each revision taken back here, and the one that took it back.
+  const [takenBack, setTakenBack] = useState<Readonly<Record<string, string>>>({})
 
   let body
   if (plan.data === undefined) {
@@ -43,10 +43,16 @@ export function PlanHistoryPage() {
     const { revisions } = plan.data
     // A revision asked for that the plan's latest do not hold is said
     // gone, not shown as another.
-    const shown =
-      rev !== undefined && takenBack?.from === rev && !revisions.some((x) => x.id === rev)
-        ? takenBack.by
-        : rev
+    // A revision gone from the latest gives its place to the one that
+    // took it back, and that one, gone too, to its own.
+    let shown = rev
+    for (let hops = 0; hops < 20; hops++) {
+      const by = shown === undefined ? undefined : takenBack[shown]
+      if (by === undefined || revisions.some((x) => x.id === shown)) {
+        break
+      }
+      shown = by
+    }
     const asked = shown === undefined ? undefined : revisions.find((x) => x.id === shown)
     const missing = shown !== undefined && asked === undefined
     const open = asked ?? (desktop && rev === undefined ? revisions[0] : undefined)
@@ -59,7 +65,7 @@ export function PlanHistoryPage() {
           rev={open}
           plan={plan.data}
           onTakenBack={(by) => {
-            setTakenBack({ from: open.id, by })
+            setTakenBack((was) => ({ ...was, [open.id]: by }))
           }}
         />
       )

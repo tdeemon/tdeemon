@@ -1569,6 +1569,17 @@ test('the oldest revision taken back gives its place to the one that took it bac
     decided_at: '2026-10-23T09:00:00Z',
     decided_by: { client: 'web' },
   }
+  const again: Proposal = {
+    ...back,
+    id: '0193c3a5-0000-7000-8000-0000000000ca',
+    reverts: back.id,
+    changes: {
+      ...sundays.changes,
+      training_weekdays: { before: ['monday'], after: ['sunday', 'monday'] },
+    },
+    created_at: '2026-10-24T09:00:00Z',
+    decided_at: '2026-10-24T09:00:00Z',
+  }
   let plan = planBody({ revisions: [sundays] })
   fakeServer({
     ...signedIn(),
@@ -1583,12 +1594,26 @@ test('the oldest revision taken back gives its place to the one that took it bac
       plan = planBody({ revisions: [applied], revisions_more: true })
       return Response.json({ proposal: applied })
     },
+    [`POST /api/v1/proposals/${back.id}/revert`]: () =>
+      Response.json({ proposal: again, preview }, { status: 201 }),
+    [`POST /api/v1/proposals/${again.id}/apply`]: () => {
+      // Nor the one that took it back.
+      const applied = { ...again, status: 'applied' as const }
+      plan = planBody({ revisions: [applied], revisions_more: true })
+      return Response.json({ proposal: applied })
+    },
   })
   const region = within(await revisionAt(sundays.id))
   fireEvent.click(region.getByRole('button', { name: 'Take back' }))
   fireEvent.click(region.getByRole('button', { name: 'Take back' }))
   await screen.findByText('Change taken back')
-  expect(await screen.findByRole('region', { name: /^Oct 23, by you/ })).toBeDefined()
+  const next = within(await screen.findByRole('region', { name: /^Oct 23, by you/ }))
+  expect(screen.queryByText('This change is older than the latest ones shown here.')).toBeNull()
+
+  // Taken back in turn, it gives its place to the next.
+  fireEvent.click(next.getByRole('button', { name: 'Take back' }))
+  fireEvent.click(next.getByRole('button', { name: 'Take back' }))
+  expect(await screen.findByRole('region', { name: /^Oct 24, by you/ })).toBeDefined()
   expect(screen.queryByText('This change is older than the latest ones shown here.')).toBeNull()
 })
 
