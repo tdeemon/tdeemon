@@ -64,7 +64,8 @@ test('G, then a letter, goes to each section, as the shortcuts list', async ({ p
   await goes('f', '/foods', 'Foods')
   await goes('p', '/progress', 'Progress')
   await goes('l', '/plan', 'Plan')
-  await goes('s', '/settings', 'Settings')
+  // The settings open their first page beside their list.
+  await goes('s', '/settings/appearance', 'Appearance')
   await goes('d', '/', 'Today')
   await page.keyboard.press('?')
   const list = page.getByRole('dialog', { name: 'Keyboard shortcuts' })

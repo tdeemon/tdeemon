@@ -229,10 +229,10 @@ const screens: Screen[] = [
   {
     name: 'changes',
     open: async (page) => {
-      await page.goto('/settings')
-      await settled(page)
-      await page.getByRole('button', { name: /^(Recent changes|Zadnje promjene)$/ }).click()
-      await expect(page.getByRole('dialog').getByRole('listitem').first()).toBeVisible()
+      // A page of the settings' (beside their list on a desktop): its
+      // list, an ordered one, the settings' not.
+      await page.goto('/settings/changes')
+      await expect(page.locator('main ol > li').first()).toBeVisible()
       await settled(page)
     },
   },
@@ -417,7 +417,6 @@ const screens: Screen[] = [
     '/settings/notifications',
     '/settings/users',
     '/settings/household',
-    '/settings/changes',
   ].map((path) => ({
     name: path.slice(1).replace('/', '-'),
     open: async (page: Page) => {

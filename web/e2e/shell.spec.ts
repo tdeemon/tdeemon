@@ -160,17 +160,18 @@ test('a window too low for the rail keeps the bar, and the settings a tap away',
   await low(640, 384)
 
   // A desktop's window made low: another day's header, a desktop's, the
-  // foods beside their list, and the progress have the mark too.
+  // foods beside their list, and the progress have the mark too, to the
+  // settings' first page beside their list.
   await page.setViewportSize({ width: 1440, height: 400 })
   const reaches = async (path: string) => {
     await page.goto(path)
     await mark.click()
-    await expect(page).toHaveURL('/settings')
+    await expect(page).toHaveURL('/settings/appearance')
   }
   await page.goto('/')
   await page.getByRole('link', { name: 'The day before' }).click()
   await mark.click()
-  await expect(page).toHaveURL('/settings')
+  await expect(page).toHaveURL('/settings/appearance')
   await reaches('/foods')
   await reaches('/progress')
 })
