@@ -1,5 +1,5 @@
-# tdeemon with Docker Compose: one service, one volume. README.md,
-# "Docker Compose", has the steps:
+# tdeemon with Docker Compose: one service, one volume. The README's
+# quick start and docs/self-hosting.md ("Docker Compose") have the steps:
 #
 #   cp .env.example .env && chmod 600 .env   # then fill it in
 #   docker compose up -d --wait

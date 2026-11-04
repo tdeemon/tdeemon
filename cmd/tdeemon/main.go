@@ -108,7 +108,7 @@ least once, which creates and migrates it; the server may be running.
 
 Configure tdeemon with TDEEMON_* environment variables; the user commands
 read the same ones as the server. See
-https://github.com/zarnautovic/tdeemon#configuration
+https://github.com/zarnautovic/tdeemon/blob/main/docs/self-hosting.md#configuration
 `
 
 // errUsage marks a command line tdeemon does not accept.

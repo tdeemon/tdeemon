@@ -4,7 +4,7 @@
 #   docker run --read-only --stop-timeout 20 -v tdeemon-data:/data \
 #     -p 8080:8080 --env-file .env tdeemon
 #
-# README.md ("Docker") has the details. The image needs no writable path
+# docs/self-hosting.md ("Docker") has the details. The image needs no writable path
 # besides /data: SQLite keeps its temporary storage in memory.
 #
 # The web and build stages run on the build machine's platform and Go

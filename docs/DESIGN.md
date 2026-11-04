@@ -1467,8 +1467,10 @@ the first spec.
   - Env, all prefixed `TDEEMON_`: `BASE_URL`, `SECRET_KEY`, `LISTEN`,
     `DATA_DIR`, `BACKUP_KEEP`, `LOG_LEVEL`, `LOG_FORMAT`, the optional
     `OIDC_*`, `LIMIT_*`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_API_URL` and
-    `OPEN_FOOD_FACTS_URL`; plus the standard `TZ`. The README has the current table.
-  - Ships a `docker-compose.yml`; the homelab gets its own manifests.
+    `OPEN_FOOD_FACTS_URL`; plus the standard `TZ`. docs/self-hosting.md
+    has the current table.
+  - Ships `deploy/compose` (Compose, alone or behind Caddy); the homelab
+    gets its own manifests.
 - **Backup:** the host's, a snapshot of the volume. A snapshot before
   every migration; a daily `VACUUM INTO` snapshot with retention
   (`TDEEMON_BACKUP_KEEP`, none by default) for a backup that copies
