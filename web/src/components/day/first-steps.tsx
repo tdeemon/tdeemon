@@ -15,6 +15,7 @@ import { useId, useRef, useState, type ReactNode } from 'react'
 import { $api } from '@/api/client'
 import { sessionQuery } from '@/api/session'
 import type { Day } from '@/api/types'
+import { mealName } from '@/components/day/meal-slot'
 import { WeighIn } from '@/components/day/weigh-in'
 import { Button } from '@/components/ui/button'
 import { useFormat } from '@/i18n/format'
@@ -72,7 +73,9 @@ function Steps({ day, user }: { day: Day; user: string }) {
   const trend = summary.data?.trend
   const profile = me.data?.profile
   const caller = tokens.data?.tokens.find((k) => k.last_used_at !== undefined)
-  const firstMeal = day.meals[0] ?? meals.data?.meals[0]
+  // The earliest meal known: today's first, else the oldest of the
+  // recent ones, which come newest first.
+  const firstMeal = day.meals[0] ?? meals.data?.meals.at(-1)
   const done = {
     profile: profile?.missing.length === 0,
     weighIn: weight !== undefined || trend !== undefined,
@@ -143,7 +146,7 @@ function Steps({ day, user }: { day: Day; user: string }) {
             done={done.meal}
             title={done.meal ? s.mealDone : s.meal}
             to={{ to: '/', search: { log: true } }}
-            meta={firstMeal?.description ?? s.mealHint}
+            meta={firstMeal === undefined ? s.mealHint : mealName(firstMeal, t)}
           />
         </ol>
       </div>
@@ -238,6 +241,8 @@ function AskCoach({ user }: { user: string }) {
   const [copied, setCopied] = useState<'yes' | 'failed' | undefined>(undefined)
 
   async function copy() {
+    // Said anew at each copy, a second's too.
+    setCopied(undefined)
     try {
       await navigator.clipboard.writeText(s.prompt)
       setCopied('yes')

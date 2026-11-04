@@ -273,3 +273,32 @@ test('the first steps speak Croatian', async () => {
     steps4.getByRole('region', { name: 'Zatim: zatraži plan od svog AI trenera' }),
   ).toBeDefined()
 })
+
+test('a first meal without a description is named by what was in it', async () => {
+  fakeServer({
+    ...newUser(),
+    'GET /api/v1/meals/recent': () =>
+      Response.json({
+        meals: [
+          {
+            ...meal,
+            description: undefined,
+            items: [
+              {
+                id: '0193c3a5-0000-7000-8000-0000000000e1',
+                name: 'Banana',
+                amount_g: 120,
+                nutrients: { kcal: 107, protein: 1.3, carbs: 27, fat: 0.4 },
+              },
+            ],
+            eaten: [{ at: meal.eaten_at, day: '2026-10-22' }],
+          },
+        ],
+      }),
+  })
+  renderAt('/')
+
+  const steps4 = await card()
+  expect(await steps4.findByText('1 of 4')).toBeDefined()
+  expect(steps()[3]).toBe('Done:Your first meal|Banana')
+})

@@ -7,9 +7,9 @@ import { cn } from '@/lib/utils'
 
 // LoadError is what a page, or a part of one, shows in place of its data
 // when it did not come: as an empty place is, an icon in a soft tile,
-// what did not (title, a page's), why, and a way to ask again. A page's is a card where its content would be, under its
-// header, the navigation around it as ever; a part's is in the part's
-// card. Neither is in an error's red: nothing the user did is wrong.
+// what did not (title, a page's), why, and a way to ask again. A page's
+// is a card where its content would be, under its header, the navigation
+// around it as ever; a part's is in the part's card. Neither is in an error's red: nothing the user did is wrong.
 export function LoadError({
   title,
   error,
