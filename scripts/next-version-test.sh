@@ -92,6 +92,24 @@ case_ "v1.0.0, fix!" v2.0.0 v1.0.0 -m "fix!: x"
 case_ "v1.0.0, refactor!" v2.0.0 v1.0.0 -m "refactor!: x"
 case_ "v1.0.0, docs" "" v1.0.0 -m "docs: x"
 
+case_ "Release-As v1.0.0 on a feat" v1.0.0 v0.164.0 -m "feat: x" -m "Release-As: v1.0.0"
+case_ "Release-As v1.0.0 on docs" v1.0.0 v0.164.0 -m "docs: x" -m "Release-As: v1.0.0"
+case_ "Release-As after a breaking change" v1.0.0 v0.164.0 -m "fix!: x" -m "Release-As: v1.0.0"
+case_ "Release-As without a tag" v1.0.0 - -m "chore: x" -m "Release-As: v1.0.0"
+case_ "Release-As not past the last tag" error v0.164.0 -m "feat: x" -m "Release-As: v0.164.0"
+case_ "Release-As behind the computed version" error v1.2.0 -m "feat: x" -m "Release-As: v1.2.1"
+case_ "Release-As not a version" error v0.164.0 -m "feat: x" -m "Release-As: 1.0"
+case_ "Release-As after a BREAKING CHANGE footer" v1.0.0 v0.164.0 -m "fix: x" -m $'BREAKING CHANGE: y\nRelease-As: v1.0.0'
+case_ "Release-As in a sentence is no trailer" v0.165.0 v0.164.0 -m "feat: x" -m "We use Release-As: v1.0.0 later, and more text follows here."
+
+repo
+commit -m "feat: x"
+git tag v0.1.0
+commit -m "docs: y" -m "Release-As: v1.0.0"
+git tag v1.0.0
+commit -m "fix: z"
+expect "Release-As behind the last tag" v1.0.1
+
 repo
 commit -m "feat: x"
 git tag v0.1.0
