@@ -527,6 +527,11 @@ function Composer({
                 setEntries((es) => [...es, entry])
               })
               submit([...entries, entry])
+              // Not sent (a time, an amount): the focus stays in the sheet,
+              // where the amount's field was.
+              if (!keys.current?.closest('[role="dialog"]')?.contains(document.activeElement)) {
+                logButton.current?.focus()
+              }
             }}
             stay
             onMake={(m, button) => {

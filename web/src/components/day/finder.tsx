@@ -774,8 +774,8 @@ export function Amount({
               return
             }
             e.preventDefault()
-            if (e.metaKey || e.ctrlKey) {
-              onLog?.(entry)
+            if ((e.metaKey || e.ctrlKey) && onLog !== undefined) {
+              onLog(entry)
             } else {
               onAdd(entry)
             }

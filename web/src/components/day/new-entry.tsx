@@ -62,6 +62,9 @@ export function NewEntry({
   const id = useId()
   const form = `${id}-form`
   const body = useRef<HTMLDivElement>(null)
+  const estimateForm = useRef<HTMLFormElement>(null)
+  // Whether the estimate goes on to the meal (Add to meal), not logged.
+  const adding = useRef(false)
   const [estimate, setEstimate] = useState<Entry & { kind: 'estimate' }>(() => ({
     key: uuidv7(),
     kind: 'estimate',
@@ -114,6 +117,7 @@ export function NewEntry({
           />
         ) : (
           <form
+            ref={estimateForm}
             id={form}
             noValidate
             className="space-y-2"
@@ -126,8 +130,9 @@ export function NewEntry({
                 return
               }
               // Logged at once, but by Add to meal.
-              const adding = e.nativeEvent.submitter?.dataset.add !== undefined
-              if (onLog !== undefined && !adding) {
+              const add = adding.current
+              adding.current = false
+              if (onLog !== undefined && !add) {
                 onLog(filled)
               } else {
                 onAdd(filled)
@@ -154,28 +159,29 @@ export function NewEntry({
         )}
       </div>
       <div className="flex gap-2 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        {/* The primary first, which Enter in a field presses; Add to meal
-            before it to the eye. */}
+        {/* No submit button of its own: Enter in a field presses the
+            primary, Log. */}
+        {logs && (
+          <Button
+            variant="outline"
+            className="h-13 shrink-0 text-base"
+            onClick={() => {
+              adding.current = true
+              estimateForm.current?.requestSubmit()
+            }}
+          >
+            {t.log.addToMeal}
+          </Button>
+        )}
         <Button
           type="submit"
           form={form}
-          className="order-2 h-13 min-w-0 flex-1 text-base"
+          className="h-13 min-w-0 flex-1 text-base"
           disabled={saving}
           focusableWhenDisabled
         >
           {ingredient ? t.recipes.addToRecipe : logs ? logAs(typedKcal) : t.log.addToMeal}
         </Button>
-        {logs && (
-          <Button
-            type="submit"
-            form={form}
-            variant="outline"
-            data-add=""
-            className="order-1 h-13 shrink-0 text-base"
-          >
-            {t.log.addToMeal}
-          </Button>
-        )}
       </div>
     </>
   )

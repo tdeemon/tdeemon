@@ -1859,3 +1859,19 @@ test("a checked + takes out the food's latest entry alone", async () => {
   fireEvent.click(sheet.getByRole('button', { name: 'Add: Rye bread', pressed: true }))
   expect(basket(sheet)).toEqual(['Rye bread · 2 slice · 207 kcal'])
 })
+
+test("⌘↵ in a food's amount that cannot log yet leaves the focus in the sheet", async () => {
+  const server = logServer('2026-10-21')
+  renderAt('/?date=2026-10-21')
+
+  const sheet = await openSheet('Lunch')
+  await giveEstimate(sheet, 'Tea')
+  fireEvent.click(sheet.getByRole('button', { name: 'Change the name and time' }))
+  fireEvent.change(sheet.getByLabelText('Time'), { target: { value: '19 pm' } })
+  await findRye(sheet)
+  fireEvent.keyDown(sheet.getByLabelText('Amount: Rye bread'), { key: 'Enter', ctrlKey: true })
+
+  expect(sheet.getByRole('alert').textContent).toBe('Type the time as 7:30 PM.')
+  expect(server.sent).toEqual([])
+  expect(document.activeElement).toBe(sheet.getByRole('button', { name: /^Log lunch · / }))
+})
