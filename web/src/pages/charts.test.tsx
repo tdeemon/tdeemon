@@ -710,6 +710,50 @@ test("a year's period asks for a year, its weeks a year's, the year said where i
   expect(sleep.querySelector('path')?.getAttribute('d')?.split('L')).toHaveLength(53)
 })
 
+// emptyWeek is a calendar week of nothing logged; over is laid over it.
+function emptyWeek(from: string, to: string, over: Partial<Week> = {}): Week {
+  return { from, to, logged_days: 0, weigh_ins: 0, training_days: 0, ...over }
+}
+
+// A week of weigh-ins alone is a row, its change unknown; one of nothing
+// at all is none.
+test('a week of nothing is no row, a week of weigh-ins alone is one', async () => {
+  progressServer({
+    'GET /api/v1/history': (r) =>
+      new URL(r.url).searchParams.get('granularity') === 'week'
+        ? Response.json({
+            from: '',
+            to: '',
+            days: [],
+            weeks: [
+              emptyWeek('2026-09-28', '2026-10-04'),
+              emptyWeek('2026-10-05', '2026-10-11', { weigh_ins: 5, trend_kg: 85 }),
+              emptyWeek('2026-10-12', '2026-10-18'),
+              emptyWeek('2026-10-19', '2026-10-22', {
+                logged_days: 4,
+                kcal: 2000,
+                protein: 150,
+                weigh_ins: 4,
+                trend_kg: 84.6,
+              }),
+            ],
+          })
+        : historyAnswer(r),
+  })
+  renderAt('/progress')
+
+  const weeks = await screen.findByRole('table', { name: 'By week' }, { timeout: 10_000 })
+  expect(
+    within(weeks)
+      .getAllByRole('row')
+      .map((r) => r.textContent),
+  ).toEqual([
+    'Weekkcalkcal a dayPProtein, g a dayΔ kgChange of the trend weight, kgDaysDays logged',
+    'Oct 19\u2009–\u2009222,000150—4/4',
+    'Oct 5\u2009–\u200911———0/7',
+  ])
+})
+
 test('the weeks are calendar weeks in a table, the latest first, the rest a tap away', async () => {
   progressServer()
   renderAt('/progress?days=90')
