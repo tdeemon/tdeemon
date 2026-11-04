@@ -3477,6 +3477,11 @@ export interface components {
             half_width?: number;
             /**
              * Format: double
+             * @description The average intake of the logged days from the first weigh-in to the last, in kcal a day: the TDEE is it less the weight's slope, at 7700 kcal a kg.
+             */
+            intake_kcal?: number;
+            /**
+             * Format: double
              * @description The measured TDEE, in kcal a day.
              */
             kcal?: number;

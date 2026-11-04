@@ -392,6 +392,22 @@ const screens: Screen[] = [
     },
   },
   {
+    // The weight's days as a table, and the TDEE's more layers.
+    name: 'progress-table',
+    open: async (page) => {
+      await page.goto('/progress')
+      await settled(page)
+      const weight = page.getByRole('region', { name: /^(Weight|Kilaža)$/ })
+      await weight.getByRole('button', { name: /^(Table|Tablica)$/ }).click()
+      await expect(weight.getByRole('table')).toBeVisible()
+      await page
+        .getByRole('region', { name: /^(TDEE and intake|TDEE i unos)$/ })
+        .getByRole('button', { name: /^(More layers|Više slojeva)$/ })
+        .click()
+      await settled(page)
+    },
+  },
+  {
     name: 'plan',
     open: async (page) => {
       await page.goto('/plan')

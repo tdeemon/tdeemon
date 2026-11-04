@@ -1,5 +1,10 @@
 import { BarChart, LineChart, ScatterChart } from 'echarts/charts'
-import { GridComponent, MarkLineComponent, TooltipComponent } from 'echarts/components'
+import {
+  GridComponent,
+  MarkAreaComponent,
+  MarkLineComponent,
+  TooltipComponent,
+} from 'echarts/components'
 import * as echarts from 'echarts/core'
 import { SVGRenderer } from 'echarts/renderers'
 import { useEffect, useRef } from 'react'
@@ -12,6 +17,7 @@ echarts.use([
   LineChart,
   ScatterChart,
   GridComponent,
+  MarkAreaComponent,
   MarkLineComponent,
   TooltipComponent,
   SVGRenderer,

@@ -4,6 +4,7 @@ import { afterEach, expect, test } from 'vitest'
 import {
   average7,
   eaten7,
+  fromFirst,
   goalShown,
   lineOption,
   nightOf,
@@ -77,29 +78,84 @@ test("a day's tooltip says its date and values in a line", () => {
   )
 })
 
-test('the TDEE is a line in a band of its interval, what was eaten dots, the target dashed', () => {
+test('the TDEE is a line in a band of its interval and what was eaten bars; more layers add the gap and the target', () => {
   const option = tdeeOption(days, words, palette)
   const s = series(option)
   expect(s.low).toEqual([2350, null, null])
   expect(s['80% interval']).toEqual([100, null, null])
   expect(s.TDEE).toEqual([2400, null, null])
   expect(s.Eaten).toEqual([2000, null, null])
-  expect(s['Target, 7-day average']).toEqual([2100, 2100, 2100])
+  // Two layers by default: no gap, no target.
+  expect(Object.keys(s).toSorted()).toEqual(['80% interval', 'Eaten', 'TDEE', 'low'])
+  const more = series(tdeeOption(days, words, palette, { more: true }))
+  expect(more['Target, 7-day average']).toEqual([2100, 2100, 2100])
+  expect(more['Eaten to TDEE, 7-day average']).toBeDefined()
   // No legend of ECharts': the card has its own, which wraps.
   expect(option.legend).toBeUndefined()
+})
+
+test('a chart starts at its first data, not at its span’s first day', () => {
+  const span = [day('2026-10-18'), day('2026-10-19'), ...days]
+  expect(fromFirst(span, (d) => d.weight_kg !== undefined).map((d) => d.date)).toEqual([
+    '2026-10-20',
+    '2026-10-21',
+    '2026-10-22',
+  ])
+  // Days of none are as they are.
+  expect(fromFirst(span, (d) => d.hrv !== undefined)).toHaveLength(5)
+})
+
+test('a proposal is marked on the chart it cites, its window shaded, in the coach’s colour', () => {
+  const cited = { window: { from: '2026-10-19', to: '2026-10-21' }, label: 'Proposal' }
+  const tdee = tdeeOption(days, words, palette, { cited })
+  const text = JSON.stringify(tdee)
+  // The window within the days, from their first; the line on the last.
+  expect(text).toContain('"markArea"')
+  expect(text).toContain('[[{"xAxis":"2026-10-20"},{"xAxis":"2026-10-21"}]]')
+  expect(text).toContain('"data":[{"xAxis":"2026-10-22"}]')
+  const svg = svgOf(tdee)
+  expect(svg).toContain(palette.coach)
+  expect(svg).toContain('Proposal')
+  // A window outside the days is not shaded; the line stays.
+  const outside = weightOption(days, words, palette, undefined, {
+    window: { from: '2026-09-01', to: '2026-09-07' },
+    label: 'Proposal',
+  })
+  expect(JSON.stringify(outside)).not.toContain('markArea')
+  expect(svgOf(outside)).toContain('Proposal')
+  expect(JSON.stringify(tdeeOption(days, words, palette))).not.toContain(palette.coach)
+})
+
+test('the trend weight is written at its end', () => {
+  expect(svgOf(weightOption(days, words, palette))).toContain('>82.5<')
+})
+
+test('a measurement over its usual range shades it', () => {
+  const values = [55, null, 57]
+  const of = {
+    name: 'Resting heart rate',
+    color: palette.blue,
+    values,
+    axis: String,
+    tip: String,
+  }
+  expect(
+    JSON.stringify(lineOption(days, words, palette, { ...of, usual: { low: 52, high: 57 } })),
+  ).toContain('[[{"yAxis":52},{"yAxis":57}]]')
+  expect(JSON.stringify(lineOption(days, words, palette, of))).not.toContain('markArea')
 })
 
 test("the target is its 7 days' average, a training day's and a rest day's not a zigzag", () => {
   const targets = [2400, 2000, 2400, 2000].map((kcal, i) =>
     day(`2026-10-2${String(i)}`, { target: { kcal, protein: 150, carbs: 200, fat: 60 } }),
   )
-  const option = tdeeOption(targets, words, palette)
+  const option = tdeeOption(targets, words, palette, { more: true })
   expect(series(option)['Target, 7-day average']).toEqual([2400, 2200, 2266.67, 2200])
   // A tooltip says the day's own.
   expect(tooltipOf(option, 1)).toBe('2026-10-21 · target 2000')
 })
 
-test("today's open day and a day left out are no dots of what was eaten (#207)", () => {
+test("today's open day and a day left out are no bars of what was eaten (#207)", () => {
   const eaten = { kcal: 360, protein: 20, carbs: 40, fat: 10 }
   const option = tdeeOption(
     [
@@ -195,13 +251,13 @@ test("the space between the TDEE and the 7 days' intake is a band, either way", 
     }),
   )
   expect(eaten7(eating)).toEqual([2000, 2300, 2300, 2300])
-  const s = series(tdeeOption(eating, words, palette))
+  const s = series(tdeeOption(eating, words, palette, { more: true }))
   // From the lower of the two, as high as they are apart.
   expect(s.gapFoot).toEqual([2000, 2300, 2300, 2300])
   expect(s['Eaten to TDEE, 7-day average']).toEqual([400, 100, 100, 100])
   // None without a TDEE.
   const intake = { kcal: 2000, protein: 150, carbs: 200, fat: 60 }
-  const before = series(tdeeOption([day('2026-10-20', { intake })], words, palette))
+  const before = series(tdeeOption([day('2026-10-20', { intake })], words, palette, { more: true }))
   expect(before.gapFoot).toEqual([null])
 })
 

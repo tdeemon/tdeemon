@@ -2,7 +2,12 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { BarChart, LineChart, ScatterChart } from 'echarts/charts'
-import { GridComponent, MarkLineComponent, TooltipComponent } from 'echarts/components'
+import {
+  GridComponent,
+  MarkAreaComponent,
+  MarkLineComponent,
+  TooltipComponent,
+} from 'echarts/components'
 import * as echarts from 'echarts/core'
 import { SVGRenderer } from 'echarts/renderers'
 
@@ -19,6 +24,7 @@ echarts.use([
   LineChart,
   ScatterChart,
   GridComponent,
+  MarkAreaComponent,
   MarkLineComponent,
   TooltipComponent,
   SVGRenderer,

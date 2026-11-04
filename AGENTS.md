@@ -140,14 +140,20 @@ and the macros disagree and adds a barcode, scanned or typed, or takes
 one away;
 beside the list on a desktop, each scrolled on its own, the page not,
 its title staying at the top and its cards in two columns), the
-progress (the phase's verdict as its
-hero, or until the TDEE is reliable calibration on its way to it, its
+progress (the TDEE measured as its
+hero, ± its interval, whether it is reliable and the sum it comes of,
+with the phase's verdict under it, or of a new phase a bar to its
+first, or until there is a TDEE calibration on its way to one, its
 counts against what it needs and about when a first comes; the weight,
-its goal drawn only near it, and the TDEE against intake, the space between them
-shaded and said, as charts, the calendar weeks in a table, sleep, the
+its goal drawn only near it, and the TDEE in its band against the intake,
+more layers (the space between them shaded and said, the target) a
+switch, as charts from their first data, each a table of its days a
+tap away, a proposal that waits marked on the chart it cites and a
+line to the plan, the calendar weeks with data in a table, sleep, the
 heart, the steps and the body fat in small, the last 7 days against
-the usual, each tile a button to a chart, over 30 days to a year or
-the phase; ECharts loaded with them, in the theme's tokens), the plan
+the usual and its range said, each tile a button to a chart, over the
+phase by default (all the days while it is young), 30 or 90 days, a
+year or all; ECharts loaded with them, in the theme's tokens), the plan
 (its phase as the hero, with its pace,
 week, progress and the phases on a timeline, edited and the next one
 planned in a sheet, a proposal that waits, saying only what it changes,

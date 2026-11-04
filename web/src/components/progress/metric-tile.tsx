@@ -3,9 +3,11 @@ import { useId, useState, type ReactNode } from 'react'
 
 import { Chart } from '@/components/charts/chart'
 import type { Option, Point } from '@/components/charts/options'
+import { DayTable, Toggle, type DayRows } from '@/components/progress/day-table'
 import { Sparkline } from '@/components/progress/sparkline'
 import { entry } from '@/components/progress/styles'
 import { Sheet } from '@/components/sheet'
+import { useMessages } from '@/i18n/messages'
 import { cn } from '@/lib/utils'
 
 // Usual is how the tile's number stands against the usual: in words
@@ -26,10 +28,11 @@ const arrows: Record<Usual['way'], LucideIcon | undefined> = {
 // MetricTile is a measurement in small, the whole tile one button: its
 // name, its number (value, with what it is, caption), how that stands
 // against the usual (usual), and its days' 7 days' average as a
-// sparkline, over the usual range (band). A tap opens it as a whole
-// chart, with its axis and a tooltip by day, in a sheet, under its
-// legend; said sums that chart up, and describes the tile to a screen
-// reader.
+// sparkline, over the usual range (band), which a caption under it says
+// (bandSaid: "usual 52–57"). A tap opens it as a whole chart, with its
+// axis and a tooltip by day, in a sheet, under its legend, or its values
+// by day as a table (table); said sums that chart up, and describes the
+// tile to a screen reader.
 export function MetricTile({
   title,
   value,
@@ -38,8 +41,10 @@ export function MetricTile({
   said,
   values,
   band,
+  bandSaid,
   legend,
   option,
+  table,
 }: {
   title: string
   value: string
@@ -48,10 +53,14 @@ export function MetricTile({
   said: string
   values: Point[]
   band?: { low: number; high: number } | undefined
+  bandSaid?: string | undefined
   legend?: ReactNode
   option: Option
+  table: DayRows
 }) {
+  const t = useMessages()
   const [open, setOpen] = useState(false)
+  const [tabled, setTabled] = useState(false)
   const saidId = useId()
   const Arrow = usual === undefined ? undefined : arrows[usual.way]
 
@@ -86,15 +95,29 @@ export function MetricTile({
           </span>
         )}
         <Sparkline values={values} band={band} />
+        {bandSaid !== undefined && (
+          <span className="text-caption text-muted-foreground">{bandSaid}</span>
+        )}
       </button>
       <span id={saidId} className="sr-only">
         {said}
       </span>
       <Sheet open={open} onOpenChange={setOpen} title={title}>
         <div className="space-y-3">
-          <p className="text-small text-muted-foreground">{said}</p>
-          {legend}
-          <Chart option={option} label={said} height={260} />
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-small text-muted-foreground">{said}</p>
+            <Toggle pressed={tabled} onChange={setTabled}>
+              {t.charts.table}
+            </Toggle>
+          </div>
+          {tabled ? (
+            <DayTable title={title} table={table} />
+          ) : (
+            <>
+              {legend}
+              <Chart option={option} label={said} height={260} />
+            </>
+          )}
         </div>
       </Sheet>
     </li>
