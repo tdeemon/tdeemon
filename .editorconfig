@@ -10,7 +10,8 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
-[{*.go,go.mod,go.sum,Makefile}]
+# Caddyfile: as `caddy fmt` writes it.
+[{*.go,go.mod,go.sum,Makefile,Caddyfile}]
 indent_style = tab
 
 [*.sql]

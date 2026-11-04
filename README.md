@@ -123,12 +123,44 @@ All settings come from environment variables:
 
 Every invalid or missing variable is reported at startup in one go.
 
+## Docker Compose
+
+[`deploy/compose`](deploy/compose) runs tdeemon with one service and one
+volume. In a directory of its own, with its files:
+
+```sh
+# Once: the settings, readable by you only, with a new secret key. Keep
+# the key. set -C refuses to replace an existing .env, so running this
+# again keeps it.
+(umask 077 && set -C && sed "s|^TDEEMON_SECRET_KEY=\$|TDEEMON_SECRET_KEY=$(openssl rand -base64 32)|" \
+  .env.example > .env)
+# Set TDEEMON_BASE_URL in .env to the instance's public URL, then:
+docker compose up -d --wait
+```
+
+- tdeemon serves on `http://127.0.0.1:8080`, for a reverse proxy on the
+  same machine that terminates HTTPS. Without one,
+  `compose.caddy.yaml` adds Caddy, with a certificate from Let's
+  Encrypt for the host of `TDEEMON_BASE_URL`, which must point at the
+  machine, ports 80 and 443 open. Uncomment
+  `COMPOSE_FILE=compose.yaml:compose.caddy.yaml` in `.env`, so that every
+  `docker compose` command, an upgrade's too, takes both files; then
+  `docker compose up -d --wait` as above.
+- The image is `ghcr.io/zarnautovic/tdeemon:latest`, the newest
+  release; pin `:X.Y.Z` in `compose.yaml` to upgrade when you choose.
+  `docker compose pull && docker compose up -d --wait` upgrades.
+- Its health check is `tdeemon healthcheck`: it asks the server's
+  `/healthz` at `TDEEMON_LISTEN` and never opens the database.
+- What follows for `docker run` holds for Compose too: the volume at
+  `/data`, the read-only container, 20 seconds to stop.
+
 ## Docker
 
 The image holds one static binary with the web app inside, on distroless,
 and runs as an unprivileged user (uid 65532). Everything it writes goes to
 one volume at `/data`, so the root filesystem can be read-only. Each
-release publishes it as `ghcr.io/zarnautovic/tdeemon:X.Y.Z` (also `:X.Y`),
+release publishes it as `ghcr.io/zarnautovic/tdeemon:X.Y.Z` (also `:X.Y` and
+`:latest`),
 for linux/amd64 and linux/arm64; or build it yourself:
 
 ```sh
@@ -158,9 +190,10 @@ docker run --read-only --stop-timeout 20 -v tdeemon-data:/data \
   `--stop-timeout 20` waits for that, where the default of 10 would kill
   the process first.
 - `--build-arg VERSION=v1.2.3` sets the version the server reports
-  (default `dev`). Without arguments the binary runs the server, and
-  `user create` adds a user ([Users](#users)); anything else prints the
-  usage and exits without touching the database.
+  (default `dev`). Without arguments the binary runs the server,
+  `user create` adds a user ([Users](#users)), and `healthcheck` is the
+  image's health check; anything else prints the usage and exits
+  without touching the database.
 - The build runs `go vet` and the tests against the web app it embeds.
   Podman builds the same file.
 

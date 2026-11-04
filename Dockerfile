@@ -57,4 +57,9 @@ COPY --from=build --chown=65532:65532 /out/root/ /
 ENV TDEEMON_DATA_DIR=/data
 EXPOSE 8080
 USER 65532:65532
+# The image has no shell nor curl: the binary asks /healthz itself, at
+# TDEEMON_LISTEN, without opening the database. The start period covers
+# the migrations of an upgrade.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=2m --retries=3 \
+  CMD ["/tdeemon", "healthcheck"]
 ENTRYPOINT ["/tdeemon"]
