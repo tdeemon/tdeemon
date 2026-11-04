@@ -17,9 +17,10 @@ against the intake and the weight's trend](docs/screenshots/desktop-progress.png
 
 The screenshots show `tdeemon user demo`, three months of made-up data.
 
-> **Status: early.** tdeemon runs every day for its author, and this is
-> its first release for other self-hosters. Expect changes between
-> releases, each said in its notes.
+> **Status: 1.0, the first release for self-hosters.** tdeemon runs
+> every day for its author. Each release says what changed in its
+> notes, and a change that needs something of you raises the major
+> version.
 
 ## What it does
 
