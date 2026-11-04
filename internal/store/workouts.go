@@ -45,31 +45,23 @@ func (db *DB) SetWorkoutDays(ctx context.Context, userID uuid.UUID, a event.Acto
 	return db.setWorkoutDays(ctx, userID, a, source, ds, func(day.Date) bool { return true }, now)
 }
 
-// SetWorkoutDaysBetween replaces the days source recorded a workout on
-// from from to to, both included, with ds, as an import of that span:
-// source's days outside it stay. It returns the days it added and
-// removed, in order, as SetWorkoutDays does; a day of ds outside the span
-// fails it.
+// SetWorkoutDaysBetween adds the days of ds to the days source recorded a
+// workout on, and removes source's days from from to to, both included,
+// that ds lacks: an import that covers that span whole. A span that ends
+// before it starts removes nothing. It returns the days it added and
+// removed, in order, as SetWorkoutDays does.
 func (db *DB) SetWorkoutDaysBetween(ctx context.Context, userID uuid.UUID, a event.Actor, source WorkoutSource,
 	from, to day.Date, ds []day.Date, now time.Time,
 ) (added, removed []day.Date, err error) {
 	if source != HAE {
 		return nil, nil, fmt.Errorf("invalid workout source %q: want %q", source, HAE)
 	}
-	if to.Before(from) {
-		return nil, nil, fmt.Errorf("set workout days: the span %s to %s ends before it starts", from, to)
-	}
 	in := func(d day.Date) bool { return !d.Before(from) && !to.Before(d) }
-	for _, d := range ds {
-		if !in(d) {
-			return nil, nil, fmt.Errorf("set workout days: %s is outside %s to %s", d, from, to)
-		}
-	}
 	return db.setWorkoutDays(ctx, userID, a, source, ds, in, now)
 }
 
-// setWorkoutDays makes source's days that in holds the days of ds, and
-// records the change of all source's days.
+// setWorkoutDays adds the days of ds to source's, removes those in holds
+// that ds lacks, and records the change of all source's days.
 func (db *DB) setWorkoutDays(ctx context.Context, userID uuid.UUID, a event.Actor, source WorkoutSource, ds []day.Date,
 	in func(day.Date) bool, now time.Time,
 ) (added, removed []day.Date, err error) {

@@ -186,6 +186,26 @@ func TestWorkoutDaysBetweenEmpty(t *testing.T) {
 	}
 }
 
+// The days of ds outside the span are added, never removed; a span that
+// ends before it starts removes nothing.
+func TestWorkoutDaysBetweenEdges(t *testing.T) {
+	t.Parallel()
+
+	db, ana, _ := withTwoUsers(t)
+	d := day.DateOf(t0)
+	if _, _, err := db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-9), d, []day.Date{d.AddDays(-9), d.AddDays(-5)}, t0); err != nil {
+		t.Fatal(err)
+	}
+	added, removed, err := db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-4), d.AddDays(-6), []day.Date{d.AddDays(-1)}, t0)
+	if err != nil || !reflect.DeepEqual(added, []day.Date{d.AddDays(-1)}) || removed != nil {
+		t.Errorf("a span backwards added %v, removed %v, %v; want the day added, none removed", added, removed, err)
+	}
+	added, removed, err = db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-8), d.AddDays(-2), []day.Date{d.AddDays(-9), d}, t0)
+	if err != nil || !reflect.DeepEqual(added, []day.Date{d}) || !reflect.DeepEqual(removed, []day.Date{d.AddDays(-5)}) {
+		t.Errorf("days on the span's edges added %v, removed %v, %v", added, removed, err)
+	}
+}
+
 func TestWorkoutDaysBetweenRefuses(t *testing.T) {
 	t.Parallel()
 
@@ -194,8 +214,6 @@ func TestWorkoutDaysBetweenRefuses(t *testing.T) {
 	for name, err := range map[string]error{
 		"no actor":         second(db.SetWorkoutDaysBetween(t.Context(), ana, event.Actor{}, store.HAE, d, d, nil, t0)),
 		"Strong's source":  second(db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.Strong, d, d, nil, t0)),
-		"a span backwards": second(db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d, d.AddDays(-1), nil, t0)),
-		"a day outside":    second(db.SetWorkoutDaysBetween(t.Context(), ana, haeActor, store.HAE, d.AddDays(-3), d.AddDays(-1), []day.Date{d}, t0)),
 		"HAE as a history": second(db.SetWorkoutDays(t.Context(), ana, haeActor, store.HAE, nil, t0)),
 	} {
 		if err == nil {

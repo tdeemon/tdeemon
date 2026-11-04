@@ -740,7 +740,9 @@ func TestIngestHAEWorkouts(t *testing.T) {
 	if w == nil {
 		t.Fatalf("no workouts in the answer: %+v", got)
 	}
-	if w.Strength != 2 || w.From != "2026-10-17" || w.To != "2026-10-21" || !slices.Equal(w.Added, []string{"2026-10-17", "2026-10-20"}) ||
+	// The span replaced is within the first and the last workout's days,
+	// today at the latest.
+	if w.Strength != 2 || w.From != "2026-10-18" || w.To != "2026-10-21" || !slices.Equal(w.Added, []string{"2026-10-17", "2026-10-20"}) ||
 		len(w.Removed) != 0 || !slices.Equal(w.Future, []string{"2026-10-23"}) || !slices.Equal(w.Skipped, []string{"Walking"}) || len(got.Days) != 0 {
 		t.Errorf("answer = %+v, workouts %+v", got, w)
 	}
@@ -772,6 +774,25 @@ func TestIngestHAEWorkoutsLaterSync(t *testing.T) {
 	}
 	if days := workoutDaysOf(t, in); !slices.Equal(days, []string{"2026-10-17", "2026-10-19"}) {
 		t.Errorf("the workout days after the later sync = %v", days)
+	}
+}
+
+// The first and the last day of a payload may be covered in part: a sync
+// of the 21st's calendar day, with a walk at 01:00, before the user's day
+// starts at 04:00, holds the 20th's last hours alone, and leaves its
+// strength workout of 18:00, which it does not hold, its day.
+func TestIngestHAEWorkoutsPartialDays(t *testing.T) {
+	t.Parallel()
+
+	in := newInstance(t, "http://localhost", "")
+	tok := ingestToken(t, in, `"ingest"`)
+	postHAE(t, in, tok, haeWorkoutsBody(haeWorkout("Traditional Strength Training", "2026-10-20 18:00:00 +0200")))
+	got := postHAE(t, in, tok, haeWorkoutsBody(haeWorkout("Walking", "2026-10-21 01:00:00 +0200")))
+	if w := got.Workouts; w == nil || len(w.Removed) != 0 || w.From != "" || w.To != "" {
+		t.Errorf("the calendar day's sync = %+v, want nothing removed and no span", got.Workouts)
+	}
+	if days := workoutDaysOf(t, in); !slices.Equal(days, []string{"2026-10-20"}) {
+		t.Errorf("the workout days = %v, want the 20th kept", days)
 	}
 }
 

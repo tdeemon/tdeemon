@@ -608,10 +608,14 @@ writes to Apple Health with its Apple Health integration on, as a watch
 does) makes the day it starts in, by your day start hour, a training
 day, for the targets that differ by the type of day, unless you set the
 day's type in the check-in yourself. Other kinds (a walk, a run) make
-none, and the answer names them under `skipped`. A sync replaces
-Health Auto Export's days of workouts within the days its workouts
-cover, up to today: a workout deleted in Apple Health goes at the next
-sync that covers its day, and the days before stay. A workout after
+none, and the answer names them under `skipped`. A sync adds the days
+of its strength workouts, and removes Health Auto Export's days of
+workouts it lacks strictly between the days of its first and its last
+workout, up to today (those two may be covered in part, as a sync of
+calendar days holds the first hours of a day that by your day start
+hour is the day before's): a workout deleted in Apple Health goes at a
+later sync with workouts on both sides of its day, and older days stay.
+The check-in's toggle sets any day's type at once. A workout after
 today is left out, and named under `future`. With this, the Strong
 export below is not needed; the days of either count.
 
