@@ -18,6 +18,9 @@ type settingsInput struct {
 		Locale       *string `json:"locale,omitempty" enum:"en,hr" doc:"The language of the app."`
 		TimeZone     *string `json:"timezone,omitempty" example:"Europe/Zagreb" doc:"An IANA time zone."`
 		DayStartHour *int    `json:"day_start_hour,omitempty" minimum:"0" maximum:"23" doc:"The hour at which the day starts; a meal before it belongs to the day before."`
+		// SingleKeyShortcuts turns the web app's shortcuts of one key on or
+		// off (WCAG 2.1.4).
+		SingleKeyShortcuts *bool `json:"single_key_shortcuts,omitempty" doc:"Whether the web app's shortcuts of one key work."`
 	}
 }
 
@@ -37,6 +40,7 @@ func (s *sessions) setSettings(ctx context.Context, in *settingsInput) (*setting
 	b := in.Body
 	u, err := s.db.ChangeSettings(ctx, p.User.ID, store.SettingsChange{
 		Name: b.Name, Locale: b.Locale, TimeZone: b.TimeZone, DayStartHour: b.DayStartHour,
+		SingleKeyShortcuts: b.SingleKeyShortcuts,
 	}, s.now())
 	switch {
 	case errors.Is(err, store.ErrInvalidSettings):
@@ -111,7 +115,7 @@ func (s *sessions) registerSettings(a huma.API) {
 		Method:      http.MethodPatch,
 		Path:        Prefix + "/me",
 		Summary:     "Change your settings",
-		Description: "Needs a web session. Changes the name, the language, the time zone and the hour the day starts, those given only. " +
+		Description: "Needs a web session. Changes the name, the language, the time zone, the hour the day starts and whether the web app's shortcuts of one key work, those given only. " +
 			"What was logged before keeps the day it was logged on.",
 		Tags:   []string{"settings"},
 		Errors: []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusUnprocessableEntity},

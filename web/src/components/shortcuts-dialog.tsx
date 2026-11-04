@@ -24,14 +24,17 @@ function go(letter: string, what: string): Shortcut {
 // ShortcutsDialog lists the keyboard's shortcuts (?), each with its keys:
 // those of anywhere (the command palette first), the sections' (G, then a letter), a day's, its
 // meals' among them, Log a meal's, and the plan's, of a proposal that
-// waits. Escape closes it, and the focus goes back where it
-// was.
+// waits. With the shortcuts of one key off (singleKeys false) it says so
+// above them, and where they are turned on. Escape closes it, and the
+// focus goes back where it was.
 export function ShortcutsDialog({
   open,
   onOpenChange,
+  singleKeys = true,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  singleKeys?: boolean
 }) {
   const t = useMessages()
   const s = t.shortcuts
@@ -88,6 +91,7 @@ export function ShortcutsDialog({
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-(--duration-base) data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 max-h-[90dvh] w-[min(26rem,calc(100vw-2rem))] -translate-1/2 space-y-4 overflow-y-auto rounded-xl bg-card p-6 shadow-sheet transition-opacity duration-(--duration-slow) ease-sheet data-ending-style:opacity-0 data-starting-style:opacity-0">
           <Dialog.Title className="text-h2">{s.title}</Dialog.Title>
+          {!singleKeys && <p className="text-sm text-muted-foreground">{s.singleKeysOff}</p>}
           {groups.map((group) => (
             <section key={group.title} className="space-y-2">
               <h3 className="text-small font-semibold text-muted-foreground">{group.title}</h3>

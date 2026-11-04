@@ -4598,6 +4598,10 @@
             "maxLength": 100,
             "type": "string"
           },
+          "single_key_shortcuts": {
+            "description": "Whether the web app's shortcuts of one key work.",
+            "type": "boolean"
+          },
           "timezone": {
             "description": "An IANA time zone.",
             "examples": [
@@ -5437,6 +5441,10 @@
             ],
             "type": "string"
           },
+          "single_key_shortcuts": {
+            "description": "Whether the web app's shortcuts of one key (N, W, G and a letter, ? and /) work; those with Ctrl or ⌘ always do.",
+            "type": "boolean"
+          },
           "timezone": {
             "description": "An IANA time zone.",
             "examples": [
@@ -5452,7 +5460,8 @@
           "role",
           "locale",
           "timezone",
-          "day_start_hour"
+          "day_start_hour",
+          "single_key_shortcuts"
         ],
         "type": "object"
       },
@@ -10502,7 +10511,7 @@
         ]
       },
       "patch": {
-        "description": "Needs a web session. Changes the name, the language, the time zone and the hour the day starts, those given only. What was logged before keeps the day it was logged on.",
+        "description": "Needs a web session. Changes the name, the language, the time zone, the hour the day starts and whether the web app's shortcuts of one key work, those given only. What was logged before keeps the day it was logged on.",
         "operationId": "set-settings",
         "requestBody": {
           "content": {

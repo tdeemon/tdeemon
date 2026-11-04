@@ -212,3 +212,29 @@ func TestChangeSettings(t *testing.T) {
 		t.Errorf("a zone no one has: %v, want ErrInvalidSettings", err)
 	}
 }
+
+// A user has the shortcuts of one key until they turn them off, which
+// is kept, and a change of another setting leaves it.
+func TestChangeSingleKeyShortcuts(t *testing.T) {
+	t.Parallel()
+
+	db, ana, _ := withTwoUsers(t)
+	if u, err := db.UserByEmail(t.Context(), "ana@example.com"); err != nil || u.NoSingleKeyShortcuts {
+		t.Fatalf("a new user = %+v, %v; want the shortcuts on", u, err)
+	}
+	off := false
+	if u, err := db.ChangeSettings(t.Context(), ana, store.SettingsChange{SingleKeyShortcuts: &off}, t0); err != nil || !u.NoSingleKeyShortcuts {
+		t.Fatalf("turned off = %+v, %v", u, err)
+	}
+	name := "Ana M."
+	if _, err := db.ChangeSettings(t.Context(), ana, store.SettingsChange{Name: &name}, t0); err != nil {
+		t.Fatal(err)
+	}
+	if u, err := db.UserByEmail(t.Context(), "ana@example.com"); err != nil || !u.NoSingleKeyShortcuts {
+		t.Errorf("after another change = %+v, %v; want the shortcuts still off", u, err)
+	}
+	on := true
+	if u, err := db.ChangeSettings(t.Context(), ana, store.SettingsChange{SingleKeyShortcuts: &on}, t0); err != nil || u.NoSingleKeyShortcuts {
+		t.Errorf("turned on again = %+v, %v", u, err)
+	}
+}

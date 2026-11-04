@@ -60,7 +60,8 @@ shortcuts (a skip to the content, G and a letter to a section, ⌘Z or
 Ctrl+Z to undo the latest change, W a weigh-in, and ⌘K or Ctrl+K the
 command palette of the actions (yesterday's meal again among them), the
 sections, foods, days and settings, each row with its key, which
-typing on the day opens too), a light and a dark theme,
+typing on the day opens too; those of one key turned off by a switch
+of the user's), a light and a dark theme,
 each change said in a toast whose Undo takes it back, clear of a
 sheet's buttons, a delete's for 10 s, and after it the recent changes
 (a page of the settings, or a sheet from the undo's toast), by whom, with

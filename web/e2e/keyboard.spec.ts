@@ -181,3 +181,32 @@ test('after N and a meal logged, the focus is on its row', async ({ page }) => {
   await expect(sheet).toBeHidden()
   await expect(rowOf(page, name)).toBeFocused()
 })
+
+test('with the shortcuts of one key turned off, N does nothing and Ctrl+K still opens the palette', async ({
+  page,
+}) => {
+  await signIn(page)
+  await page.goto('/settings/appearance')
+  const shortcuts = page.getByRole('switch', { name: 'Shortcuts of one key' })
+  await expect(shortcuts).toBeChecked()
+  try {
+    await shortcuts.click()
+    await expect(shortcuts).not.toBeChecked()
+
+    await page.goto('/')
+    await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
+    await page.keyboard.press('n')
+    await page.keyboard.press('g')
+    await page.keyboard.press('f')
+    await page.keyboard.press('Control+k')
+    await expect(page.getByRole('combobox')).toBeFocused()
+    await expect(
+      page.getByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ }),
+    ).toHaveCount(0)
+    await expect(page).toHaveURL('/')
+  } finally {
+    // The tests' user shares the setting with every other test.
+    const back = await page.request.patch('/api/v1/me', { data: { single_key_shortcuts: true } })
+    expect(back.ok()).toBe(true)
+  }
+})
