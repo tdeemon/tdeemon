@@ -80,6 +80,7 @@ type tdeeBody struct {
 	LoggedDays       int           `json:"logged_days"`
 	WeighIns         int           `json:"weigh_ins"`
 	KgPerWeek        *float64      `json:"kg_per_week,omitempty" doc:"The weight's slope over the window, a minus being a loss."`
+	IntakeKcal       *float64      `json:"intake_kcal,omitempty" doc:"The average intake of the logged days from the first weigh-in to the last, in kcal a day: the TDEE is it less the weight's slope, at 7700 kcal a kg."`
 	Doubts           []string      `json:"doubts" nullable:"false" doc:"Why the estimate is missing or not trusted: few_days, few_weigh_ins, few_logged_days, wide_interval."`
 	Needs            tdeeNeedsBody `json:"needs" doc:"What the window has of what an estimate needs: with each, it is measured."`
 	Trust            tdeeTrustBody `json:"trust" doc:"What a measured estimate needs to be trusted."`
@@ -442,6 +443,7 @@ func newTDEEBody(e calibration.Estimate, p calibration.Params) tdeeBody {
 	}
 	if e.Measured {
 		b.Kcal, b.HalfWidth, b.KgPerWeek = new(noNegativeZero(math.Round(e.TDEE))), new(math.Round(e.HalfWidth)), new(round2(e.KgPerWeek))
+		b.IntakeKcal = new(math.Round(e.IntakeKcal))
 	}
 	// A summary's window ends the day before it: on the day the phase's
 	// own window may first end, the summary still gives the one before.

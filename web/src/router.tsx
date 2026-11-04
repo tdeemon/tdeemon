@@ -193,17 +193,17 @@ const foodRoute = createRoute({
   }),
   component: FoodPage,
 })
-// The progress, over the span of days the address says (90 by default),
-// or the phase's days: its charts load ECharts with them, not with the
-// app.
+// The progress, over the span of days the address says, the phase's
+// days, or all of them; without one, the phase's or all (defaultSpan):
+// its charts load ECharts with them, not with the app.
 function spanOf(search: Record<string, unknown>): {
-  days?: 30 | 180 | 365 | 'phase' | undefined
+  days?: 30 | 90 | 365 | 'phase' | 'all' | undefined
 } {
-  if (search.days === 'phase') {
-    return { days: 'phase' }
+  if (search.days === 'phase' || search.days === 'all') {
+    return { days: search.days }
   }
   const days = Number(search.days)
-  return { days: days === 30 || days === 180 || days === 365 ? days : undefined }
+  return { days: days === 30 || days === 90 || days === 365 ? days : undefined }
 }
 const progressRoute = createRoute({
   getParentRoute: () => appRoute,

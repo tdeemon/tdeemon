@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 
-import { weeksOf, weekStart } from '@/components/progress/span'
+import { defaultSpan, firstDay, weeksOf, weekStart } from '@/components/progress/span'
 
 test('a week starts on Monday, as a calendar week does', () => {
   // Monday 26 October 2026 to Sunday 1 November.
@@ -22,4 +22,21 @@ test.each([
   { first: '2025-10-30', today: '2026-10-29', count: 52, from: '2025-10-27', to: '2026-10-28' },
 ])('the span from $first to $today has $count calendar weeks', ({ first, today, ...weeks }) => {
   expect(weeksOf(first, today)).toEqual(weeks)
+})
+
+test.each([
+  // A phase of two weeks and more is shown by default; a younger one, or
+  // none, from the start.
+  { start: '2026-10-01', span: 'phase' },
+  { start: '2026-10-15', span: 'phase' },
+  { start: '2026-10-16', span: 'all' },
+  { start: undefined, span: 'all' },
+])('a phase from $start is shown by default as $span', ({ start, span }) => {
+  expect(defaultSpan('2026-10-29', start)).toBe(span)
+})
+
+test('all is the days a history has, the phase its own', () => {
+  expect(firstDay('all', '2026-10-29')).toBe('2025-10-29')
+  expect(firstDay('phase', '2026-10-29', '2026-10-01')).toBe('2026-10-01')
+  expect(firstDay('30', '2026-10-29')).toBe('2026-09-30')
 })

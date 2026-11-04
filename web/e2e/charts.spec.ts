@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 import { signIn } from './user.ts'
 
-test('the progress says how the phase goes, and shows the days logged and their weeks', async ({
+test('the progress says how calibration goes, and shows the days logged and their weeks', async ({
   page,
 }) => {
   await signIn(page)
@@ -36,6 +36,9 @@ test('the progress says how the phase goes, and shows the days logged and their 
   await expect(calibration).toContainText('No phase yet.')
   await expect(calibration.getByRole('link', { name: 'Set up a plan' })).toBeVisible()
 
+  // Without a phase, all the days are shown, from the first data.
+  await expect(page.getByRole('radio', { name: 'Since the start' })).toBeChecked()
+
   // Today's weigh-in joins the trend once the day is over, as the
   // summary has it.
   const weight = page.getByRole('region', { name: 'Weight' })
@@ -44,7 +47,14 @@ test('the progress says how the phase goes, and shows the days logged and their 
       name: '1 weigh-in today; the trend weight takes it once the day is over.',
     }),
   ).toBeVisible()
-  await expect(weight.locator('svg').first()).toBeVisible()
+  await expect(weight.locator('[role="img"] svg')).toBeVisible()
+  // Its days as a table, a tap away: today's weigh-in, the one day of it.
+  await weight.getByRole('button', { name: 'Weight: table' }).click()
+  const days = weight.getByRole('table', { name: 'Weight, by day' })
+  await expect(days.getByRole('row')).toHaveCount(2)
+  await expect(days).toContainText('80.5')
+  await weight.getByRole('button', { name: 'Weight: table' }).click()
+  await expect(weight.locator('[role="img"] svg')).toBeVisible()
   await page.getByText('30 d', { exact: true }).click()
   await expect(page).toHaveURL(/days=30/)
   await expect(page.getByRole('radio', { name: '30 days' })).toBeChecked()

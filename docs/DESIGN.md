@@ -1652,23 +1652,40 @@ the first spec.
     page (`getComputedStyle`) and again when the theme changes; the dark
     theme's series are health-api's validated palette (`palette.ts`), its
     warning and destructive moved off the macros' amber and pink. A chart has
-    one axis of values and a legend of its card's; to a screen reader it
-    is an image with a summary, and the weeks' table says the charts in
-    text.
-  - The progress leads with the verdict on the phase, or, until the TDEE
-    is reliable, with calibration on its way to it (§7); without a phase
-    the TDEE still leads, the way to a plan after it. The weight's axis
-    holds the weights: a goal far off them is said, not drawn. The TDEE
-    and intake chart shades the space between the TDEE and the last 7
-    days' intake, and says what it comes to ("You eat about 500 kcal under
-    what you burn: about −0.5 kg a week"), at 7700 kcal a kg, the
-    server's (`limits.json`). The weeks are calendar weeks, Monday to
-    Sunday, as everywhere in the app. Sleep, the resting heart rate and
-    the HRV in small are the last 7 days' average against the usual (the
-    summary's recovery), in words and an arrow, a line of the 7 days'
-    average in a neutral colour over the usual range; each tile is one
-    button to its whole chart, and what recovery flags is a sentence of
-    the hero's. Sleep is hours and minutes everywhere ("6 h 52").
+    one axis of values and a legend of its card's, of two marks or so; to
+    a screen reader it is an image with a summary, and each chart is a
+    table of its days a tap away (its Table), as the weeks' table says
+    the charts in text. A chart starts at its first data, never at an
+    empty span's first day.
+  - The progress shows the phase's days by default, or all of them (a
+    year's at most) while the phase is younger than two weeks or there is
+    none; 30 days, 90 and a year are the others. It leads with the TDEE
+    measured, ± its interval and whether it is reliable, and the sum it
+    comes of: the intake of calibration's window (`intake_kcal`) and the
+    energy of the trend's change, "Intake 2,209 + trend −0.43 kg/wk
+    (≈ 470) = 2,679" (§7). Under it the verdict on the phase; of a new
+    phase, that the TDEE is reliable and the phase has no verdict yet, as
+    the morning summary says it, with a bar of its days to the first;
+    without a phase or a target, the way to a plan. Until there is a
+    TDEE, calibration on its way to one stands there. The weight's axis
+    holds the weights: a goal far off them is said, not drawn, and the
+    trend's last value is written at its end. The TDEE and intake chart
+    is the TDEE in its band and the intake as bars; more layers, a
+    switch, shade the space between the TDEE and the last 7 days' intake
+    and draw the target. It says what that comes to ("You eat about 500
+    kcal under what you burn: about −0.5 kg a week"), at 7700 kcal a kg,
+    the server's (`limits.json`). A proposal that waits is marked on the
+    chart it cites, in the coach's colour: the weight's when it changes
+    the phases alone, else the TDEE's, its window shaded and a line on
+    today, with a line under the chart to the plan. The weeks are
+    calendar weeks, Monday to Sunday, as everywhere in the app, those
+    with data alone. Sleep, the resting heart rate and the HRV in small
+    are the last 7 days' average against the usual (the summary's
+    recovery), in words and an arrow, a line of the 7 days' average in a
+    neutral colour over the usual range, which a caption says ("usual
+    52–57"); each tile is one button to its whole chart, and what
+    recovery flags is a sentence of the hero's. Sleep is hours and
+    minutes everywhere ("6 h 52").
   - Loading and a bad network: a page that loads is a skeleton of its
     shape under its header, never a bare "Loading…". The day waits for
     what it shows above its meals as well (the user, the summary, the

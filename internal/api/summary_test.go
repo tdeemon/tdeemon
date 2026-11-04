@@ -42,10 +42,12 @@ type summaryAnswer struct {
 		Date string  `json:"date"`
 	} `json:"trend"`
 	TDEE struct {
-		Measured bool     `json:"measured"`
-		Kcal     *float64 `json:"kcal"`
-		Trusted  bool     `json:"trusted"`
-		Doubts   []string `json:"doubts"`
+		Measured   bool     `json:"measured"`
+		Kcal       *float64 `json:"kcal"`
+		IntakeKcal *float64 `json:"intake_kcal"`
+		KgPerWeek  *float64 `json:"kg_per_week"`
+		Trusted    bool     `json:"trusted"`
+		Doubts     []string `json:"doubts"`
 	} `json:"tdee"`
 	Verdict struct {
 		Rate       string   `json:"rate"`
@@ -166,6 +168,12 @@ func TestGetSummaryTDEE(t *testing.T) {
 	// the day of 500 kcal lowers a little.
 	if !b.TDEE.Measured || !b.TDEE.Trusted || b.TDEE.Kcal == nil || math.Abs(*b.TDEE.Kcal-2350) > 50 || len(b.TDEE.Doubts) != 0 {
 		t.Errorf("TDEE %+v, want a trusted 2350 or so", b.TDEE)
+	}
+	// The TDEE is the intake less the weight's slope, at 7700 kcal a kg:
+	// the progress's hero says that sum.
+	if b.TDEE.IntakeKcal == nil || b.TDEE.KgPerWeek == nil ||
+		math.Abs(*b.TDEE.IntakeKcal-*b.TDEE.KgPerWeek*plan.KcalPerKg/7-*b.TDEE.Kcal) > 6 {
+		t.Errorf("TDEE %+v, want its intake less its slope", b.TDEE)
 	}
 	if b.Trend == nil || b.Trend.Date != today.AddDays(-1).String() || math.Abs(b.Trend.Kg-80.5) > 0.5 {
 		t.Errorf("trend %+v, want about 80.5 from yesterday", b.Trend)

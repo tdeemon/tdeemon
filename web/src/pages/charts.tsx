@@ -1,13 +1,15 @@
 import { keepPreviousData } from '@tanstack/react-query'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { ChartLine } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 
 import { $api } from '@/api/client'
 import type { components } from '@/api/schema'
-import { Legend } from '@/components/charts/legend'
+import { Legend, type Mark } from '@/components/charts/legend'
 import {
   counted,
   eaten7,
+  fromFirst,
   goalShown,
   lineOption,
   sleepOption,
@@ -15,6 +17,7 @@ import {
   stepsOption,
   tdeeOption,
   weightOption,
+  type Cited,
   type HistoryDay,
   type Point,
   type Words,
@@ -23,36 +26,50 @@ import { useChartColors, type ChartColors } from '@/components/charts/palette'
 import { useChartWords } from '@/components/charts/words'
 import { LoadError } from '@/components/load-error'
 import { ChartCard } from '@/components/progress/chart-card'
+import { citesWeight } from '@/components/progress/cites'
+import { CoachLine } from '@/components/progress/coach-line'
+import type { DayRows } from '@/components/progress/day-table'
 import { MetricTile, type Usual } from '@/components/progress/metric-tile'
+import { phaseSaid } from '@/components/progress/said'
 import { Skeleton } from '@/components/progress/skeleton'
-import { byMonth, firstDay, spans, weeksOf, type Span } from '@/components/progress/span'
+import {
+  byMonth,
+  defaultSpan,
+  firstDay,
+  spans,
+  weeksOf,
+  type Span,
+} from '@/components/progress/span'
 import { card, entry } from '@/components/progress/styles'
 import { VerdictHero } from '@/components/progress/verdict-hero'
 import { WeeklyTable } from '@/components/progress/weekly-table'
 import { SettingsAvatar } from '@/components/settings-avatar'
 import { buttonVariants } from '@/components/ui/button'
+import { InfoTip } from '@/components/ui/info-tip'
 import { SegmentedControl } from '@/components/ui/segmented'
 import { rounded, useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
 import limits from '@/lib/limits.json'
+import { useDesktop } from '@/lib/media'
 import { cn } from '@/lib/utils'
 
 type Phase = components['schemas']['PhaseBody']
+type Plan = components['schemas']['PlanBody']
 
-type Days = 30 | 180 | 365 | 'phase' | undefined
+type Days = 30 | 90 | 365 | 'phase' | 'all'
 
-// The address's days of each span: 90 is the default, left out.
+// The address's days of each span; the default's is left out.
 const searchOf: Record<Span, Days> = {
   '30': 30,
-  '90': undefined,
-  '180': 180,
-  '365': 365,
   phase: 'phase',
+  '90': 90,
+  '365': 365,
+  all: 'all',
 }
 
-// spanOf is the span the address's days say.
-function spanOf(days: Days): Span {
-  return spans.find((s) => searchOf[s] === days) ?? '90'
+// spanOf is the span the address's days say, else the default.
+function spanOf(days: Days | undefined, fallback: Span): Span {
+  return spans.find((s) => searchOf[s] === days) ?? fallback
 }
 
 // drawn reports whether a day has anything a chart draws.
@@ -76,23 +93,58 @@ function averageOf(values: Point[]): number | undefined {
   return have.length === 0 ? undefined : have.reduce((a, b) => a + b, 0) / have.length
 }
 
-// ChartsPage is the progress over a period up to today (30 days to a year,
-// or the phase's): first how the phase goes, as calibration judges it;
-// then the weight and its trend, and the TDEE against what was eaten and
-// the target; the weeks in a table, which says the charts in text; and
-// sleep, the heart, the steps and the body fat in small, each a whole
-// chart a tap away.
+// trimmed are a measurement's days and values from its first value on: a
+// chart starts at its first data.
+function trimmed(days: HistoryDay[], values: Point[]): { days: HistoryDay[]; values: Point[] } {
+  const first = values.findIndex((v) => v !== null)
+  return first <= 0 ? { days, values } : { days: days.slice(first), values: values.slice(first) }
+}
+
+// tableOf are a chart's days as a table's rows, the latest first: each
+// day's cells (cells), those of none written as a dash, and no day of
+// none at all.
+function tableOf(
+  days: HistoryDay[],
+  w: Words,
+  columns: string[],
+  cells: (day: HistoryDay, i: number) => (string | undefined)[],
+): DayRows {
+  return {
+    columns,
+    rows: days
+      .flatMap((d, i) => {
+        const of = cells(d, i)
+        return of.every((c) => c === undefined)
+          ? []
+          : [{ key: d.date, date: w.day(d.date), cells: of.map((c) => c ?? '—') }]
+      })
+      .toReversed(),
+  }
+}
+
+// ChartsPage is the progress over a period up to today (30 days to a
+// year, the phase's, or all), by default the phase's, or all while the
+// phase is young: first the TDEE measured and how the phase goes, as
+// calibration judges it; then the weight and its trend, and the TDEE
+// against what was eaten, each from its first data, and a proposal that
+// waits marked on the chart it cites; sleep, the heart, the steps and the
+// body fat in small, each a whole chart a tap away; and the weeks in a
+// table, which says the charts in text. Each chart is a table of its days
+// a tap away too.
 export function ChartsPage() {
   const t = useMessages()
   const { days: asked } = useSearch({ from: '/app/progress' })
   const navigate = useNavigate({ from: '/progress' })
   const me = $api.useQuery('get', '/api/v1/me')
+  const plan = $api.useQuery('get', '/api/v1/plan')
+  const desktop = useDesktop()
   const today = me.data?.today
   const phase = me.data?.phase
-  // The phase's span is there while the user is in one; without, the
-  // default's.
   const noPhase = me.data !== undefined && phase === undefined
-  const span = asked === 'phase' && noPhase ? '90' : spanOf(asked)
+  const fallback = today === undefined ? 'all' : defaultSpan(today, phase?.start)
+  // The phase's span is there while the user is in one.
+  const chosen = spanOf(asked, fallback)
+  const span = chosen === 'phase' && noPhase ? fallback : chosen
   const from = today === undefined ? undefined : firstDay(span, today, phase?.start)
   const history = $api.useQuery(
     'get',
@@ -100,12 +152,23 @@ export function ChartsPage() {
     { params: { query: { from: from ?? '' } } },
     { enabled: from !== undefined, placeholderData: keepPreviousData },
   )
-  const words = useChartWords(from !== undefined && today !== undefined && byMonth(from, today))
+  // The first day of data, where the charts start.
+  const first = history.data?.days.find(drawn)?.date ?? from
+  const words = useChartWords(first !== undefined && today !== undefined && byMonth(first, today))
   const colors = useChartColors()
+
+  const hero =
+    today === undefined ? (
+      !me.isError && <HeroSkeleton />
+    ) : (
+      <VerdictHero phase={phase} today={today} />
+    )
 
   // What came stays while asking for it again fails: the bar over the
   // page says since when.
   let body
+  let loading = false
+  let charts: Charts | undefined
   if (me.data === undefined && me.isError) {
     body = (
       <LoadError title={t.loadFailed.progress} error={me.error} onRetry={() => void me.refetch()} />
@@ -118,29 +181,34 @@ export function ChartsPage() {
         onRetry={() => void history.refetch()}
       />
     )
-  } else if (!history.data || today === undefined || from === undefined) {
+  } else if (!history.data || today === undefined || first === undefined) {
+    loading = true
     body = <ProgressSkeleton />
   } else if (history.data.days.every((d) => !drawn(d))) {
     body = <Empty />
   } else {
-    body = (
-      <Progress
-        days={history.data.days}
-        words={words}
-        colors={colors}
-        phase={phase}
-        weeks={weeksOf(from, today)}
-        today={today}
-        busy={history.isPlaceholderData}
-      />
-    )
+    charts = {
+      // From the first day of data on: a chart of none has no more.
+      days: fromFirst(history.data.days, drawn),
+      words,
+      colors,
+      phase,
+      weeks: weeksOf(first, today),
+      today,
+      plan: plan.data,
+    }
   }
 
   return (
     <section className="space-y-3 lg:space-y-4">
       <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-title">{t.charts.title}</h1>
+          <div className="min-w-0">
+            <h1 className="text-title">{t.charts.title}</h1>
+            {phase !== undefined && today !== undefined && (
+              <p className="text-small text-muted-foreground">{phaseSaid(phase, today, t)}</p>
+            )}
+          </div>
           <SettingsAvatar className="-my-1.5" />
         </div>
         <SegmentedControl
@@ -160,16 +228,21 @@ export function ChartsPage() {
             }))}
           value={span}
           onChange={(s) => {
-            void navigate({ search: { days: searchOf[s] }, replace: true })
+            void navigate({
+              search: s === fallback ? {} : { days: searchOf[s] },
+              replace: true,
+            })
           }}
         />
       </header>
-      {today === undefined ? (
-        !me.isError && <HeroSkeleton />
-      ) : (
-        <VerdictHero phase={phase} today={today} />
-      )}
-      {body}
+      <Progress
+        hero={hero}
+        charts={charts}
+        fallback={body}
+        loading={loading}
+        busy={history.isPlaceholderData}
+        desktop={desktop}
+      />
     </section>
   )
 }
@@ -202,38 +275,126 @@ function balanceOf(
   return undefined
 }
 
-// Progress is the charts of the days, the table of the weeks and the
-// measurements in small.
-function Progress({
-  days,
-  words,
-  colors,
-  phase,
-  weeks,
-  today,
-  busy,
-}: {
+// Charts are what the charts are drawn of, once the days have come.
+interface Charts {
   days: HistoryDay[]
   words: Words
   colors: ChartColors
   phase: Phase | undefined
   weeks: { from: string; to: string; count: number }
   today: string
+  plan: Plan | undefined
+}
+
+// Progress is the hero beside the charts of the days, the measurements in
+// small and the table of the weeks: on a desktop the hero beside the
+// TDEE, the weight beside the measurements; on a phone one after the
+// other, the weight first. Until the charts come (or when they cannot),
+// fallback stands in their place, the hero where it stays, so it is not
+// drawn again when they come.
+function Progress({
+  hero,
+  charts,
+  fallback,
+  loading,
+  busy,
+  desktop,
+}: {
+  hero: ReactNode
+  charts: Charts | undefined
+  fallback: ReactNode
+  loading: boolean
   busy: boolean
+  desktop: boolean
 }) {
+  const cards = useCards(charts)
+
+  return (
+    <div
+      aria-busy={busy}
+      className={cn('space-y-3 transition-opacity lg:space-y-4', busy && 'opacity-60')}
+    >
+      {desktop ? (
+        <>
+          {/* The hero beside the TDEE, or its skeleton; what did not come
+              (an error, no days) under it, as wide as the page. */}
+          <div
+            className={cn(
+              'grid items-start gap-4',
+              cards !== undefined || loading ? 'grid-cols-[380px_minmax(0,1fr)]' : 'grid-cols-1',
+            )}
+          >
+            {hero}
+            {cards?.tdee ?? (loading ? <ChartSkeleton loading /> : fallback)}
+          </div>
+          {cards !== undefined && (
+            <>
+              <div className="grid grid-cols-2 items-start gap-4">
+                {cards.weight}
+                {cards.measurements}
+              </div>
+              <div className="grid grid-cols-2 items-start gap-4">{cards.weekly}</div>
+            </>
+          )}
+          {cards === undefined && loading && (
+            <div aria-busy className="grid grid-cols-2 items-start gap-4">
+              <ChartSkeleton />
+              <TilesSkeleton />
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {hero}
+          {cards === undefined ? (
+            fallback
+          ) : (
+            <>
+              {cards.weight}
+              {cards.tdee}
+              {cards.measurements}
+              {cards.weekly}
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// useCards are the cards of the charts, once they have come: the weight,
+// the TDEE (its more layers a switch of its own), the measurements in
+// small and the weeks.
+function useCards(
+  charts: Charts | undefined,
+): { weight: ReactNode; tdee: ReactNode; measurements: ReactNode; weekly: ReactNode } | undefined {
   const t = useMessages()
   const f = useFormat()
+  const [more, setMore] = useState(false)
+  if (charts === undefined) {
+    return undefined
+  }
+  const { days, words, colors, phase, weeks, today, plan } = charts
   const said = t.charts.said
   const none = said.none
+  const names = words.names
+  const tips = words.tips
 
-  const trends = days.flatMap((d) => (d.trend_kg === undefined ? [] : [d.trend_kg]))
+  // Each chart from its first data.
+  const weightDays = fromFirst(days, (d) => d.weight_kg !== undefined || d.trend_kg !== undefined)
+  const tdeeDays = fromFirst(
+    days,
+    (d) => d.tdee !== undefined || (counted(d) && d.intake !== undefined),
+  )
+
+  const trends = weightDays.flatMap((d) => (d.trend_kg === undefined ? [] : [d.trend_kg]))
   const firstTrend = trends[0]
   const lastTrend = trends.at(-1)
-  const weighIns = days.filter((d) => d.weight_kg !== undefined).length
-  const lastTDEE = days.findLast((d) => d.tdee !== undefined)?.tdee
+  const weighIns = weightDays.filter((d) => d.weight_kg !== undefined).length
+  const lastTDEE = tdeeDays.findLast((d) => d.tdee !== undefined)?.tdee
   // The days logged, as calibration counts them: over, with a meal, not
   // left out. Today is open, its intake not all eaten yet.
-  const logged = days.filter((d) => counted(d) && d.intake !== undefined)
+  const logged = tdeeDays.filter((d) => counted(d) && d.intake !== undefined)
   const kcal = averageOf(logged.map((d) => d.intake?.kcal ?? null))
 
   // Weigh-ins and no trend are today's alone, which the trend takes once
@@ -252,10 +413,9 @@ function Progress({
       )
     : undefined
   const eatenSaid = kcal === undefined ? undefined : said.eaten(f.number(kcal), logged.length)
-  const names = words.names
   const goal = phase?.goal_weight
   // A goal far off the weights is said, not drawn.
-  const goalDrawn = goalShown(days, goal)
+  const goalDrawn = goalShown(weightDays, goal)
   const weightNote = [
     firstTrend === undefined || lastTrend === undefined || trends.length < 2
       ? undefined
@@ -263,52 +423,80 @@ function Progress({
     goal === undefined || goalDrawn ? undefined : t.charts.goal(f.number(goal, 1)),
   ].filter((s) => s !== undefined)
 
-  return (
-    <div
-      aria-busy={busy}
-      className={cn('space-y-3 transition-opacity lg:space-y-4', busy && 'opacity-60')}
-    >
-      <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
-        <ChartCard
-          title={t.charts.weight}
-          value={lastTrend === undefined ? undefined : t.charts.tips.kg(f.number(lastTrend, 1))}
-          caption={t.charts.trend}
-          note={weightNote.length === 0 ? undefined : weightNote.join(' · ')}
-          marks={[
-            { name: names.weighIn, mark: 'dot', color: 'bg-chart-5' },
-            { name: names.trend, mark: 'line', color: 'bg-chart-1' },
-            ...(goalDrawn
-              ? [{ name: names.goal, mark: 'dashed' as const, color: 'border-warning' }]
-              : []),
-          ]}
-          option={weightOption(days, words, colors, goal)}
-          label={weightLabel}
-        />
-        <ChartCard
-          title={t.charts.tdee}
-          value={lastTDEE ? t.unit.kcal(f.number(lastTDEE.kcal)) : undefined}
-          caption={lastTDEE ? t.charts.tdeeNow(f.number(lastTDEE.half_width)) : undefined}
-          note={kcal === undefined ? undefined : t.charts.eaten(f.number(kcal), logged.length)}
-          lead={balanceOf(days, t, f)}
-          marks={[
-            { name: names.tdee, mark: 'line', color: 'bg-chart-2' },
-            { name: names.interval, mark: 'band', color: 'bg-chart-2' },
-            { name: names.intake, mark: 'dot', color: 'bg-chart-5' },
-            { name: names.gap, mark: 'band', color: 'bg-chart-5' },
-            { name: names.target, mark: 'dashed', color: 'border-warning' },
-          ]}
-          option={tdeeOption(days, words, colors)}
-          label={[tdeeSaid, eatenSaid].filter((s) => s !== undefined).join(' ') || none}
-        />
-      </div>
-      {/* A desktop's weeks and measurements side by side, a phone's one
-          after the other. */}
-      <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
-        {weeks.count > 0 && <WeeklyTable weeks={weeks} today={today} />}
-        <Measurements days={days} words={words} colors={colors} />
-      </div>
-    </div>
+  // A proposal that waits, on the chart it cites: the weight's when it
+  // changes the phases alone, else the TDEE's.
+  const pending = plan?.pending
+  const cited: Cited | undefined =
+    pending === undefined ? undefined : { window: pending.window, label: names.proposal }
+  const onWeight = pending !== undefined && citesWeight(pending)
+  const coach = pending !== undefined && plan !== undefined && (
+    <CoachLine proposal={pending} plan={plan} />
   )
+
+  const tdeeMarks: Mark[] = [
+    { name: names.tdeeBand, mark: 'lineBand', color: 'bg-chart-2' },
+    { name: names.intake, mark: 'bar', color: 'bg-chart-5' },
+    ...(more
+      ? [
+          { name: names.gap, mark: 'band' as const, color: 'bg-chart-5' },
+          { name: names.target, mark: 'dashed' as const, color: 'border-warning' },
+        ]
+      : []),
+  ]
+
+  const weightCard = (
+    <ChartCard
+      title={t.charts.weight}
+      info={
+        <InfoTip label={t.info.trend.label} title={t.info.trend.title}>
+          {t.info.trend.text}
+        </InfoTip>
+      }
+      note={weightNote.length === 0 ? undefined : weightNote.join(' · ')}
+      marks={[
+        { name: names.weighIn, mark: 'dot', color: 'bg-chart-5' },
+        { name: names.trend, mark: 'line', color: 'bg-chart-1' },
+        ...(goalDrawn
+          ? [{ name: names.goal, mark: 'dashed' as const, color: 'border-warning' }]
+          : []),
+      ]}
+      option={weightOption(weightDays, words, colors, goal, onWeight ? cited : undefined)}
+      label={weightLabel}
+      table={tableOf(weightDays, words, [names.weighIn, names.trend], (d) => [
+        d.weight_kg === undefined ? undefined : f.number(d.weight_kg, 1),
+        d.trend_kg === undefined ? undefined : f.number(d.trend_kg, 1),
+      ])}
+      footer={onWeight && coach}
+    />
+  )
+  const tdeeCard = (
+    <ChartCard
+      title={t.charts.tdee}
+      note={kcal === undefined ? undefined : t.charts.eaten(f.number(kcal), logged.length)}
+      lead={balanceOf(tdeeDays, t, f)}
+      marks={tdeeMarks}
+      option={tdeeOption(tdeeDays, words, colors, {
+        more,
+        cited: onWeight ? undefined : cited,
+      })}
+      label={[tdeeSaid, eatenSaid].filter((s) => s !== undefined).join(' ') || none}
+      table={tableOf(tdeeDays, words, [names.tdee, names.intake, names.dayTarget], (d) => [
+        d.tdee === undefined
+          ? undefined
+          : tips.tdee(f.number(d.tdee.kcal), f.number(d.tdee.half_width)).replace(/^TDEE /, ''),
+        d.intake === undefined || !counted(d) ? undefined : f.number(d.intake.kcal),
+        d.target === undefined ? undefined : f.number(d.target.kcal),
+      ])}
+      more={{ shown: more, onChange: setMore }}
+      footer={!onWeight && coach}
+    />
+  )
+  return {
+    weight: weightCard,
+    tdee: tdeeCard,
+    measurements: <Measurements days={days} words={words} colors={colors} />,
+    weekly: weeks.count > 0 && <WeeklyTable weeks={weeks} today={today} />,
+  }
 }
 
 // usualOf is how the last 7 days' average (now) stands against its base,
@@ -332,10 +520,11 @@ function usualOf(
 }
 
 // Measurements are sleep, the resting heart rate, the HRV, the steps and
-// the body fat in small, each that has a value in the days. Sleep, the
-// heart rate and the HRV are the last 7 days' average, as recovery has
-// them (GET /api/v1/summary), against the usual, the 21 days before
-// them; until it has them, the days' average.
+// the body fat in small, each that has a value in the days, from its
+// first. Sleep, the heart rate and the HRV are the last 7 days' average,
+// as recovery has them (GET /api/v1/summary), against the usual, the 21
+// days before them, whose range a caption says under the line; until it
+// has them, the days' average.
 function Measurements({
   days,
   words,
@@ -352,19 +541,44 @@ function Measurements({
   const recovery = $api.useQuery('get', '/api/v1/summary').data?.recovery
   const flags = recovery?.flags ?? []
 
-  const sleep = days.map((d): Point => d.sleep_h ?? null)
-  const rhr = days.map((d): Point => d.resting_hr ?? null)
-  const hrv = days.map((d): Point => d.hrv ?? null)
-  const steps = stepsOf(days)
-  const fat = days.map((d): Point => d.body_fat_pct ?? null)
-  const sleepAverage = averageOf(sleep)
-  const rhrAverage = averageOf(rhr)
-  const hrvAverage = averageOf(hrv)
-  const stepsAverage = averageOf(steps)
-  const lastFat = fat.findLast((v): v is number => v !== null)
+  const sleep = trimmed(
+    days,
+    days.map((d): Point => d.sleep_h ?? null),
+  )
+  const rhr = trimmed(
+    days,
+    days.map((d): Point => d.resting_hr ?? null),
+  )
+  const hrv = trimmed(
+    days,
+    days.map((d): Point => d.hrv ?? null),
+  )
+  const steps = trimmed(days, stepsOf(days))
+  const fat = trimmed(
+    days,
+    days.map((d): Point => d.body_fat_pct ?? null),
+  )
+  const sleepAverage = averageOf(sleep.values)
+  const rhrAverage = averageOf(rhr.values)
+  const hrvAverage = averageOf(hrv.values)
+  const stepsAverage = averageOf(steps.values)
+  const lastFat = fat.values.findLast((v): v is number => v !== null)
   // A value of the last 7 days', else the days' average.
   const caption = (lastWeek: number | undefined) =>
     lastWeek === undefined ? t.charts.average : t.charts.lastWeek
+  // The usual range, in words under the line.
+  const usualSaid = (range: { low: number; high: number } | undefined) =>
+    range === undefined ? undefined : t.charts.usual(f.number(range.low), f.number(range.high))
+  // A measurement's days as a table of one column.
+  const table = (
+    of: { days: HistoryDay[]; values: Point[] },
+    name: string,
+    write: (v: number) => string,
+  ) =>
+    tableOf(of.days, words, [name], (_, i) => {
+      const v = of.values[i]
+      return [v === null || v === undefined ? undefined : write(v)]
+    })
 
   const tiles = [
     sleepAverage !== undefined && (
@@ -374,9 +588,10 @@ function Measurements({
         value={words.hm(recovery?.sleep_h ?? sleepAverage)}
         caption={caption(recovery?.sleep_h)}
         said={said.sleep(words.hm(sleepAverage))}
-        values={sleep}
+        values={sleep.values}
         legend={<SleepLegend />}
-        option={sleepOption(days, words, colors)}
+        option={sleepOption(sleep.days, words, colors)}
+        table={table(sleep, t.charts.sleep, words.hm)}
       />
     ),
     rhrAverage !== undefined && (
@@ -397,15 +612,18 @@ function Measurements({
           t,
         )}
         said={said.rhr(f.number(rhrAverage))}
-        values={rhr}
+        values={rhr.values}
         band={recovery?.resting_hr_usual}
-        option={lineOption(days, words, colors, {
+        bandSaid={usualSaid(recovery?.resting_hr_usual)}
+        option={lineOption(rhr.days, words, colors, {
           name: words.names.rhr,
           color: colors.blue,
-          values: rhr,
+          values: rhr.values,
           axis: (n) => words.number(n),
           tip: (v) => tips.bpm(f.number(v)),
+          usual: recovery?.resting_hr_usual,
         })}
+        table={table(rhr, t.charts.rhr, (v) => tips.bpm(f.number(v)))}
       />
     ),
     hrvAverage !== undefined && (
@@ -426,15 +644,18 @@ function Measurements({
           t,
         )}
         said={said.hrv(f.number(hrvAverage))}
-        values={hrv}
+        values={hrv.values}
         band={recovery?.hrv_usual}
-        option={lineOption(days, words, colors, {
+        bandSaid={usualSaid(recovery?.hrv_usual)}
+        option={lineOption(hrv.days, words, colors, {
           name: words.names.hrv,
           color: colors.blue,
-          values: hrv,
+          values: hrv.values,
           axis: (n) => words.number(n),
           tip: (v) => tips.ms(f.number(v)),
+          usual: recovery?.hrv_usual,
         })}
+        table={table(hrv, t.charts.hrv, (v) => tips.ms(f.number(v)))}
       />
     ),
     stepsAverage !== undefined && (
@@ -444,8 +665,9 @@ function Measurements({
         value={f.number(stepsAverage)}
         caption={t.charts.average}
         said={said.steps(f.number(stepsAverage))}
-        values={steps}
-        option={stepsOption(days, words, colors)}
+        values={steps.values}
+        option={stepsOption(steps.days, words, colors)}
+        table={table(steps, t.charts.steps, (v) => f.number(v))}
       />
     ),
     lastFat !== undefined && (
@@ -455,14 +677,15 @@ function Measurements({
         value={f.percent(lastFat, 1)}
         caption={t.charts.latest}
         said={said.bodyFat(f.percent(lastFat, 1))}
-        values={fat}
-        option={lineOption(days, words, colors, {
+        values={fat.values}
+        option={lineOption(fat.days, words, colors, {
           name: words.names.bodyFat,
           color: colors.blue,
-          values: fat,
+          values: fat.values,
           axis: (n) => words.percent(n),
           tip: (v) => f.percent(v, 1),
         })}
+        table={table(fat, t.charts.bodyFat, (v) => f.percent(v, 1))}
       />
     ),
   ].filter((tile) => tile !== false)
@@ -526,39 +749,44 @@ function HeroSkeleton() {
   )
 }
 
-// ProgressSkeleton stands in the charts' place, in their shape, while
-// their days come.
-function ProgressSkeleton() {
+// ChartSkeleton stands in a chart's card while its days come; loading
+// says so to a screen reader, once on the page.
+function ChartSkeleton({ loading = false }: { loading?: boolean }) {
   const t = useMessages()
 
   return (
-    <div aria-busy className="space-y-3 lg:space-y-4">
-      <output className="sr-only">{t.loading}</output>
-      <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
-        {[0, 1].map((i) => (
-          <div key={i} className={cn(card, 'space-y-3')}>
-            <div className="space-y-1.5">
-              <Skeleton className="h-5 w-32" />
-              <Skeleton className="h-4 w-48" />
-            </div>
-            <Skeleton className="h-4 w-56" />
-            <Skeleton className="h-60" />
-          </div>
-        ))}
+    <div aria-busy className={cn(card, 'space-y-3')}>
+      {loading && <output className="sr-only">{t.loading}</output>}
+      <div className="space-y-1.5">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-4 w-48" />
       </div>
-      <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
-        <div className={cn(card, 'space-y-3')}>
-          <Skeleton className="h-5 w-24" />
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-7" />
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-36 rounded-lg" />
-          ))}
-        </div>
-      </div>
+      <Skeleton className="h-4 w-56" />
+      <Skeleton className="h-60" />
+    </div>
+  )
+}
+
+// TilesSkeleton stands in the measurements in small.
+function TilesSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 lg:gap-4 xl:grid-cols-3">
+      {[0, 1, 2].map((i) => (
+        <Skeleton key={i} className="h-36 rounded-lg" />
+      ))}
+    </div>
+  )
+}
+
+// ProgressSkeleton stands in the charts' place on a phone, in their
+// shape, one after the other, while their days come (a desktop's are
+// beside the hero: ChartSkeleton, TilesSkeleton).
+function ProgressSkeleton() {
+  return (
+    <div aria-busy className="space-y-3">
+      <ChartSkeleton loading />
+      <ChartSkeleton />
+      <TilesSkeleton />
     </div>
   )
 }

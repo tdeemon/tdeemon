@@ -1,23 +1,37 @@
 import { addDays, daysBetween } from '@/i18n/format'
 
-// Span is the period the progress shows: so many days up to today, or the
-// phase today is in.
-export type Span = '30' | '90' | '180' | '365' | 'phase'
+// Span is the period the progress shows: so many days up to today, the
+// phase today is in, or all the days a history has (all).
+export type Span = '30' | 'phase' | '90' | '365' | 'all'
 
-export const spans: readonly Span[] = ['30', '90', '180', '365', 'phase']
+export const spans: readonly Span[] = ['30', 'phase', '90', '365', 'all']
 
 // A history is of 366 days at most (the API's), and its table of weeks
 // of a year's.
 const mostDays = 366
 const mostWeeks = 52
 
+// A phase younger than this many days is shown from the start by
+// default: its own days would be a few points.
+const youngDays = 14
+
+// defaultSpan is the span shown when none is asked for: the phase's,
+// once it has days enough to show; else all of them.
+export function defaultSpan(today: string, phaseStart?: string): Span {
+  return phaseStart !== undefined && daysBetween(phaseStart, today) >= youngDays ? 'phase' : 'all'
+}
+
 // firstDay is a span's first day, up to today: the phase's first, but no
-// more than the days a history has.
+// more than the days a history has; all, those days. A chart starts at
+// its first data after it (fromFirst).
 export function firstDay(span: Span, today: string, phaseStart?: string): string {
+  const earliest = addDays(today, 1 - mostDays)
+  if (span === 'all') {
+    return earliest
+  }
   if (span !== 'phase') {
     return addDays(today, 1 - Number(span))
   }
-  const earliest = addDays(today, 1 - mostDays)
   return phaseStart === undefined || phaseStart < earliest ? earliest : phaseStart
 }
 

@@ -27,8 +27,9 @@ the limits with their sources in [limits.md](limits.md).
   before the user's first logged meal; 63 days when the weigh-ins carry
   water over for days, as a heavier body's do.
 - **Intake:** the average of the window's complete, not excluded days
-  with at least one meal, between its first weigh-in and its last. A day
-  without a meal was not logged: its intake is unknown, not 0.
+  with at least one meal, between its first weigh-in and its last
+  (`intake_kcal`). A day without a meal was not logged: its intake is
+  unknown, not 0.
 - **Slope:** a linear regression of the weigh-ins in the window, in kg a
   week (`kg_per_week`, a minus a loss).
 - **TDEE** = intake − slope × 7700 / 7, in kcal a day: what was eaten,

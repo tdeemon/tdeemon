@@ -19,6 +19,7 @@ import {
   type Handler,
 } from '@/test/app'
 import { themeStyle, themeTokens } from '@/test/charts'
+import { planBody } from '@/test/plan'
 
 // The first test of the file loads the charts' module, ECharts with it,
 // which a busy machine takes seconds to.
@@ -129,6 +130,7 @@ const trusted: Summary['tdee'] = {
   kcal: 2400,
   half_width: 60,
   kg_per_week: -0.6,
+  intake_kcal: 1740,
   needs,
   trust: { half_width: 200, weigh_ins: 3, logged_days: 4 },
 }
@@ -185,48 +187,67 @@ function asked(fetch: ReturnType<typeof fakeServer>): URLSearchParams[] {
   })
 }
 
-// hero is the verdict on the phase, once it has come.
+// big is the hero's number, the TDEE.
+function big(region: HTMLElement): string | null | undefined {
+  return region.querySelector('.text-display')?.textContent
+}
+
+// drawing is a chart's drawing, once ECharts has drawn it.
+function drawing(region: HTMLElement): SVGElement | null {
+  return region.querySelector('[role="img"] svg')
+}
+
+// hero is the TDEE measured and the verdict on the phase, once it has
+// come.
 async function hero() {
   // The page's module loads with its route, the first time a while.
-  const region = await screen.findByRole(
-    'region',
-    { name: 'The phase so far' },
-    { timeout: 10_000 },
-  )
+  const region = await screen.findByRole('region', { name: 'Measured TDEE' }, { timeout: 10_000 })
   await waitFor(() => {
     expect(region.getAttribute('aria-busy')).toBeNull()
   })
   return region
 }
 
-test('the progress says how the phase goes, then the charts and the weeks, over 90 days', async () => {
-  const fetch = progressServer()
+test('the progress says the TDEE and how the phase goes, then the charts and the weeks, over the phase', async () => {
+  // Of the window's 41 logged days, the 40 from the first weigh-in to the
+  // last are the intake's.
+  const fetch = progressServer({
+    'GET /api/v1/summary': () => Response.json(summaryOf(onTrack, { ...trusted, logged_days: 41 })),
+  })
   renderAt('/progress')
 
   const verdict = await hero()
-  expect(within(verdict).getByText('Cut · week 8 of 12')).toBeDefined()
+  // The phase and its week are the page's, under its title.
+  expect(screen.getByText('Cut · week 8 of 12')).toBeDefined()
+  expect(within(verdict).queryByText('Cut · week 8 of 12')).toBeNull()
+  expect(big(verdict)).toBe('2,400')
+  expect(within(verdict).getByText('kcal ± 60')).toBeDefined()
+  expect(within(verdict).getByText('reliable')).toBeDefined()
+  // The sum it comes of, which adds up as written.
+  expect(
+    within(verdict)
+      .getByText(/^Intake/, { selector: 'p' })
+      .textContent.replaceAll(/\s+/g, ' '),
+  ).toBe('Intake 1,740 + trend −0.6 kg/wk (≈ 660) = 2,400 · 40 logged days, 38 weigh-ins')
   expect(within(verdict).getByText('On track.')).toBeDefined()
   expect(
     within(verdict).getByText("You're losing 0.68% a week, within the phase's range (0.65–0.85%)."),
   ).toBeDefined()
-  expect(within(verdict).getByText('TDEE 2,400 ± 60 kcal')).toBeDefined()
-  expect(within(verdict).getByText('Reliable')).toBeDefined()
-  expect(within(verdict).getByText('Trend weight 84.2 kg')).toBeDefined()
-  expect(within(verdict).getByText('Eaten 2,050 of 2,100 kcal a day')).toBeDefined()
+  // The phase is the default span.
+  expect(screen.getByRole<HTMLInputElement>('radio', { name: 'The phase' }).checked).toBe(true)
 
   // The charts' module, ECharts with it, loads when they are first shown.
   const weight = await screen.findByRole('region', { name: 'Weight' }, { timeout: 10_000 })
   expect(
     within(weight).getByRole('img', {
-      name: 'Trend weight from 85 to 76.1 kg, 90 weigh-ins.',
+      name: 'Trend weight from 85 to 79.8 kg, 53 weigh-ins.',
     }),
   ).toBeDefined()
-  expect(within(weight).getByText('76.1 kg')).toBeDefined()
-  expect(within(weight).getByText('-8.9 kg in these days')).toBeDefined()
+  expect(within(weight).getByText('-5.2 kg in these days · Goal 78 kg')).toBeDefined()
   const tdee = screen.getByRole('region', { name: 'TDEE and intake' })
   expect(
     within(tdee).getByRole('img', {
-      name: 'TDEE 2,400 ± 60 kcal a day, as of the last day. 2,000 kcal a day eaten on average, over 89 logged days.',
+      name: 'TDEE 2,400 ± 60 kcal a day, as of the last day. 2,000 kcal a day eaten on average, over 52 logged days.',
     }),
   ).toBeDefined()
   // What was eaten against the TDEE comes to a sentence: 2,000 a day
@@ -234,17 +255,17 @@ test('the progress says how the phase goes, then the charts and the weeks, over 
   expect(
     within(tdee).getByText('You eat about 400 kcal under what you burn, about -0.4 kg a week.'),
   ).toBeDefined()
-  // Each chart is drawn.
+  // Each chart is drawn, the trend weight written at its end.
   await waitFor(() => {
-    expect(weight.querySelector('svg')).not.toBeNull()
+    expect(drawing(weight)?.textContent).toContain('79.8')
   })
 
   const histories = asked(fetch)
-  expect(histories.find((q) => q.get('granularity') === null)?.get('from')).toBe('2026-07-26')
-  // The calendar weeks up to yesterday, Thursday: 14 of them, from the
-  // Monday of Sunday the 26th, and the one before.
+  expect(histories.find((q) => q.get('granularity') === null)?.get('from')).toBe(cut.start)
+  // The calendar weeks up to yesterday, Thursday: 8 of them, from the
+  // Monday of the phase's first day, and the one before.
   const weekly = histories.find((q) => q.get('granularity') === 'week')
-  expect([weekly?.get('from'), weekly?.get('to')]).toEqual(['2026-07-13', '2026-10-22'])
+  expect([weekly?.get('from'), weekly?.get('to')]).toEqual(['2026-08-24', '2026-10-22'])
 })
 
 test.each([
@@ -256,13 +277,13 @@ test.each([
   progressServer({
     'GET /api/v1/me': () => Response.json({ ...me(), phase: { ...cut, goal_weight: goal } }),
   })
-  renderAt('/progress')
+  renderAt('/progress?days=90')
 
   const weight = await screen.findByRole('region', { name: 'Weight' }, { timeout: 10_000 })
   expect(within(weight).getByText(note)).toBeDefined()
   expect(within(weight).queryByText('Goal') !== null).toBe(drawn)
   await waitFor(() => {
-    expect(weight.querySelector('svg')).not.toBeNull()
+    expect(drawing(weight)).not.toBeNull()
   })
   // The axis holds the weights, from 76 to 85 kg, by 2 kg, not the goal
   // too, by 5.
@@ -271,7 +292,7 @@ test.each([
   expect(labels).not.toContain('70')
 })
 
-test("the space between the TDEE and the 7 days' intake is shaded, and said, either way", async () => {
+test("the TDEE's chart has two layers, more a tap away: the space to the 7 days' intake, shaded, and the target", async () => {
   progressServer({
     'GET /api/v1/history': (r) =>
       historyAnswer(r, (from) =>
@@ -286,7 +307,30 @@ test("the space between the TDEE and the 7 days' intake is shaded, and said, eit
   expect(
     within(tdee).getByText('You eat about 300 kcal over what you burn, about +0.3 kg a week.'),
   ).toBeDefined()
-  expect(within(tdee).getByText('Eaten to TDEE, 7-day average')).toBeDefined()
+  // Two items in its legend: the TDEE in its band, and what was eaten.
+  const legend = () => [...tdee.querySelectorAll('ul[aria-hidden] li')].map((li) => li.textContent)
+  expect(legend()).toEqual(['TDEE ± 80%', 'Eaten'])
+  const more = within(tdee).getByRole('button', { name: 'More layers' })
+  expect(more.getAttribute('aria-pressed')).toBe('false')
+  fireEvent.click(more)
+  expect(more.getAttribute('aria-pressed')).toBe('true')
+  expect(legend()).toEqual([
+    'TDEE ± 80%',
+    'Eaten',
+    'Eaten to TDEE, 7-day average',
+    'Target, 7-day average',
+  ])
+
+  // Its table is of each day's own values: the target the day's, not
+  // the 7 days' average the chart draws.
+  fireEvent.click(within(tdee).getByRole('button', { name: 'TDEE and intake: table' }))
+  const rows = within(
+    within(tdee).getByRole('table', { name: 'TDEE and intake, by day' }),
+  ).getAllByRole('row')
+  expect(rows[0]?.textContent).toBe('DateTDEEEatenTarget')
+  // Today is open: what it ate is no value yet.
+  expect(rows[1]?.textContent).toBe('Fri, Oct 232,400 ± 60—2,100')
+  expect(rows[2]?.textContent).toBe('Thu, Oct 222,400 ± 602,7002,100')
 })
 
 test.each([
@@ -361,11 +405,14 @@ test.each([
   })
   renderAt('/progress')
 
-  const card = await calibration()
-  expect(within(card).getByText('Cut · week 8 of 12')).toBeDefined()
-  expect(within(card).getByText('TDEE ≈ 2,350 ± 310 · not reliable yet.')).toBeDefined()
+  // The TDEE so far leads, with what it needs: never only "too little
+  // data".
+  const card = await hero()
+  expect(big(card)).toBe('2,350')
+  expect(within(card).getByText('kcal ± 310')).toBeDefined()
+  expect(within(card).getByText('not reliable yet')).toBeDefined()
   expect(within(card).getByText(said)).toBeDefined()
-  expect(screen.queryByRole('region', { name: 'The phase so far' })).toBeNull()
+  expect(screen.queryByRole('region', { name: 'Calibration' })).toBeNull()
 })
 
 test('a threshold of the user’s own is said as the summary gives it', async () => {
@@ -384,7 +431,7 @@ test('a threshold of the user’s own is said as the summary gives it', async ()
   })
   renderAt('/progress')
 
-  const card = await calibration()
+  const card = await hero()
   expect(
     within(card).getByText(
       'It needs 1 weigh-in a week, in the last week too. Reliable once ± is 150 or less. Weighing in 1× a week helps most.',
@@ -435,8 +482,11 @@ test('without a phase or a TDEE, calibration counts toward one, says when, and l
   const router = renderAt('/progress?days=phase')
 
   const card = await calibration()
+  // No phase to show: all the days, from their first.
   expect(screen.queryByRole('radio', { name: 'The phase' })).toBeNull()
-  expect(screen.getByRole<HTMLInputElement>('radio', { name: '90 days' }).checked).toBe(true)
+  expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Since the start' }).checked).toBe(
+    true,
+  )
   // Days too few; logged days and weigh-ins enough, ticked.
   expect(rowsOf(card)).toEqual(['Days9 of 14', 'Logged days9 of 7enough', 'Weigh-ins9 of 6enough'])
   expect(within(card).getByText('First TDEE around Nov 2 if you keep this up.')).toBeDefined()
@@ -490,25 +540,39 @@ test('calibration speaks Croatian', async () => {
   expect(within(card).getByText('Još nema faze.')).toBeDefined()
 })
 
-test('a new phase says until when the TDEE is from the days before it', async () => {
+// A new phase: the TDEE is reliable, the phase has no verdict yet, as
+// the morning summary says it (#312), and a bar of its days toward its
+// first.
+test('a new phase says its TDEE is reliable and when its first verdict comes', async () => {
   progressServer({
+    'GET /api/v1/me': () =>
+      Response.json({ ...me(), phase: { ...cut, start: '2026-10-16', end: undefined } }),
     'GET /api/v1/summary': () =>
       Response.json(
         summaryOf(none('before_phase'), {
           ...trusted,
           before_phase: true,
-          before_phase_until: '2026-11-21',
+          before_phase_until: '2026-11-12',
         }),
       ),
   })
   renderAt('/progress')
 
   const verdict = await hero()
-  expect(within(verdict).getByText('Not enough data yet.')).toBeDefined()
+  expect(within(verdict).getByText('reliable, from the days before the phase')).toBeDefined()
+  expect(big(verdict)).toBe('2,400')
   expect(
-    within(verdict).getByText('New phase. Until Nov 21 the TDEE comes from the days before it.'),
+    within(verdict).getByText('The phase has just begun, its first verdict about Nov 13.'),
   ).toBeDefined()
-  expect(within(verdict).getByText('From before the phase')).toBeDefined()
+  expect(within(verdict).queryByText(/Not enough data/)).toBeNull()
+  // 7 of its 28 days to the first verdict.
+  const bar = within(verdict).getByRole('progressbar', { name: 'Phase verdict' })
+  expect([bar.getAttribute('value'), bar.getAttribute('max')]).toEqual(['7', '28'])
+  expect(within(verdict).getByText('7 / 28 days')).toBeDefined()
+  // A phase of a week is shown from the start of the days.
+  expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Since the start' }).checked).toBe(
+    true,
+  )
 })
 
 test('a TDEE without a phase leads, the way to the plan follows', async () => {
@@ -519,11 +583,13 @@ test('a TDEE without a phase leads, the way to the plan follows', async () => {
   renderAt('/progress')
 
   const verdict = await hero()
-  expect(within(verdict).getByText('TDEE 2,400 ± 60 kcal')).toBeDefined()
-  expect(within(verdict).getByText('Reliable')).toBeDefined()
-  expect(within(verdict).getByText('Trend weight 84.2 kg')).toBeDefined()
+  expect(big(verdict)).toBe('2,400')
+  expect(within(verdict).getByText('reliable')).toBeDefined()
   expect(within(verdict).getByText('No phase yet.')).toBeDefined()
   expect(within(verdict).getByRole('link', { name: 'Set up a plan' })).toBeDefined()
+  // Nothing says a phase there is not (#343).
+  expect(screen.queryByText(/phase so far/i)).toBeNull()
+  expect(screen.queryByText(/ · week /)).toBeNull()
 })
 
 test('a phase with no target says so, and opens the plan', async () => {
@@ -534,7 +600,7 @@ test('a phase with no target says so, and opens the plan', async () => {
 
   const verdict = await hero()
   expect(within(verdict).getByText('No target yet.')).toBeDefined()
-  expect(within(verdict).getByText('TDEE 2,400 ± 60 kcal')).toBeDefined()
+  expect(big(verdict)).toBe('2,400')
   expect(within(verdict).getByRole('link', { name: 'Open the plan' }).getAttribute('href')).toBe(
     '/plan',
   )
@@ -554,7 +620,7 @@ test("what recovery flags is a sentence of the verdict's", async () => {
   expect(within(verdict).getByText('Sleep and HRV were worse than usual last week.')).toBeDefined()
 })
 
-test('a period is chosen, and kept in the address; the phase is one', async () => {
+test('a period is chosen, and kept in the address; the phase is the default', async () => {
   const fetch = progressServer()
   const router = renderAt('/progress')
 
@@ -571,18 +637,55 @@ test('a period is chosen, and kept in the address; the phase is one', async () =
       ?.get('from'),
   ).toBe('2026-09-24')
 
-  fireEvent.click(screen.getByRole('radio', { name: 'The phase' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'Since the start' }))
   await waitFor(() => {
-    expect(router.state.location.search).toEqual({ days: 'phase' })
+    expect(router.state.location.search).toEqual({ days: 'all' })
   })
+  // All the days a history has, a year's.
   await waitFor(() => {
-    expect(asked(fetch).some((q) => q.get('from') === cut.start)).toBe(true)
+    expect(asked(fetch).some((q) => q.get('from') === '2025-10-23')).toBe(true)
   })
 
-  fireEvent.click(screen.getByRole('radio', { name: '90 days' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'The phase' }))
   await waitFor(() => {
     expect(router.state.location.search).toEqual({})
   })
+})
+
+// The days before the first data are no chart's, nor the table's weeks
+// (#325).
+test('the charts and the weeks start at the first data, not at the span’s first day', async () => {
+  const fetch = progressServer({
+    'GET /api/v1/me': () => Response.json(me()),
+    'GET /api/v1/summary': () => Response.json(summaryOf(none('no_phase', 'no_target'))),
+    'GET /api/v1/history': (r) =>
+      historyAnswer(r, (from) =>
+        historyOf(from).map((d) =>
+          d.date < '2026-10-06' ? { date: d.date, status: 'complete', type: 'rest', meals: 0 } : d,
+        ),
+      ),
+  })
+  renderAt('/progress')
+
+  const weight = await screen.findByRole('region', { name: 'Weight' }, { timeout: 10_000 })
+  // All the days were asked for; the charts are of the 18 that have data.
+  expect(
+    asked(fetch)
+      .find((q) => q.get('granularity') === null)
+      ?.get('from'),
+  ).toBe('2025-10-23')
+  expect(within(weight).getByRole('img', { name: /, 18 weigh-ins\.$/ })).toBeDefined()
+  fireEvent.click(within(weight).getByRole('button', { name: 'Weight: table' }))
+  const table = within(weight).getByRole('table', { name: 'Weight, by day' })
+  // The latest first, 14 of them, the rest a tap away.
+  const rows = within(table).getAllByRole('row')
+  expect(rows).toHaveLength(15)
+  expect(rows[1]?.textContent).toMatch(/^Fri, Oct 23/)
+  fireEvent.click(within(weight).getByRole('button', { name: 'Show all days (18)' }))
+  expect(within(table).getAllByRole('row').at(-1)?.textContent).toContain('Oct 6')
+  // The weeks from the Monday of the first data's, and the one before.
+  const weekly = asked(fetch).find((q) => q.get('granularity') === 'week')
+  expect(weekly?.get('from')).toBe('2026-09-28')
 })
 
 test("a year's period asks for a year, its weeks a year's, the year said where it changes", async () => {
@@ -607,9 +710,53 @@ test("a year's period asks for a year, its weeks a year's, the year said where i
   expect(sleep.querySelector('path')?.getAttribute('d')?.split('L')).toHaveLength(53)
 })
 
+// emptyWeek is a calendar week of nothing logged; over is laid over it.
+function emptyWeek(from: string, to: string, over: Partial<Week> = {}): Week {
+  return { from, to, logged_days: 0, weigh_ins: 0, training_days: 0, ...over }
+}
+
+// A week of weigh-ins alone is a row, its change unknown; one of nothing
+// at all is none.
+test('a week of nothing is no row, a week of weigh-ins alone is one', async () => {
+  progressServer({
+    'GET /api/v1/history': (r) =>
+      new URL(r.url).searchParams.get('granularity') === 'week'
+        ? Response.json({
+            from: '',
+            to: '',
+            days: [],
+            weeks: [
+              emptyWeek('2026-09-28', '2026-10-04'),
+              emptyWeek('2026-10-05', '2026-10-11', { weigh_ins: 5, trend_kg: 85 }),
+              emptyWeek('2026-10-12', '2026-10-18'),
+              emptyWeek('2026-10-19', '2026-10-22', {
+                logged_days: 4,
+                kcal: 2000,
+                protein: 150,
+                weigh_ins: 4,
+                trend_kg: 84.6,
+              }),
+            ],
+          })
+        : historyAnswer(r),
+  })
+  renderAt('/progress')
+
+  const weeks = await screen.findByRole('table', { name: 'By week' }, { timeout: 10_000 })
+  expect(
+    within(weeks)
+      .getAllByRole('row')
+      .map((r) => r.textContent),
+  ).toEqual([
+    'Weekkcalkcal a dayPProtein, g a dayΔ kgChange of the trend weight, kgDaysDays logged',
+    'Oct 19\u2009–\u2009222,000150—4/4',
+    'Oct 5\u2009–\u200911———0/7',
+  ])
+})
+
 test('the weeks are calendar weeks in a table, the latest first, the rest a tap away', async () => {
   progressServer()
-  renderAt('/progress')
+  renderAt('/progress?days=90')
 
   const weeks = await screen.findByRole('table', { name: 'By week' }, { timeout: 10_000 })
   const rows = within(weeks).getAllByRole('row')
@@ -667,6 +814,11 @@ test('the measurements are small charts, each a whole one a tap away', async () 
   expect(
     within(sheet).getByRole('img', { name: 'Resting heart rate 58 bpm on average.' }),
   ).toBeDefined()
+  // Its values by day, a tap away.
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Resting heart rate: table' }))
+  const table = within(sheet).getByRole('table', { name: 'Resting heart rate, by day' })
+  expect(within(table).getAllByRole('row')[1]?.textContent).toBe('Fri, Oct 2358 bpm')
+  expect(within(sheet).queryByRole('img')).toBeNull()
 })
 
 test("sleep, the heart rate and the HRV are the last 7 days', against the usual", async () => {
@@ -694,10 +846,11 @@ test("sleep, the heart rate and the HRV are the last 7 days', against the usual"
     expect(tile('Sleep').textContent).toBe('Sleep7 h 09last 7 days')
   })
   // 59 against 57 as shown; 48.7 against 52.2, 6.7% under.
+  // The usual range said under the line, as it is shaded (#330).
   expect(tile('Resting heart rate').textContent).toBe(
-    'Resting heart rate59 bpmlast 7 days+2 vs usual',
+    'Resting heart rate59 bpmlast 7 days+2 vs usualusual 54–60',
   )
-  expect(tile('HRV').textContent).toBe('HRV49 mslast 7 days-7% vs usual')
+  expect(tile('HRV').textContent).toBe('HRV49 mslast 7 days-7% vs usualusual 44–60')
   // Worse than usual, as recovery flags it, in the warning's colour.
   expect(within(tile('HRV')).getByText('-7% vs usual').className).toContain('text-warning')
   expect(within(tile('Resting heart rate')).getByText('+2 vs usual').className).not.toContain(
@@ -754,7 +907,7 @@ test('what came stays when it cannot be asked again, and the bar over it says si
 
   expect(await screen.findByText(/^Offline · data from /)).toBeDefined()
   expect(screen.getByRole('region', { name: 'Weight' })).toBeDefined()
-  expect(screen.getByRole('region', { name: 'The phase so far' })).toBeDefined()
+  expect(screen.getByRole('region', { name: 'Measured TDEE' })).toBeDefined()
   expect(screen.queryByRole('alert')).toBeNull()
 })
 
@@ -765,12 +918,12 @@ test('a summary that did not come says why in the hero, and asks again', async (
   })
   renderAt('/progress')
 
-  const verdict = await screen.findByRole('region', { name: 'The phase so far' })
+  const verdict = await screen.findByRole('region', { name: 'Measured TDEE' })
   expect((await within(verdict).findByRole('alert')).textContent).toBeTruthy()
   up = true
   fireEvent.click(within(verdict).getByRole('button', { name: 'Try again' }))
 
-  expect(await within(verdict).findByText('On track.')).toBeDefined()
+  expect(await within(await hero()).findByText('On track.')).toBeDefined()
 })
 
 test('the progress speaks Croatian', async () => {
@@ -780,14 +933,18 @@ test('the progress speaks Croatian', async () => {
     'GET /api/v1/summary': () => Response.json(summaryOf()),
     'GET /api/v1/history': (r) => historyAnswer(r),
   })
-  renderAt('/progress')
+  renderAt('/progress?days=90')
 
-  const verdict = await screen.findByRole('region', { name: 'Faza dosad' })
+  const verdict = await screen.findByRole('region', { name: 'Izmjereni TDEE' })
   expect(await within(verdict).findByText('Na putu.')).toBeDefined()
   expect(
     within(verdict).getByText('Gubiš 0,68 % tjedno, u rasponu faze (0,65–0,85 %).'),
   ).toBeDefined()
-  expect(within(verdict).getByText('TDEE 2.400 ± 60 kcal')).toBeDefined()
+  expect(big(verdict)).toBe('2.400')
+  expect(within(verdict).getByText('pouzdan')).toBeDefined()
+  expect(
+    within(verdict).getByText(/^Unos/, { selector: 'p' }).textContent.replaceAll(/\s+/g, ' '),
+  ).toBe('Unos 1.740 + trend −0,6 kg/tj (≈ 660) = 2.400 · 40 upisanih dana, 38 vaganja')
   expect(
     await screen.findByText(
       'Pojedeno 2.000 kcal na dan, kroz 89 upisanih dana',
@@ -796,10 +953,12 @@ test('the progress speaks Croatian', async () => {
     ),
   ).toBeDefined()
   expect(screen.getByRole('radio', { name: '30 dana' })).toBeDefined()
+  expect(screen.getByRole('radio', { name: 'Od početka' })).toBeDefined()
   expect(screen.getByRole('table', { name: 'Po tjednima' })).toBeDefined()
 })
 
 test("today's open day and a day left out count in no average, as calibration counts", async () => {
+  // Over 90 days, the first of them left out.
   progressServer({
     'GET /api/v1/history': (r) =>
       historyAnswer(r, (from) => {
@@ -822,7 +981,7 @@ test("today's open day and a day left out count in no average, as calibration co
         return days
       }),
   })
-  renderAt('/progress')
+  renderAt('/progress?days=90')
 
   expect(
     await screen.findByText('Eaten 2,000 kcal a day, over 88 logged days', {}, { timeout: 10_000 }),
@@ -878,7 +1037,7 @@ test("the charts take the dark theme's tokens when it is chosen, and draw again"
   renderAt('/progress')
 
   const weight = await screen.findByRole('region', { name: 'Weight' }, { timeout: 10_000 })
-  const svg = () => weight.querySelector('svg')?.outerHTML ?? ''
+  const svg = () => drawing(weight)?.outerHTML ?? ''
   await waitFor(() => {
     expect(svg()).toContain(light['--primary'])
   })
@@ -894,13 +1053,12 @@ test("the charts take the dark theme's tokens when it is chosen, and draw again"
   expect(svg()).not.toContain(light['--primary'])
 })
 
-// The verdict, the TDEE and its ±, its trust and the trend weight: each an
-// ⓘ away from what it is, in words.
+// The verdict, the TDEE and its ±, and its trust: each an ⓘ away from
+// what it is, in words; the trend weight's beside its chart.
 test.each([
   ['How the phase is judged', 'The verdict', 'measured from the phase'],
   ['What TDEE is', 'TDEE', 'with 80% probability'],
   ['What reliable means', 'Reliable', '200 kcal or less'],
-  ['What trend weight is', 'Trend weight', 'swings of water and salt'],
 ])('the hero\'s "%s" ⓘ says what it is', async (tip, name, said) => {
   progressServer()
   renderAt('/progress')
@@ -908,4 +1066,149 @@ test.each([
   const verdict = await hero()
   fireEvent.click(within(verdict).getByRole('button', { name: tip }))
   expect((await screen.findByRole('dialog', { name })).textContent).toContain(said)
+})
+
+test("the weight's ⓘ says what the trend weight is", async () => {
+  progressServer()
+  renderAt('/progress')
+
+  const weight = await screen.findByRole('region', { name: 'Weight' }, { timeout: 10_000 })
+  fireEvent.click(within(weight).getByRole('button', { name: 'What trend weight is' }))
+  expect((await screen.findByRole('dialog', { name: 'Trend weight' })).textContent).toContain(
+    'swings of water and salt',
+  )
+})
+
+// proposalOf is a proposal that waits, an AI coach's, drawn from the days
+// before today; changes are what it changes, a new target by default.
+function proposalOf(
+  changes: Partial<components['schemas']['ChangesBody']> = {},
+): components['schemas']['ProposalBody'] {
+  return {
+    id: '0193c3a5-0000-7000-8000-0000000000aa',
+    by: { client: 'mcp', model: 'claude-opus-5-5' },
+    status: 'pending',
+    rationale: 'Made up.',
+    created_at: '2026-10-23T08:00:00Z',
+    expires_at: '2026-10-30T08:00:00Z',
+    window: { from: '2026-10-09', to: '2026-10-22' },
+    changes: {
+      limits: [],
+      phases: [],
+      targets: [
+        {
+          from: '2026-10-24',
+          after: {
+            training: { kcal: 2100, protein: 150, carbs: 220, fat: 60 },
+            rest: { kcal: 2100, protein: 150, carbs: 220, fat: 60 },
+          },
+        },
+      ],
+      ...changes,
+    },
+  }
+}
+
+test.each([
+  { cites: 'TDEE and intake', changes: {}, other: 'Weight' },
+  {
+    cites: 'Weight',
+    changes: {
+      targets: [],
+      phases: [{ start: cut.start, before: cut, after: { ...cut, rate_pct_week: -0.5 } }],
+    },
+    other: 'TDEE and intake',
+  },
+])(
+  'a proposal that waits is marked on the chart it cites, $cites, and leads to the plan',
+  async ({ cites, changes, other }) => {
+    progressServer({
+      'GET /api/v1/plan': () => Response.json(planBody({ pending: proposalOf(changes) })),
+    })
+    const router = renderAt('/progress')
+
+    const chart = await screen.findByRole('region', { name: cites }, { timeout: 10_000 })
+    const link = await within(chart).findByRole('link', { name: /^Claude proposes 1 plan change / })
+    expect(link.textContent).toContain('Drawn from the days Oct 9 to Oct 22.')
+    await waitFor(() => {
+      expect(drawing(chart)?.textContent).toContain('Proposal')
+    })
+    expect(
+      within(screen.getByRole('region', { name: other })).queryByRole('link', {
+        name: /proposes/,
+      }),
+    ).toBeNull()
+    fireEvent.click(link)
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/plan')
+    })
+  },
+)
+
+// desktop makes the window a desktop's width, as matchMedia says.
+function desktop() {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query === '(min-width: 64rem)',
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }))
+}
+
+test("a desktop's hero is beside the TDEE, its skeleton too; what did not load is as wide as the page", async () => {
+  desktop()
+  let up = true
+  progressServer({
+    'GET /api/v1/history': (r) => (up ? historyAnswer(r) : problem(500)),
+  })
+  renderAt('/progress')
+
+  const tdee = await screen.findByRole('region', { name: 'TDEE and intake' }, { timeout: 10_000 })
+  const row = tdee.parentElement
+  expect(row?.firstElementChild).toBe(await hero())
+  expect(row?.className).toContain('grid-cols-[380px_minmax(0,1fr)]')
+  cleanup()
+
+  // A history that did not come: under the hero, not in its column.
+  up = false
+  renderAt('/progress?days=30')
+  const alert = await screen.findByRole('alert', {}, { timeout: 10_000 })
+  const verdict = await hero()
+  expect(verdict.parentElement?.className).toContain('grid-cols-1')
+  expect(verdict.parentElement?.contains(alert)).toBe(true)
+})
+
+test('each chart’s table is a switch of its own name', async () => {
+  progressServer()
+  renderAt('/progress')
+
+  const weight = await screen.findByRole('region', { name: 'Weight' }, { timeout: 10_000 })
+  expect(within(weight).getByRole('button', { name: 'Weight: table' }).textContent).toBe('Table')
+  expect(screen.getByRole('button', { name: 'TDEE and intake: table' })).toBeDefined()
+})
+
+test.each([
+  // A slope of 0 kg a week is no term: the few kcal are rounding, the sum
+  // about.
+  {
+    tdee: { kcal: 2405, intake_kcal: 2400, kg_per_week: 0.004 },
+    said: 'Intake 2,400 + trend 0 kg/wk (≈ 0) ≈ 2,405',
+  },
+  // A gain, with the minus sign, not a hyphen.
+  {
+    tdee: { kcal: 2400, intake_kcal: 2730, kg_per_week: 0.3 },
+    said: 'Intake 2,730 − trend +0.3 kg/wk (≈ 330) = 2,400',
+  },
+  {
+    tdee: { kcal: 2400, intake_kcal: 1740, kg_per_week: -0.6 },
+    said: 'Intake 1,740 + trend −0.6 kg/wk (≈ 660) = 2,400',
+  },
+])('the hero’s sum says $said', async ({ tdee, said }) => {
+  progressServer({
+    'GET /api/v1/summary': () => Response.json(summaryOf(onTrack, { ...trusted, ...tdee })),
+  })
+  renderAt('/progress')
+
+  const sum = within(await hero()).getByText(/^Intake/, { selector: 'p' })
+  expect(sum.textContent.replaceAll(/\s+/g, ' ').startsWith(`${said} ·`)).toBe(true)
 })

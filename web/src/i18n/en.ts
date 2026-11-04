@@ -173,8 +173,7 @@ export const en = {
     expected: (date: string) => `First TDEE around ${date} if you keep this up.`,
     // Without a day foreseen: no meal or no weigh-in lately.
     start: 'Log your meals and weigh in, and the counts grow day by day.',
-    // A TDEE measured but not reliable yet, and what it needs to be.
-    unsure: (kcal: string, half: string) => `TDEE ≈ ${kcal} ± ${half} · not reliable yet.`,
+    // What a TDEE measured but not reliable yet needs to be.
     doubts: {
       wide_interval: (half: string, weighIns: string) =>
         `Reliable once ± is ${half} or less. Weighing in ${weighIns}× a week helps most.`,
@@ -183,8 +182,6 @@ export const en = {
       few_logged_days: (days: string, count: number) =>
         `It needs ${days} logged ${plural('en', count, { one: 'day', other: 'days' })} a week, in the last week too.`,
     },
-    beforePhase: (date: string) =>
-      `New phase. Until ${date} the TDEE comes from the days before it.`,
   },
   // What a number is, an ⓘ beside it away (InfoTip): the ⓘ's name, the
   // number's, and two or three sentences, from DESIGN.md §7 in plain
@@ -1105,13 +1102,13 @@ export const en = {
     title: 'Progress',
     span: 'Period',
     // The periods: short in their segments, whole for a screen reader.
-    spans: { '30': '30 d', '90': '90 d', '180': '180 d', '365': '1 y', phase: 'Phase' },
+    spans: { '30': '30 d', phase: 'Phase', '90': '90 d', '365': '1 y', all: 'All' },
     spansSaid: {
       '30': '30 days',
-      '90': '90 days',
-      '180': '180 days',
-      '365': '1 year',
       phase: 'The phase',
+      '90': '90 days',
+      '365': '1 year',
+      all: 'Since the start',
     },
     none: 'Nothing logged in these days yet.',
     noneHint: 'Log a meal or a weigh-in, and how it goes shows here.',
@@ -1129,9 +1126,17 @@ export const en = {
     average: 'average',
     lastWeek: 'last 7 days',
     latest: 'latest',
-    trend: 'trend',
-    // Under the last day's TDEE: half its 80 % interval.
-    tdeeNow: (half: string) => `TDEE ± ${half}`,
+    // The usual range, under a measurement's line in small.
+    usual: (low: string, high: string) => `usual ${low}–${high}`,
+    // A chart's switches: the layers past the first two, and its values
+    // as a table of days.
+    moreLayers: 'More layers',
+    table: 'Table',
+    date: 'Date',
+    // A chart's table, to a screen reader.
+    tableOfChart: (chart: string) => `${chart}: table`,
+    tableOf: (chart: string) => `${chart}, by day`,
+    allDays: (n: number) => `Show all days (${String(n)})`,
     // The trend weight's change over the days shown.
     change: (kg: string) => `${kg} kg in these days`,
     // The phase's goal, said when it is far off the weights shown.
@@ -1165,6 +1170,12 @@ export const en = {
       goal: 'Goal',
       tdee: 'TDEE',
       interval: '80% interval',
+      // The TDEE's line in its band, one mark of the legend.
+      tdeeBand: 'TDEE ± 80%',
+      // A coach's proposal, marked on the chart it cites.
+      proposal: 'Proposal',
+      // A day's own target, a column of the TDEE's table.
+      dayTarget: 'Target',
       intake: 'Eaten',
       target: 'Target, 7-day average',
       // The space between the TDEE and the 7 days' intake.
@@ -1212,13 +1223,31 @@ export const en = {
       steps: (steps: string) => `${steps} steps a day on average.`,
       none: 'No values in these days.',
     },
+    // The hero: the TDEE measured, the sum it comes of, and the verdict
+    // on the phase, or until when there is none.
+    hero: {
+      title: 'Measured TDEE',
+      reliable: 'reliable',
+      before: 'reliable, from the days before the phase',
+      unsure: 'not reliable yet',
+      half: (half: string) => `kcal ± ${half}`,
+      // The sum: Intake 2,209 + trend −0.43 kg/wk (≈ 470) = 2,679.
+      intake: 'Intake',
+      trend: (kg: string) => `trend ${kg} kg/wk`,
+      of: (days: number, weighIns: number) =>
+        `${String(days)} logged ${plural('en', days, { one: 'day', other: 'days' })}, ${String(weighIns)} ${plural('en', weighIns, { one: 'weigh-in', other: 'weigh-ins' })}`,
+      verdict: 'Phase verdict',
+      first: (date: string) => `first around ${date}`,
+      daysOf: (has: string, need: string) => `${has} / ${need} days`,
+      // As the morning summary says it (#312).
+      begun: (date: string) => `The phase has just begun, its first verdict about ${date}.`,
+      begunSoon: 'The phase has just begun.',
+    },
     // The verdict on the phase, as calibration gives it.
     verdict: {
-      label: 'The phase so far',
       onTarget: 'On track.',
       fast: 'Too fast.',
       slow: 'Too slow.',
-      waiting: 'Not enough data yet.',
       noPhase: 'No phase yet.',
       noTarget: 'No target yet.',
       losing: (pct: string) => `You're losing ${pct}% a week`,
@@ -1239,11 +1268,7 @@ export const en = {
           'The phase is new. Until it has enough days of its own, the TDEE comes from the days before it.',
         no_tdee: 'The TDEE came out at 0 or less: are the meals all logged?',
       },
-      tdee: (kcal: string, half: string) => `TDEE ${kcal} ± ${half} kcal`,
-      trusted: 'Reliable',
-      before: 'From before the phase',
       trend: (kg: string) => `Trend weight ${kg} kg`,
-      eaten: (kcal: string, target: string) => `Eaten ${kcal} of ${target} kcal a day`,
       setPlan: 'Set up a plan',
       openPlan: 'Open the plan',
     },

@@ -1,16 +1,17 @@
 import { cn } from '@/lib/utils'
 
-// A mark is how a series is drawn: a line, a dashed line, a band, dots,
-// bars, or an outline around one. Its colour is a class of the token the
-// series is drawn in: bg-…, or border-… of a dashed line or an outline.
+// A mark is how a series is drawn: a line, a line in its band, a dashed
+// line, a band, dots, bars, or an outline around one. Its colour is a
+// class of the token the series is drawn in: bg-…, or border-… of a
+// dashed line or an outline.
 export interface Mark {
   name: string
-  mark: 'line' | 'dashed' | 'band' | 'dot' | 'bar' | 'outline'
+  mark: 'line' | 'lineBand' | 'dashed' | 'band' | 'dot' | 'bar' | 'outline'
   color: string
 }
 
 // The marks' shapes, as small as the legend's text.
-const shapes: Record<Mark['mark'], string> = {
+const shapes: Record<Exclude<Mark['mark'], 'lineBand'>, string> = {
   line: 'h-0.5 w-4 rounded-full',
   dashed: 'w-4 border-t-2 border-dashed',
   band: 'h-2.5 w-4 rounded-xs opacity-25',
@@ -27,7 +28,14 @@ export function Legend({ marks }: { marks: Mark[] }) {
     <ul aria-hidden className="flex flex-wrap gap-x-3 gap-y-1 text-caption text-muted-foreground">
       {marks.map((m) => (
         <li key={m.name} className="flex items-center gap-1.5">
-          <span className={cn('shrink-0', shapes[m.mark], m.color)} />
+          {m.mark === 'lineBand' ? (
+            <span className="relative flex h-2.5 w-4 shrink-0 items-center">
+              <span className={cn('absolute inset-0 rounded-xs opacity-25', m.color)} />
+              <span className={cn('relative h-0.5 w-full rounded-full', m.color)} />
+            </span>
+          ) : (
+            <span className={cn('shrink-0', shapes[m.mark], m.color)} />
+          )}
           {m.name}
         </li>
       ))}

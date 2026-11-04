@@ -49,6 +49,16 @@ test('a proposed change is accepted in the app, and taken back from its history'
   await expect(
     page.getByRole('link', { name: /^Claude proposes 1 plan change New target/ }),
   ).toBeVisible()
+  // The progress marks it on the chart it cites, the intake's, and leads
+  // to the plan from there.
+  await page
+    .getByRole('navigation', { name: 'Sections' })
+    .getByRole('link', { name: 'Progress' })
+    .click()
+  const tdee = page.getByRole('region', { name: 'TDEE and intake' })
+  await expect(tdee.locator('[role="img"] svg')).toContainText('Proposal')
+  await tdee.getByRole('link', { name: /^Claude proposes 1 plan change New target/ }).click()
+  await expect(page).toHaveURL('/plan')
   const plan = page
     .getByRole('navigation', { name: 'Sections' })
     .getByRole('link', { name: 'Plan' })

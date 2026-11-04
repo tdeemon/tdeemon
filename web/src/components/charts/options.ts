@@ -24,6 +24,9 @@ export interface Words {
     goal: string
     tdee: string
     interval: string
+    tdeeBand: string
+    proposal: string
+    dayTarget: string
     intake: string
     target: string
     gap: string
@@ -61,6 +64,68 @@ function value<T>(v: T | undefined): T | null {
   return v ?? null
 }
 
+// fromFirst are the days from the first that has a value of a chart's
+// (has) on: a chart starts at its first data, not at its span's first
+// day, which would squeeze its values into a strip. Days of none are as
+// they are.
+export function fromFirst(days: HistoryDay[], has: (day: HistoryDay) => boolean): HistoryDay[] {
+  const first = days.findIndex(has)
+  return first <= 0 ? days : days.slice(first)
+}
+
+// Cited is what a coach's proposal cites of a chart: the days it was
+// drawn from (window), shaded, and a line on the last day, the proposal
+// waiting now, which label names.
+export interface Cited {
+  window?: { from: string; to: string } | undefined
+  label: string
+}
+
+// citedSeries is a proposal's marks on a chart of days, in the coach's
+// colour: a series of no values of its own, so no tooltip or legend
+// says it. A window outside the days is not shaded.
+function citedSeries(days: HistoryDay[], c: ChartColors, cited: Cited): Option {
+  const first = days[0]?.date
+  const last = days.at(-1)?.date
+  const from =
+    cited.window && first !== undefined && cited.window.from < first ? first : cited.window?.from
+  const to = cited.window && last !== undefined && cited.window.to > last ? last : cited.window?.to
+  return {
+    name: 'proposal',
+    type: 'line',
+    silent: true,
+    showSymbol: false,
+    lineStyle: { opacity: 0 },
+    data: days.map(() => null),
+    ...(from !== undefined && to !== undefined && from <= to
+      ? {
+          markArea: {
+            silent: true,
+            itemStyle: { color: c.coach, opacity: 0.1 },
+            data: [[{ xAxis: from }, { xAxis: to }]],
+          },
+        }
+      : {}),
+    ...(last === undefined
+      ? {}
+      : {
+          markLine: {
+            symbol: 'none',
+            silent: true,
+            lineStyle: { color: c.coach, type: 'dashed', width: 1.5 },
+            label: {
+              color: c.coach,
+              fontWeight: 600,
+              position: 'end',
+              align: 'right',
+              formatter: cited.label,
+            },
+            data: [{ xAxis: last }],
+          },
+        }),
+  }
+}
+
 // some are the values of a series that a day has.
 function some(values: Point[]): number[] {
   return values.filter((v): v is number => v !== null)
@@ -90,6 +155,10 @@ interface Base {
   axis: (n: number) => string
   tip: (day: HistoryDay, i: number) => string[]
   reach?: Option
+  // The room right of the grid, for a line's label at its end, and above
+  // it, for a proposal's label over its line.
+  right?: number
+  top?: number
 }
 
 // base is what every chart shares: the days along the bottom, one axis of
@@ -108,8 +177,8 @@ function base(days: HistoryDay[], w: Words, c: ChartColors, of: Base): Option {
     // are the bounds of the grid with its labels.
     grid: {
       left: 4,
-      right: 12,
-      top: 12,
+      right: of.right ?? 12,
+      top: of.top ?? 12,
       bottom: 4,
       outerBoundsMode: 'same',
       outerBoundsContain: 'axisLabel',
@@ -212,14 +281,16 @@ export function goalShown(days: HistoryDay[], goalKg: number | undefined): boole
   )
 }
 
-// weightOption is the weigh-ins as dots and the trend weight as a line,
-// with the phase's goal as a dashed line when it is near them
-// (goalShown). The axis reaches the weights alone.
+// weightOption is the weigh-ins as faint dots under the trend weight's
+// line, its last value written at its end, with the phase's goal as a
+// dashed line when it is near them (goalShown), and a proposal that
+// cites the weight (cited). The axis reaches the weights alone.
 export function weightOption(
   days: HistoryDay[],
   w: Words,
   c: ChartColors,
   goalKg?: number,
+  cited?: Cited,
 ): Option {
   const goal = goalShown(days, goalKg) ? goalKg : undefined
   return {
@@ -230,13 +301,15 @@ export function weightOption(
         ...(d.trend_kg === undefined ? [] : [w.tips.trend(w.number(d.trend_kg, 1))]),
       ],
       reach: reachOf(weightsOf(days)),
+      right: 44,
+      ...(cited === undefined ? {} : { top: 28 }),
     }),
     series: [
       {
         name: w.names.weighIn,
         type: 'scatter',
         symbolSize: 7,
-        itemStyle: { color: c.neutral, opacity: 0.75 },
+        itemStyle: { color: c.neutral, opacity: 0.45 },
         data: days.map((d): Point => value(d.weight_kg)),
       },
       line(
@@ -245,6 +318,13 @@ export function weightOption(
         days.map((d): Point => value(d.trend_kg)),
         {
           lineStyle: { color: c.primary, width: 2.5 },
+          endLabel: {
+            show: true,
+            color: c.text,
+            fontWeight: 600,
+            formatter: (p: { value?: unknown }) =>
+              typeof p.value === 'number' ? w.number(p.value, 1) : '',
+          },
           ...(goal === undefined
             ? {}
             : {
@@ -262,6 +342,7 @@ export function weightOption(
               }),
         },
       ),
+      ...(cited === undefined ? [] : [citedSeries(days, c, cited)]),
     ],
   }
 }
@@ -272,14 +353,29 @@ export function eaten7(days: HistoryDay[]): Point[] {
   return average7(days.map((d): Point => (counted(d) ? value(d.intake?.kcal) : null)))
 }
 
+// Layers is what the TDEE chart draws past its first two layers, the
+// TDEE in its band and what was eaten: the space between the TDEE and
+// the 7 days' average of what was eaten, and the target.
+export interface Layers {
+  more?: boolean | undefined
+  cited?: Cited | undefined
+}
+
 // tdeeOption is the TDEE measured up to each day, with its 80 % interval
-// as a band, what was eaten as dots, the space between the TDEE and the 7
-// days' average of what was eaten shaded (a deficit, or a surplus), and
-// the target as its 7 days' average, a dashed line: the days' own, a
-// training day's and a rest day's in turn, would zigzag (a tooltip says
-// the day's own). What was eaten is of the days calibration counts:
-// today's, not over yet, would be a dot far below the others.
-export function tdeeOption(days: HistoryDay[], w: Words, c: ChartColors): Option {
+// as a band, and what was eaten as faint bars; with more layers, the
+// space between the TDEE and the 7 days' average of what was eaten
+// shaded (a deficit, or a surplus), and the target as its 7 days'
+// average, a dashed line: the days' own, a training day's and a rest
+// day's in turn, would zigzag (a tooltip says the day's own). What was
+// eaten is of the days calibration counts: today's, not over yet, would
+// be a bar far below the others. A proposal that cites the intake is
+// marked (cited).
+export function tdeeOption(
+  days: HistoryDay[],
+  w: Words,
+  c: ChartColors,
+  layers: Layers = {},
+): Option {
   const eaten = eaten7(days)
   // The gap's foot and its height, on the days that have both.
   const gap = days.map((d, i) => {
@@ -288,6 +384,31 @@ export function tdeeOption(days: HistoryDay[], w: Words, c: ChartColors): Option
       ? undefined
       : { foot: Math.min(d.tdee.kcal, kcal), height: Math.abs(d.tdee.kcal - kcal) }
   })
+  const more = [
+    {
+      // The gap's foot, not drawn: the gap stacks on it.
+      name: 'gapFoot',
+      type: 'line',
+      stack: 'gap',
+      showSymbol: false,
+      lineStyle: { opacity: 0 },
+      data: gap.map((g): Point => g?.foot ?? null),
+    },
+    {
+      name: w.names.gap,
+      type: 'line',
+      stack: 'gap',
+      showSymbol: false,
+      lineStyle: { opacity: 0 },
+      itemStyle: { color: c.neutral },
+      areaStyle: { color: c.neutral, opacity: 0.22 },
+      data: gap.map((g): Point => g?.height ?? null),
+    },
+    line(w.names.target, c.warning, average7(days.map((d): Point => value(d.target?.kcal))), {
+      showSymbol: false,
+      lineStyle: { color: c.warning, type: 'dashed', width: 1.5 },
+    }),
+  ]
   return {
     ...base(days, w, c, {
       axis: (n) => w.number(n),
@@ -297,8 +418,16 @@ export function tdeeOption(days: HistoryDay[], w: Words, c: ChartColors): Option
         ...(d.target ? [w.tips.target(w.number(d.target.kcal))] : []),
       ],
       reach: { scale: true },
+      ...(layers.cited === undefined ? {} : { top: 28 }),
     }),
     series: [
+      {
+        name: w.names.intake,
+        type: 'bar',
+        barMaxWidth: 10,
+        itemStyle: { color: c.neutral, opacity: 0.35, borderRadius: [2, 2, 0, 0] },
+        data: days.map((d): Point => (counted(d) ? value(d.intake?.kcal) : null)),
+      },
       {
         // The band's foot, not drawn: the band stacks on it.
         name: 'low',
@@ -318,41 +447,13 @@ export function tdeeOption(days: HistoryDay[], w: Words, c: ChartColors): Option
         areaStyle: { color: c.blue, opacity: 0.16 },
         data: days.map((d): Point => (d.tdee ? 2 * d.tdee.half_width : null)),
       },
-      {
-        // The gap's foot, not drawn: the gap stacks on it.
-        name: 'gapFoot',
-        type: 'line',
-        stack: 'gap',
-        showSymbol: false,
-        lineStyle: { opacity: 0 },
-        data: gap.map((g): Point => g?.foot ?? null),
-      },
-      {
-        name: w.names.gap,
-        type: 'line',
-        stack: 'gap',
-        showSymbol: false,
-        lineStyle: { opacity: 0 },
-        itemStyle: { color: c.neutral },
-        areaStyle: { color: c.neutral, opacity: 0.22 },
-        data: gap.map((g): Point => g?.height ?? null),
-      },
+      ...(layers.more === true ? more : []),
       line(
         w.names.tdee,
         c.blue,
         days.map((d): Point => value(d.tdee?.kcal)),
       ),
-      {
-        name: w.names.intake,
-        type: 'scatter',
-        symbolSize: 7,
-        itemStyle: { color: c.neutral, opacity: 0.85 },
-        data: days.map((d): Point => (counted(d) ? value(d.intake?.kcal) : null)),
-      },
-      line(w.names.target, c.warning, average7(days.map((d): Point => value(d.target?.kcal))), {
-        showSymbol: false,
-        lineStyle: { color: c.warning, type: 'dashed', width: 1.5 },
-      }),
+      ...(layers.cited === undefined ? [] : [citedSeries(days, c, layers.cited)]),
     ],
   }
 }
@@ -434,8 +535,8 @@ export function sleepOption(days: HistoryDay[], w: Words, c: ChartColors): Optio
 }
 
 // lineOption is one measurement as a line on one axis: the resting heart
-// rate, the HRV, the body fat. axis writes its axis's numbers, and tip
-// says a day's value.
+// rate, the HRV, the body fat, over its usual range when it has one.
+// axis writes its axis's numbers, and tip says a day's value.
 export function lineOption(
   days: HistoryDay[],
   w: Words,
@@ -446,8 +547,11 @@ export function lineOption(
     values: Point[]
     axis: (n: number) => string
     tip: (v: number) => string
+    // The usual range, shaded behind the line.
+    usual?: { low: number; high: number } | undefined
   },
 ): Option {
+  const usual = of.usual
   return {
     ...base(days, w, c, {
       axis: of.axis,
@@ -457,7 +561,22 @@ export function lineOption(
       },
       reach: { scale: true },
     }),
-    series: [line(of.name, of.color, of.values)],
+    series: [
+      line(
+        of.name,
+        of.color,
+        of.values,
+        usual === undefined
+          ? {}
+          : {
+              markArea: {
+                silent: true,
+                itemStyle: { color: c.neutral, opacity: 0.16 },
+                data: [[{ yAxis: usual.low }, { yAxis: usual.high }]],
+              },
+            },
+      ),
+    ],
   }
 }
 

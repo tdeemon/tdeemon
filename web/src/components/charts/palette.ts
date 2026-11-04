@@ -21,6 +21,8 @@ export interface ChartColors {
   // The plan's lines, and what falls short (a short night).
   warning: string
   bad: string
+  // What an AI coach proposed, marked on the chart it cites.
+  coach: string
 }
 
 // tokens are the custom properties each colour is read from.
@@ -36,6 +38,7 @@ export const tokens: Record<keyof ChartColors, string> = {
   neutral: '--chart-5',
   warning: '--warning',
   bad: '--destructive',
+  coach: '--coach',
 }
 
 // palette is the charts' colours in the dark theme, which the dark
@@ -58,6 +61,7 @@ export const palette: ChartColors = {
   neutral: '#8b95ab',
   warning: '#f2c14e',
   bad: '#fe724f',
+  coach: '#b4a3ff',
 }
 
 // chartColors are the colours of the theme the page is in now, as its
@@ -85,6 +89,7 @@ export function chartColors(
     neutral: of('neutral'),
     warning: of('warning'),
     bad: of('bad'),
+    coach: of('coach'),
   }
 }
 

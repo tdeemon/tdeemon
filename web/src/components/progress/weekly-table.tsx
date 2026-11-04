@@ -19,7 +19,8 @@ const first = 8
 // trend weight's change from the week before, and how many of its days
 // were logged, of the 7, or of this week's that are over. It says in text
 // what the charts show. weeks is the history to ask for, a week more than
-// it shows: the first's change is from it.
+// it shows: the first's change is from it. A week of nothing (no meal,
+// no trend weight) is no row.
 export function WeeklyTable({
   weeks,
   today,
@@ -62,7 +63,9 @@ export function WeeklyTable({
           week.trend_kg === undefined || before.trend_kg === undefined
             ? undefined
             : week.trend_kg - before.trend_kg
-        return [{ ...week, change }]
+        const empty =
+          week.logged_days === 0 && week.kcal === undefined && week.trend_kg === undefined
+        return empty ? [] : [{ ...week, change }]
       })
       .toReversed()
     const shown = all ? rows : rows.slice(0, first)
