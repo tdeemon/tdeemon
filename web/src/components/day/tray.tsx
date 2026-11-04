@@ -135,7 +135,7 @@ export function Tray({
           {t.log.logAs(label, f.number(kcal))}
           <kbd
             aria-hidden
-            className="hidden rounded-[5px] border border-primary-foreground/50 px-1.5 font-mono text-caption opacity-80 lg:inline"
+            className="hidden rounded-[5px] border border-primary-foreground/50 px-1.5 font-mono text-caption lg:inline"
           >
             {apple() ? '⌘↵' : 'Ctrl ↵'}
           </kbd>

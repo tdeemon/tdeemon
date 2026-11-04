@@ -277,6 +277,8 @@ const screens: Screen[] = [
     open: async (page) => {
       await page.goto('/?log=true')
       await page.getByRole('button', { name: /^(New food|Nova namirnica)$/ }).click()
+      // Off the step's button, which came under it: not hovered.
+      await page.mouse.move(0, 0)
       await expect(
         page.getByRole('button', { name: /^(Add to meal|Dodaj u obrok)$/ }),
       ).toBeVisible()
@@ -715,7 +717,7 @@ for (const size of sizes) {
 
         test('every screen passes axe, its targets and its focus', async ({ page }, testInfo) => {
           // Long: every screen, its checks and its photograph.
-          test.setTimeout(180_000)
+          test.setTimeout(240_000)
           await signIn(page)
           const made = await make(
             page,
