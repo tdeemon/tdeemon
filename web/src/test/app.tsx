@@ -71,6 +71,7 @@ export function session(locale: Locale = 'en'): components['schemas']['SessionBo
       // not the user's, fails the tests anywhere.
       timezone: 'America/Los_Angeles',
       day_start_hour: 4,
+      single_key_shortcuts: true,
     },
     expires_at: '2026-11-22T10:00:00Z',
   }

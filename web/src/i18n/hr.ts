@@ -55,6 +55,8 @@ export const hr: Messages = {
   },
   shortcuts: {
     title: 'Prečaci tipkovnice',
+    singleKeysOff:
+      'Prečaci jednom tipkom su isključeni, u Postavke › Izgled. I dalje rade oni s Ctrl ili ⌘, strelice i tipke označenog retka.',
     logMeal: 'Upiši obrok',
     find: 'Pronađi namirnicu',
     days: 'Dan prije ili poslije',
@@ -1176,6 +1178,9 @@ export const hr: Messages = {
     title: 'Postavke',
     appearance: 'Izgled',
     appearanceHint: 'Samo za ovaj preglednik, pa mobitel može biti taman, a laptop svijetao.',
+    singleKeys: 'Prečaci jednom tipkom',
+    singleKeysHint:
+      'N, W, G pa slovo, ? i /, te tipkanje na Danu. Isključene ih glasovni unos ne može slučajno pokrenuti. I dalje rade oni s Ctrl ili ⌘, strelice i tipke označenog retka. Za tvoj račun, na svim uređajima.',
     themes: {
       system: 'Sustav',
       light: 'Svijetla',

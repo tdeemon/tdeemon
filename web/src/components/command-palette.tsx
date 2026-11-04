@@ -332,7 +332,10 @@ function useGroups(query: string, actions: Command[]): Group[] {
   const q = query.trim()
   const foods = useFindFoods(q)
   const today = $api.useQuery('get', '/api/v1/me').data?.today
-  const admin = useQuery(sessionQuery).data?.user.role === 'admin'
+  const user = useQuery(sessionQuery).data?.user
+  const admin = user?.role === 'admin'
+  // A section's keys, unless the user turned the shortcuts of one key off.
+  const singleKeys = user?.single_key_shortcuts !== false
   const s = t.shortcuts.sections
   const found = (c: Command) => matches(q, [c.label, c.words])
 
@@ -340,7 +343,7 @@ function useGroups(query: string, actions: Command[]): Group[] {
     id: `go-${to}`,
     icon,
     label,
-    keys: `G ${letter}`,
+    ...(singleKeys && { keys: `G ${letter}` }),
     run: () => {
       void navigate({ to })
     },

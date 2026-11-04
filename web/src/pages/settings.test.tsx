@@ -1038,3 +1038,27 @@ test('tokens that did not come say why, and come when asked again', async () => 
   fireEvent.click(tokens.getByRole('button', { name: 'Try again' }))
   expect(await tokens.findByRole('heading', { name: 'iPhone' })).toBeDefined()
 })
+
+// The appearance's switch turns the shortcuts of one key off for the
+// user, at once; the session holds it, so N no longer logs a meal.
+test('the shortcuts of one key are turned off in the appearance, and N does nothing', async () => {
+  const server = settingsServer()
+  renderAt('/settings/appearance')
+
+  const shortcuts = await screen.findByRole('switch', { name: 'Shortcuts of one key' })
+  expect(shortcuts.getAttribute('aria-checked')).toBe('true')
+  fireEvent.click(shortcuts)
+  await waitFor(() => {
+    expect(server.sent['PATCH /api/v1/me']).toEqual([{ single_key_shortcuts: false }])
+  })
+  await waitFor(() => {
+    expect(shortcuts.getAttribute('aria-checked')).toBe('false')
+  })
+  expect(await screen.findByText('Saved')).toBeDefined()
+
+  fireEvent.keyDown(document.body, { key: 'n' })
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 50))
+  })
+  expect(screen.queryByRole('dialog', { name: /^(Breakfast|Lunch|Snack|Dinner)$/ })).toBeNull()
+})

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, renderHook } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
-import { useShortcuts } from '@/lib/shortcuts'
+import { useShortcuts, useSingleKeyShortcuts } from '@/lib/shortcuts'
 
 // tick lets a sequence begun end, as the browser's next task does.
 const tick = () => new Promise((r) => setTimeout(r))
@@ -116,4 +116,41 @@ test("a page's keys are typed again once it is gone", () => {
   plan.unmount()
   expect(press('a')).toBe(true)
   expect(typed.mock.calls).toEqual([['a']])
+})
+
+// With the shortcuts of one key off, a letter, a sign and a sequence do
+// nothing and type nothing; Ctrl or ⌘ and a key, and an arrow, still
+// work; on again, so do they.
+test('the shortcuts of one key off leave those with a modifier and the arrows', async () => {
+  const n = vi.fn<() => void>()
+  const help = vi.fn<() => void>()
+  const gd = vi.fn<() => void>()
+  const palette = vi.fn<() => void>()
+  const left = vi.fn<() => void>()
+  const typed = vi.fn<(key: string) => void>()
+  const { rerender } = renderHook(
+    ({ on }: { on: boolean }) => {
+      useSingleKeyShortcuts(on)
+      useShortcuts({ n, '?': help, 'g d': gd, 'Mod+k': palette, ArrowLeft: left }, typed)
+    },
+    { initialProps: { on: false } },
+  )
+  for (const key of ['n', 'N', '?', 'g', 'd', 'q', '5']) {
+    expect(press(key)).toBe(false)
+  }
+  await tick()
+  expect(n).not.toHaveBeenCalled()
+  expect(help).not.toHaveBeenCalled()
+  expect(gd).not.toHaveBeenCalled()
+  expect(typed).not.toHaveBeenCalled()
+  expect(!fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })).toBe(true)
+  expect(palette).toHaveBeenCalledOnce()
+  expect(press('ArrowLeft')).toBe(true)
+  expect(left).toHaveBeenCalledOnce()
+
+  rerender({ on: true })
+  expect(press('n')).toBe(true)
+  expect(n).toHaveBeenCalledOnce()
+  press('q')
+  expect(typed).toHaveBeenCalledWith('q')
 })

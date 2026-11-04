@@ -1552,8 +1552,13 @@ the first spec.
     before or after. No one key writes data from anywhere: yesterday's
     meal again is the palette's alone, and a meal's R only its focused
     row's. These keys of one character are a concern of WCAG 2.1.4 (for
-    speech input); a setting to turn them off is planned, tracked as a
-    task of its own. A key held down runs its action once. The command
+    speech input): a switch in the settings' Appearance, the user's own
+    (`single_key_shortcuts`, on by default, kept on every device), turns
+    them off, and then N, W, G and a letter, ? and /, a proposal's A and
+    X, and typing on the day do nothing, the palette and the list of the
+    shortcuts no longer show them, and the list says so; ⌘K, ⌘Z, ⌘↵, the
+    arrows and a focused row's keys still work. A key held down runs its
+    action once. The command
     palette (a Base UI dialog, from any
     screen; the sidebar's Search… too) is a field over rows, each with its
     icon, its name and its key: with nothing typed the actions (log a

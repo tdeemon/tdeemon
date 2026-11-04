@@ -4,6 +4,7 @@ import { Keyboard, Plus, Repeat2, Scale, Undo2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 
 import { pushDeviceQuery } from '@/api/push'
+import { sessionQuery } from '@/api/session'
 import { AppNav } from '@/components/app-nav'
 import { CommandPalette, type Command } from '@/components/command-palette'
 import { LogToday } from '@/components/day/log-today'
@@ -14,7 +15,7 @@ import { StaleBar } from '@/components/stale-bar'
 import { useMessages } from '@/i18n/messages'
 import { formPage } from '@/lib/form-page'
 import { LogHereContext, type LogHere } from '@/lib/log-here'
-import { apple, useShortcuts } from '@/lib/shortcuts'
+import { apple, useShortcuts, useSingleKeyShortcuts } from '@/lib/shortcuts'
 import { useUndoLatest } from '@/lib/undo'
 import { cn } from '@/lib/utils'
 
@@ -44,6 +45,9 @@ export function AppLayout() {
   // This device's notifications, told to the server again as the app
   // opens: iOS can drop a subscription without a word.
   useQuery(pushDeviceQuery)
+  // The user's shortcuts of one key, on until they turn them off.
+  const singleKeys = useQuery(sessionQuery).data?.user.single_key_shortcuts !== false
+  useSingleKeyShortcuts(singleKeys)
   const form = useRouterState({ select: (state) => formPage(state.location) })
   const [logging, setLogging] = useState(false)
   // What opened the meal to log, which the focus goes back to.
@@ -147,8 +151,7 @@ export function AppLayout() {
         icon: Plus,
         label: t.palette.logMeal,
         words: k.logMeal,
-        keys: 'N',
-        aria: 'N',
+        ...(singleKeys && { keys: 'N', aria: 'N' }),
         run: () => {
           log(paletteFrom.current)
         },
@@ -158,8 +161,7 @@ export function AppLayout() {
         icon: Scale,
         label: t.palette.weighIn,
         words: k.weighIn,
-        keys: 'W',
-        aria: 'W',
+        ...(singleKeys && { keys: 'W', aria: 'W' }),
         run: () => {
           weigh(paletteFrom.current)
         },
@@ -193,8 +195,7 @@ export function AppLayout() {
         icon: Keyboard,
         label: t.palette.shortcuts,
         words: k.shortcuts,
-        keys: '?',
-        aria: '?',
+        ...(singleKeys && { keys: '?', aria: '?' }),
         run: () => {
           setShortcuts(true)
         },
@@ -251,7 +252,7 @@ export function AppLayout() {
         actions={actions}
         opener={paletteFrom}
       />
-      <ShortcutsDialog open={shortcuts} onOpenChange={setShortcuts} />
+      <ShortcutsDialog open={shortcuts} onOpenChange={setShortcuts} singleKeys={singleKeys} />
     </>
   )
 }

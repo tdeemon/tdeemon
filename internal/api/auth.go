@@ -225,12 +225,15 @@ type userBody struct {
 	Locale       string `json:"locale" enum:"en,hr" doc:"The language of the app."`
 	TimeZone     string `json:"timezone" example:"Europe/Zagreb" doc:"An IANA time zone."`
 	DayStartHour int    `json:"day_start_hour" minimum:"0" maximum:"23" doc:"The hour at which the user's day starts; a meal before it belongs to the day before."`
+	// SingleKeyShortcuts is the web app's to read.
+	SingleKeyShortcuts bool `json:"single_key_shortcuts" doc:"Whether the web app's shortcuts of one key (N, W, G and a letter, ? and /) work; those with Ctrl or ⌘ always do."`
 }
 
 func newUserBody(u user.User) userBody {
 	return userBody{
 		ID: u.ID.String(), Email: u.Email, Name: u.Name, Role: string(u.Role),
 		Locale: u.Locale, TimeZone: u.TimeZone, DayStartHour: u.DayStartHour,
+		SingleKeyShortcuts: !u.NoSingleKeyShortcuts,
 	}
 }
 

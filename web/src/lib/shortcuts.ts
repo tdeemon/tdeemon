@@ -16,6 +16,24 @@ const ownKeys = [
   '[role="dialog"]',
 ].join(', ')
 
+// singleKeys tells whether the shortcuts of one key work: a letter, a
+// digit or a sign alone (N, W, G and a letter, ? and /, and what typing
+// starts), which speech input can set off (WCAG 2.1.4). The user's
+// setting, which useSingleKeyShortcuts sets; those with Ctrl or ⌘, and
+// the keys that type nothing (an arrow, Escape), work either way.
+let singleKeys = true
+
+// useSingleKeyShortcuts turns the shortcuts of one key of every page on
+// or off, as the user's setting says.
+export function useSingleKeyShortcuts(on: boolean) {
+  useEffect(() => {
+    singleKeys = on
+    return () => {
+      singleKeys = true
+    }
+  }, [on])
+}
+
 // How long the second key of a sequence (g, then d) is waited for.
 const sequenceMs = 1500
 
@@ -69,7 +87,8 @@ function keyOf(event: KeyboardEvent): string | undefined {
 }
 
 // useShortcuts runs the action of a key pressed on the page, outside a
-// field or a control that takes keys itself: by its KeyboardEvent.key,
+// field or a control that takes keys itself, unless it is a key of one
+// character and those are off (useSingleKeyShortcuts): by its KeyboardEvent.key,
 // "Mod+z" for one with Ctrl or ⌘ (Ctrl+Shift+Z is "Mod+Z", another), or
 // a sequence of two ("g d", the second within a second and a half of the
 // first). The actions of the latest render run, and a sequence begun
@@ -103,7 +122,9 @@ export function useShortcuts(
         return
       }
       const key = keyOf(event)
-      if (key === undefined) {
+      // A character alone, with the shortcuts of one key off, is nobody's:
+      // no action, no sequence and nothing typed.
+      if (key === undefined || (!singleKeys && /^.$/u.test(key))) {
         return
       }
       const before = sequenceBefore(event)

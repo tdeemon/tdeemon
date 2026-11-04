@@ -83,9 +83,10 @@ func (db *DB) UserCredentials(ctx context.Context, email string) (user.User, str
 // userColumns are the columns scanUser reads; userColumnsOfU the same,
 // for a query that calls the users table u.
 const (
-	userColumns    = "id, email, name, role, locale, timezone, day_start_hour, created_at, updated_at, disabled_at"
+	userColumns = "id, email, name, role, locale, timezone, day_start_hour, created_at, updated_at, disabled_at, " +
+		"no_single_key_shortcuts"
 	userColumnsOfU = "u.id, u.email, u.name, u.role, u.locale, u.timezone, u.day_start_hour, u.created_at, u.updated_at, " +
-		"u.disabled_at"
+		"u.disabled_at, u.no_single_key_shortcuts"
 )
 
 // scanUser reads the columns of userColumns, then any extra ones into
@@ -99,6 +100,7 @@ func scanUser(scan func(dest ...any) error, extra ...any) (user.User, error) {
 	)
 	dest := append([]any{
 		&id, &u.Email, &u.Name, &role, &u.Locale, &u.TimeZone, &u.DayStartHour, &createdAt, &updatedAt, &disabledAt,
+		&u.NoSingleKeyShortcuts,
 	}, extra...)
 	if err := scan(dest...); err != nil {
 		return user.User{}, err
@@ -225,6 +227,9 @@ func (s Settings) Validate() error {
 type SettingsChange struct {
 	Name, Locale, TimeZone *string
 	DayStartHour           *int
+	// SingleKeyShortcuts turns the web app's shortcuts of one key on or
+	// off.
+	SingleKeyShortcuts *bool
 }
 
 // ErrInvalidSettings is a change that would leave settings the rules
@@ -261,13 +266,17 @@ func (db *DB) ChangeSettings(ctx context.Context, id uuid.UUID, c SettingsChange
 		if c.DayStartHour != nil {
 			u.DayStartHour = *c.DayStartHour
 		}
+		if c.SingleKeyShortcuts != nil {
+			u.NoSingleKeyShortcuts = !*c.SingleKeyShortcuts
+		}
 		s := Settings{Name: u.Name, Locale: u.Locale, TimeZone: u.TimeZone, DayStartHour: u.DayStartHour}
 		if err := s.Validate(); err != nil {
 			return fmt.Errorf("%w: %w", ErrInvalidSettings, err)
 		}
 		u.UpdatedAt = now.UTC().Truncate(time.Second)
-		_, err = tx.ExecContext(ctx, `UPDATE users SET name = ?, locale = ?, timezone = ?, day_start_hour = ?, updated_at = ?
-			WHERE id = ?`, u.Name, u.Locale, u.TimeZone, u.DayStartHour, formatTime(now), id.String())
+		_, err = tx.ExecContext(ctx, `UPDATE users SET name = ?, locale = ?, timezone = ?, day_start_hour = ?,
+			no_single_key_shortcuts = ?, updated_at = ? WHERE id = ?`,
+			u.Name, u.Locale, u.TimeZone, u.DayStartHour, u.NoSingleKeyShortcuts, formatTime(now), id.String())
 		return err
 	})
 	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrInvalidSettings) {

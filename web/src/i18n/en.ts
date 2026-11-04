@@ -69,6 +69,8 @@ export const en = {
   },
   shortcuts: {
     title: 'Keyboard shortcuts',
+    singleKeysOff:
+      "Shortcuts of one key are off, in Settings › Appearance. Those with Ctrl or ⌘ still work, as do the arrows and a focused row's keys.",
     logMeal: 'Log a meal',
     find: 'Find a food',
     days: 'The day before or after',
@@ -1360,6 +1362,9 @@ export const en = {
     title: 'Settings',
     appearance: 'Appearance',
     appearanceHint: 'For this browser only, so a phone can be dark and a laptop light.',
+    singleKeys: 'Shortcuts of one key',
+    singleKeysHint:
+      "N, W, G and a letter, ? and /, and typing on the day. Off, speech input cannot set one off. Those with Ctrl or ⌘ still work, as do the arrows and a focused row's keys. For your account, on every device.",
     themes: {
       system: 'System',
       light: 'Light',

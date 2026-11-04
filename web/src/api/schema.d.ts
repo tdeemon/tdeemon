@@ -747,7 +747,7 @@ export interface paths {
         head?: never;
         /**
          * Change your settings
-         * @description Needs a web session. Changes the name, the language, the time zone and the hour the day starts, those given only. What was logged before keeps the day it was logged on.
+         * @description Needs a web session. Changes the name, the language, the time zone, the hour the day starts and whether the web app's shortcuts of one key work, those given only. What was logged before keeps the day it was logged on.
          */
         patch: operations["set-settings"];
         trace?: never;
@@ -3350,6 +3350,8 @@ export interface components {
             locale?: "en" | "hr";
             /** @description The name the app shows. */
             name?: string;
+            /** @description Whether the web app's shortcuts of one key work. */
+            single_key_shortcuts?: boolean;
             /**
              * @description An IANA time zone.
              * @example Europe/Zagreb
@@ -3742,6 +3744,8 @@ export interface components {
              * @enum {string}
              */
             role: "admin" | "user";
+            /** @description Whether the web app's shortcuts of one key (N, W, G and a letter, ? and /) work; those with Ctrl or ⌘ always do. */
+            single_key_shortcuts: boolean;
             /**
              * @description An IANA time zone.
              * @example Europe/Zagreb

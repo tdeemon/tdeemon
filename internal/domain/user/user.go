@@ -66,6 +66,11 @@ type User struct {
 	// DisabledAt is when the admin deactivated the user, who then cannot
 	// sign in; nil for an active user.
 	DisabledAt *time.Time
+	// NoSingleKeyShortcuts turns off the web app's shortcuts of one key
+	// (N, W, G and a letter, ?, / and typing on the day), which speech
+	// input can set off (WCAG 2.1.4); those with Ctrl or ⌘ and a focused
+	// row's keys stay.
+	NoSingleKeyShortcuts bool
 }
 
 // NormalizeEmail returns the address as tdeemon stores and compares it:

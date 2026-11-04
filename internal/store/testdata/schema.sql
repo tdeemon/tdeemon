@@ -693,7 +693,9 @@ CREATE TABLE users (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 , sex TEXT CHECK (sex IN ('male', 'female')), birth_date TEXT
-CHECK (birth_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'), height_cm REAL CHECK (height_cm BETWEEN 50 AND 275), disabled_at TEXT CHECK (disabled_at <> '')) STRICT;
+CHECK (birth_date GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'), height_cm REAL CHECK (height_cm BETWEEN 50 AND 275), disabled_at TEXT CHECK (disabled_at <> ''), no_single_key_shortcuts INTEGER NOT NULL DEFAULT 0 CHECK (
+    no_single_key_shortcuts IN (0, 1)
+)) STRICT;
 
 CREATE UNIQUE INDEX users_email ON users (email);
 

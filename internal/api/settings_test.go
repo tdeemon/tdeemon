@@ -58,6 +58,38 @@ func TestSetSettings(t *testing.T) {
 	}
 }
 
+// The shortcuts of one key are on for a user until they turn them off,
+// which the session says after.
+func TestSetSingleKeyShortcuts(t *testing.T) {
+	t.Parallel()
+
+	in, session := signedIn(t)
+	cookies := []*http.Cookie{session}
+	shortcuts := func() bool {
+		t.Helper()
+		var got struct {
+			User struct {
+				SingleKeyShortcuts bool `json:"single_key_shortcuts"`
+			} `json:"user"`
+		}
+		rec := in.do(t, http.MethodGet, "/api/v1/auth/session", "", cookies, nil)
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		return got.User.SingleKeyShortcuts
+	}
+	if !shortcuts() {
+		t.Error("a new user's shortcuts of one key are off, want on")
+	}
+	if rec := in.do(t, http.MethodPatch, "/api/v1/me", `{"single_key_shortcuts": false}`, cookies, nil); rec.Code != http.StatusOK ||
+		!strings.Contains(rec.Body.String(), `"single_key_shortcuts":false`) {
+		t.Fatalf("turned off: %d %s", rec.Code, rec.Body.String())
+	}
+	if shortcuts() {
+		t.Error("the session after: the shortcuts on, want off")
+	}
+}
+
 // A refusal of settings gives each reason, in one line, without the
 // store's words around them.
 func TestSetSettingsRefusal(t *testing.T) {
