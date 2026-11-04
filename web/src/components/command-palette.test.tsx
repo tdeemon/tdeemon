@@ -283,12 +283,15 @@ test('the palette says it in Croatian, and nothing found', async () => {
 // is not logged again, and R says there is none. A meal's own row, a
 // phone's card too, takes R itself; a refusal is said.
 test('R repeats yesterday as it is now, never a focused meal, and says why it did not', async () => {
+  let posted = 0
   const { logged, yesterday } = server({
-    'POST /api/v1/meals': () =>
-      Response.json(
+    'POST /api/v1/meals': () => {
+      posted++
+      return Response.json(
         { status: 409, title: 'Conflict', detail: 'the food is archived' },
         { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
-      ),
+      )
+    },
   })
   renderAt('/foods')
   await screen.findByRole('heading', { name: 'Foods', level: 1 })
@@ -306,6 +309,8 @@ test('R repeats yesterday as it is now, never a focused meal, and says why it di
   document.body.append(row)
   row.focus()
   fireEvent.keyDown(row, { key: 'r' })
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(posted).toBe(0)
   row.remove()
 
   // Refused, R says why.
