@@ -12,7 +12,7 @@ this guide has the rest.
 - [Telegram](#telegram), [notifications on a device](#notifications-on-a-device-web-push)
   and [single sign-on](#single-sign-on-openid-connect)
 - [API tokens](#api-tokens), [MCP](#mcp) (an AI coach), and imports from
-  [Apple Health](#import-from-apple-health) and [Strong](#import-from-strong)
+  [Apple Health](#import-from-apple-health)
 - [Data](#data): backups and restore
 - [Upgrade](#upgrade)
 
@@ -343,7 +343,7 @@ when their data stop coming:
   missed, as a day of a user who moves changes its steps;
 - an ingest token unused for more than 3 days: the device that sends
   with it has stopped. Every ingest token counts as a daily device's, so
-  one that sends only now and then (a Strong export twice a week) alarms
+  one that sends only now and then (a script twice a week) alarms
   after each pause, until the alarms have settings.
 
 Each stop alarms once (and a chat that blocked the bot, not at all); it
@@ -613,8 +613,7 @@ never removes them: it cannot tell that it holds every workout of a day
 (an automation may send part of a day, or some kinds of workouts), so a
 workout deleted in Apple Health keeps its day as a training day until
 you set the day's type in the check-in. A workout after today is left
-out, and named under `future`. With this, the Strong
-export below is not needed; the days of either count.
+out, and named under `future`.
 
 A value belongs to the calendar date of its point, the parts of a day's
 total add up, the longest sleep is the night, and the day keeps its
@@ -641,33 +640,6 @@ curl -H 'Authorization: Bearer tdm_…' -H 'Content-Type: application/json' \
 Both routes take an API token, not a web session: what they write is
 recorded as an import. tdeemon keeps the values it reads, not the
 bodies.
-
-### Import from Strong
-
-The Strong app's CSV export (Settings, Export Strong Data) holds the
-whole history of workouts, for someone who does not send Apple Health's
-workouts through Health Auto Export (above). tdeemon keeps the days
-they were on, each workout on the day it starts in, by your day start
-hour, as a meal is: a day with a workout counts as a training day, for
-the targets that differ by the type of day, unless you set the day's
-type in the check-in yourself. It reads the days alone, not the sets,
-and keeps none of the export.
-
-Send the export as it comes, with a token with the `ingest` scope, from
-an iOS Shortcut for instance (Get Contents of URL, method POST, request
-body File, or Form with the file as `file`):
-
-```sh
-curl -H 'Authorization: Bearer tdm_…' -H 'Content-Type: text/csv' \
-  --data-binary @strong_workouts.csv \
-  https://tdeemon.example.com/api/v1/ingest/strong
-```
-
-Each export replaces the days of the one before: a workout you deleted
-in Strong is no longer a day of a workout. A workout on a day after
-your today (a phone's clock set wrong, or a time zone) is left out, and
-the answer's `future` lists its day. An export without a workout up to
-today is refused, so a wrong file cannot clear them.
 
 ## Data
 

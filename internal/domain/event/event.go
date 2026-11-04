@@ -130,7 +130,7 @@ type Event struct {
 	// first day (YYYY-MM-DD), "profile", "limits", "plan" (the training
 	// weekdays), "notes", "autopilot" (its settings), "household", a
 	// review by its day ("review/2026-11-02") or a source of workouts
-	// ("strong"), or for an
+	// ("hae"), or for an
 	// undo the event undone, or "nothing" for an undo under a client's id
 	// that found nothing to take back.
 	Entity string

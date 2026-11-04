@@ -18,31 +18,14 @@ type WorkoutSource string
 
 // Workout sources.
 const (
-	// Strong is the Strong app's export, its whole history each time.
-	Strong WorkoutSource = "strong"
-	// HAE is Health Auto Export's workouts, Apple Health's: a span of
-	// days each time.
+	// HAE is Health Auto Export's workouts, Apple Health's: Strong's and a
+	// watch's alike.
 	HAE WorkoutSource = "hae"
 )
 
 // workoutDaysState is the state of a source's days of workouts.
 type workoutDaysState struct {
 	Days []string `json:"days"`
-}
-
-// SetWorkoutDays replaces the days source recorded a workout on with ds,
-// as an import of source's whole history, and returns the days it added
-// and removed, in order. A day of a workout is a training day unless the
-// check-in's toggle says otherwise (plan.TypeOf), so the toggle is not
-// touched. The same days again record nothing (record), and a day the
-// table cannot hold, such as the zero Date, fails it.
-func (db *DB) SetWorkoutDays(ctx context.Context, userID uuid.UUID, a event.Actor, source WorkoutSource, ds []day.Date,
-	now time.Time,
-) (added, removed []day.Date, err error) {
-	if source != Strong {
-		return nil, nil, fmt.Errorf("invalid workout source %q: want %q", source, Strong)
-	}
-	return db.setWorkoutDays(ctx, userID, a, source, ds, func(day.Date) bool { return true }, now)
 }
 
 // AddWorkoutDays adds the days of ds to the days source recorded a

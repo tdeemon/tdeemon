@@ -28,6 +28,35 @@ func HAEStrength() []string {
 	return out
 }
 
+// Workouts are the days of workouts a payload holds, in order, and how
+// many workouts they are; after UpTo, the days after today it left out,
+// in order too.
+type Workouts struct {
+	Count  int
+	Days   []day.Date
+	Future []day.Date
+	// perDay is how many workouts each day holds.
+	perDay map[day.Date]int
+}
+
+// UpTo returns w with the days after today left out, as a measurement's
+// are (Result.UpTo): a clock set wrong, or a time zone, would put a
+// workout on a day to come, and make it a training day it is not. The
+// days left out are its Future, and their workouts are no longer counted.
+func (w Workouts) UpTo(today day.Date) Workouts {
+	out := Workouts{Days: []day.Date{}, perDay: map[day.Date]int{}}
+	for _, d := range w.Days {
+		if today.Before(d) {
+			out.Future = append(out.Future, d)
+			continue
+		}
+		out.Days = append(out.Days, d)
+		out.Count += w.perDay[d]
+		out.perDay[d] = w.perDay[d]
+	}
+	return out
+}
+
 // HAEWorkouts is what a Health Auto Export payload says of the workouts.
 type HAEWorkouts struct {
 	// Sent reports that the payload has a list of workouts, even an empty

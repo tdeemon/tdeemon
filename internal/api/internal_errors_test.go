@@ -329,8 +329,9 @@ func TestInternalErrorsStayInTheLog(t *testing.T) {
 			}, inside: "refused by the test",
 		},
 		{
-			op: "ingest-strong", method: http.MethodPost, path: "/api/v1/ingest/strong",
-			body:      "Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Seconds\n2026-10-21 06:55:30,Day B,58m,Deadlift,1,120,3,0\n",
+			name: "ingest-hae, the days of workouts",
+			op:   "ingest-hae", method: http.MethodPost, path: "/api/v1/ingest/hae",
+			body:      `{"data":{"workouts":[{"name":"Traditional Strength Training","start":"2026-10-20 18:00:00 +0200"}]}}`,
 			withToken: true,
 			breakIt: func(t *testing.T, in *instance, _ *http.Cookie) string {
 				t.Helper()
@@ -433,9 +434,9 @@ func TestInternalErrorsStayInTheLog(t *testing.T) {
 			}, inside: "refused by the test",
 		},
 		{
-			name: "ingest-strong, the user's calendar",
-			op:   "ingest-strong", method: http.MethodPost, path: "/api/v1/ingest/strong",
-			body:      "Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Seconds\n2026-10-21 06:55:30,Day B,58m,Deadlift,1,120,3,0\n",
+			name: "ingest-hae, the user's calendar",
+			op:   "ingest-hae", method: http.MethodPost, path: "/api/v1/ingest/hae",
+			body:      `{"data":{"workouts":[{"name":"Traditional Strength Training","start":"2026-10-20 18:00:00 +0200"}]}}`,
 			withToken: true,
 			breakIt: func(t *testing.T, in *instance, _ *http.Cookie) string {
 				t.Helper()
