@@ -235,8 +235,10 @@ func (s *sessions) ingestStrong(ctx context.Context, in *ingestStrongInput) (*st
 	}
 	s.logger.InfoContext(ctx, "imported workouts", "user_id", p.User.ID.String(), "workouts", w.Count, "days", len(w.Days),
 		"added", len(added), "removed", len(removed), "future", len(w.Future))
-	return &strongOutput{Body: strongBody{Workouts: w.Count, Days: len(w.Days), Added: dateStrings(added), Removed: dateStrings(removed),
-		Future: dateStrings(w.Future)}}, nil
+	return &strongOutput{Body: strongBody{
+		Workouts: w.Count, Days: len(w.Days),
+		Added: dateStrings(added), Removed: dateStrings(removed), Future: dateStrings(w.Future),
+	}}, nil
 }
 
 func dateStrings(ds []day.Date) []string {
