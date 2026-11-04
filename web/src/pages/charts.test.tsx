@@ -1210,7 +1210,5 @@ test.each([
   renderAt('/progress')
 
   const sum = within(await hero()).getByText(/^Intake/, { selector: 'p' })
-  expect(sum.textContent.replaceAll(/\s+/g, ' ')).toMatch(
-    new RegExp(`^${said.replaceAll(/[+()]/g, '\\$&')} ·`),
-  )
+  expect(sum.textContent.replaceAll(/\s+/g, ' ').startsWith(`${said} ·`)).toBe(true)
 })
