@@ -1,10 +1,11 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { ChevronLeft } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { use, useEffect, useRef, type ReactNode } from 'react'
 
 import { SettingsAvatar } from '@/components/settings-avatar'
 import { buttonVariants } from '@/components/ui/button'
 import { useMessages } from '@/i18n/messages'
+import { FocusTitle } from '@/lib/focus-title'
 import { formPage } from '@/lib/form-page'
 import { useDesktop } from '@/lib/media'
 
@@ -30,6 +31,13 @@ export function SubPage({
   const form = useRouterState({ select: (state) => formPage(state.location) })
   const back = buttonVariants({ variant: 'ghost', className: '-ml-3' })
   const beside = useDesktop() && from === 'settings'
+  const focusTitle = use(FocusTitle)
+  const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (beside && focusTitle?.() === true) {
+      heading.current?.focus()
+    }
+  }, [beside, focusTitle])
 
   return (
     <section className="max-w-2xl space-y-4">
@@ -45,7 +53,13 @@ export function SubPage({
         </div>
       )}
       <header className="space-y-1">
-        <h1 id={titleId} className="text-title">
+        {/* Beside the list, a row gives it the focus (FocusTitle). */}
+        <h1
+          ref={heading}
+          id={titleId}
+          tabIndex={beside ? -1 : undefined}
+          className="text-title outline-none"
+        >
           {title}
         </h1>
         {hint !== undefined && <p className="text-small text-muted-foreground">{hint}</p>}

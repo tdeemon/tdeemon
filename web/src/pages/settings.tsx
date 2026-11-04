@@ -1,11 +1,13 @@
 import { Navigate, Outlet, useChildMatches } from '@tanstack/react-router'
-import { useId } from 'react'
+import { useCallback, useId, useRef } from 'react'
 
 import { AccountCard } from '@/components/settings/account-card'
 import { SettingsFoot } from '@/components/settings/settings-foot'
 import { SettingsList } from '@/components/settings/settings-list'
 import { useMessages } from '@/i18n/messages'
+import { FocusTitle } from '@/lib/focus-title'
 import { useDesktop } from '@/lib/media'
+import { cn } from '@/lib/utils'
 
 // SettingsPage is the user's settings (SettingsList), each a row to its
 // page, and the page open of them: on a desktop the list at the left and
@@ -21,29 +23,54 @@ export function SettingsPage() {
   const open = useChildMatches({
     select: (matches) => matches.some((m) => m.routeId !== '/app/settings/'),
   })
+  // A row of the list beside the page opens another: its title takes the
+  // focus (SubPage), so the keyboard and a screen reader are where the
+  // page is; the desktop's first page, opened of itself, leaves it be.
+  const rowClicked = useRef(false)
+  const focusTitle = useCallback(() => {
+    const clicked = rowClicked.current
+    rowClicked.current = false
+    return clicked
+  }, [])
 
-  if (!desktop) {
-    return <Outlet />
-  }
+  // One tree at any width, the page open in the same place in it, so a
+  // window that crosses a desktop's width keeps the page as it was (an
+  // access key shown once, a draft typed): the list and the name come
+  // beside it, or go.
   return (
-    <section aria-labelledby={id} className="space-y-6">
-      {/* The page open beside the list has the heading of the first
+    <FocusTitle value={focusTitle}>
+      <section aria-labelledby={desktop ? id : undefined} className={cn(desktop && 'space-y-6')}>
+        {/* The page open beside the list has the heading of the first
           level, so its sections are of the second, as on a phone. */}
-      <p id={id} className="text-title">
-        {t.settings.title}
-      </p>
-      <div className="grid grid-cols-[minmax(0,22rem)_minmax(0,1fr)] items-start gap-8">
-        {/* The list stays in sight as the page beside it scrolls. */}
-        <div className="sticky top-8 space-y-4">
-          <SettingsList beside />
-          <SettingsFoot />
+        {desktop && (
+          <p id={id} className="text-title">
+            {t.settings.title}
+          </p>
+        )}
+        <div
+          className={cn(
+            desktop && 'grid grid-cols-[minmax(0,22rem)_minmax(0,1fr)] items-start gap-8',
+          )}
+        >
+          {/* The list stays in sight as the page beside it scrolls. */}
+          {desktop && (
+            <div
+              className="sticky top-8 space-y-4"
+              onClickCapture={() => {
+                rowClicked.current = true
+              }}
+            >
+              <SettingsList beside />
+              <SettingsFoot />
+            </div>
+          )}
+          <div className={cn(desktop && 'max-w-2xl min-w-0')}>
+            {/* A desktop has a page open beside the list: the first's. */}
+            {desktop && !open ? <Navigate to="/settings/appearance" replace /> : <Outlet />}
+          </div>
         </div>
-        <div className="max-w-2xl min-w-0">
-          {/* A desktop has a page open beside the list: the first's. */}
-          {open ? <Outlet /> : <Navigate to="/settings/appearance" replace />}
-        </div>
-      </div>
-    </section>
+      </section>
+    </FocusTitle>
   )
 }
 

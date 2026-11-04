@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import type { components } from '@/api/schema'
@@ -143,6 +143,29 @@ function desktop() {
   }))
 }
 
+// resizable makes the window a phone's, and widened() a desktop's, as
+// matchMedia says and tells those listening.
+function resizable() {
+  let wide = false
+  const listeners = new Set<() => void>()
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    get matches() {
+      return wide && query === '(min-width: 64rem)'
+    },
+    media: query,
+    addEventListener: (_: string, listener: () => void) => listeners.add(listener),
+    removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
+  }))
+  return {
+    widened: () => {
+      wide = true
+      for (const listener of listeners) {
+        listener()
+      }
+    },
+  }
+}
+
 // summaryOf is what a row of a list says of its value.
 function summaryOf(row: HTMLElement): string | null | undefined {
   return document.getElementById(row.getAttribute('aria-describedby') ?? '')?.textContent
@@ -245,6 +268,40 @@ test('on a desktop the list stays beside the page open of it, the first open at 
   fireEvent.click(screen.getByRole('link', { name: 'Recent changes' }))
   expect(await screen.findByRole('heading', { name: 'Recent changes', level: 1 })).toBeDefined()
   expect(router.state.location.pathname).toBe('/settings/changes')
+})
+
+test('a window widened to a desktop keeps the page as it was, a key shown once with it', async () => {
+  const window = resizable()
+  settingsServer()
+  renderAt('/settings/devices?connect=coach')
+
+  const sheet = within(await screen.findByRole('dialog', { name: 'Connect' }))
+  fireEvent.click(sheet.getByRole('button', { name: 'Create the access key' }))
+  expect(await sheet.findByText('tdm_made_up')).toBeDefined()
+
+  // The list comes beside the page, which stays: the sheet, its key.
+  act(() => {
+    window.widened()
+  })
+  // (The sheet, modal, hides the rest from the accessibility tree.)
+  expect(await screen.findByRole('link', { name: 'Appearance', hidden: true })).toBeDefined()
+  expect(screen.getByRole('dialog', { name: 'Connect' })).toBeDefined()
+  expect(screen.getByText('tdm_made_up')).toBeDefined()
+})
+
+test('on a desktop a row gives the focus to the title of the page it opens', async () => {
+  desktop()
+  settingsServer()
+  renderAt('/settings')
+
+  // The first page, opened of itself, leaves the focus be.
+  const appearance = await screen.findByRole('heading', { name: 'Appearance', level: 1 })
+  expect(document.activeElement).not.toBe(appearance)
+  fireEvent.click(screen.getByRole('link', { name: 'Notifications' }))
+  const title = await screen.findByRole('heading', { name: 'Notifications', level: 1 })
+  await waitFor(() => {
+    expect(document.activeElement).toBe(title)
+  })
 })
 
 test("the user's name, language, time zone and day's start are changed, and the app follows", async () => {
