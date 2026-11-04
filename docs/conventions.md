@@ -702,7 +702,10 @@ generator writes it.
   `linkTarget` in `web/src/lib/styles.ts` draws one), but a link in a
   sentence, which is the sentence's size (WCAG 2.5.8); on a desktop, the
   keyboard's first stops show the focus; asked for less motion, nothing
-  moves but by fading. A new screen joins its `screens`. Each screen is
+  moves but by fading; in Croatian, no English word (its `english`
+  list) is shown or names a control, which catches a text written in a
+  component, where the type check of `hr.ts` cannot see it. A new
+  screen joins its `screens`. Each screen is
   photographed as it runs (a phone's in Croatian, a desktop's in English,
   as the design has them), and CI keeps the photographs as the
   `e2e-screens` artifact.

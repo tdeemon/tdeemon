@@ -40,6 +40,9 @@ var version string
 const usage = `Usage:
   tdeemon                           run the server
   tdeemon user create [flags]       add a user
+  tdeemon user demo [flags]         add a user with months of made-up
+                                    data, to try tdeemon or for
+                                    screenshots
   tdeemon user set-password [flags] give a user a new password and end
                                     their sessions
   tdeemon user set-telegram [flags] set the Telegram chat a user's
@@ -63,6 +66,15 @@ Flags of user create:
   --password-stdin   read the password from the first line of standard
                      input; without it, tdeemon generates one and prints
                      it once
+
+Flags of user demo:
+  --email ADDRESS    the address the demo user signs in with (required)
+  --name, --timezone, --locale, --password-stdin
+                     as for user create
+  --days N           how many days of data, up to today (default: 90;
+                     30 to 365)
+  --seed N           picks the data: the same seed gives the same data
+                     (default: 1)
 
 Flags of user set-password:
   --email ADDRESS    the user's address (required)

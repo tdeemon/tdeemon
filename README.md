@@ -58,7 +58,9 @@ docker compose exec tdeemon /tdeemon user create --admin --email you@example.com
 ```
 
 The last command prints your password once. Open the base URL and sign
-in; the first steps on the day take you to a plan.
+in; the first steps on the day take you to a plan. To look around with
+three months of made-up data first, add a demo user:
+`docker compose exec tdeemon /tdeemon user demo --email demo@example.com`.
 
 tdeemon then listens on `127.0.0.1:8080`. For HTTPS, put your reverse
 proxy in front of it, or let Caddy do it: uncomment `COMPOSE_FILE` in

@@ -37,6 +37,8 @@ func userCommand(ctx context.Context, args []string, lookup config.LookupFunc, i
 		return err
 	case "create":
 		return createUser(ctx, args[1:], lookup, in, out)
+	case "demo":
+		return demoUser(ctx, args[1:], lookup, in, out)
 	case "set-password":
 		return setPassword(ctx, args[1:], lookup, in, out)
 	case "set-telegram":
@@ -97,15 +99,8 @@ func createUser(ctx context.Context, args []string, lookup config.LookupFunc, in
 	}
 
 	u := newUser(f, cfg.Location, time.Now())
-	// The hint only helps when the address itself is fine; otherwise
-	// Validate reports the address.
-	if f.name == "" && user.ValidateEmail(u.Email) == nil {
-		if err := user.ValidateName(u.Name); err != nil {
-			return fmt.Errorf("invalid user: the name comes from the part of the address before the @, and %w; set one with --name", err)
-		}
-	}
-	if err := u.Validate(); err != nil {
-		return fmt.Errorf("invalid user:\n%w", err)
+	if err := checkNewUser(u, f.name != ""); err != nil {
+		return err
 	}
 	password, generated, err := choosePassword(f.passwordStdin, in)
 	if err != nil {
@@ -541,6 +536,22 @@ func newUser(f createUserFlags, instanceZone *time.Location, now time.Time) user
 		}
 	}
 	return u
+}
+
+// checkNewUser reports what makes u, a new user of the flags, invalid;
+// named says whether --name named them.
+func checkNewUser(u user.User, named bool) error {
+	// The hint only helps when the address itself is fine; otherwise
+	// Validate reports the address.
+	if !named && user.ValidateEmail(u.Email) == nil {
+		if err := user.ValidateName(u.Name); err != nil {
+			return fmt.Errorf("invalid user: the name comes from the part of the address before the @, and %w; set one with --name", err)
+		}
+	}
+	if err := u.Validate(); err != nil {
+		return fmt.Errorf("invalid user:\n%w", err)
+	}
+	return nil
 }
 
 // readPassword reads the first line of in, without its line ending, and
