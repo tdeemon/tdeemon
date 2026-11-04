@@ -1,3 +1,6 @@
+// The clipboard is read in the page, which has the DOM's types.
+/// <reference lib="dom" />
+
 import { AxeBuilder } from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 
@@ -11,6 +14,9 @@ test("a new user's first steps lead to a plan, one ticked at a time", async ({ p
   const steps = page.getByRole('region', { name: 'First steps' })
   await expect(steps).toBeVisible()
   await expect(steps.getByText('0 of 4')).toBeVisible()
+  // The step after them, the AI coach's, already says what it will be.
+  const coach = steps.getByRole('region', { name: 'Then: ask your AI coach for a plan' })
+  await expect(coach).toBeVisible()
   // Nothing measured nor said yet: no empty check-in, no empty tiles.
   await expect(page.getByRole('region', { name: 'Check-in' })).toContainText('How was today?')
   const body = page.getByRole('region', { name: 'Body today' })
@@ -77,19 +83,22 @@ test("a new user's first steps lead to a plan, one ticked at a time", async ({ p
   await expect(sheet.getByText('Connected', { exact: true })).toBeVisible()
   await sheet.getByRole('button', { name: 'Done' }).click()
 
-  // All four: what to ask the AI coach for.
+  // All four, each ticked: what to ask the AI coach for, copied in a tap.
   await page
     .getByRole('navigation', { name: 'Sections' })
     .getByRole('link', { name: 'Today' })
     .click()
   await expect(steps.getByText('4 of 4')).toBeVisible()
-  await expect(steps.getByText('Ask your AI coach for a plan')).toBeVisible()
-  await expect(
-    steps.getByRole('group', { name: 'Write this to your AI coach' }).locator('code'),
-  ).toHaveText('Look at my data and propose a plan.')
+  await expect(steps.getByRole('link')).toHaveCount(0)
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await coach.getByRole('button', { name: 'Copy' }).click()
+  await expect(coach.getByRole('button', { name: 'Copied' })).toBeVisible()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    'Look at my profile and first weigh-ins in tdeemon and propose a phase and targets. Ask me what you need.',
+  )
 
   // Put off for later, and back from the plan.
-  await steps.getByRole('button', { name: 'Later' }).click()
+  await coach.getByRole('button', { name: 'Later' }).click()
   await expect(steps).toBeHidden()
   await expect(page.getByText('A plan gives the day its target.')).toBeVisible()
   await page

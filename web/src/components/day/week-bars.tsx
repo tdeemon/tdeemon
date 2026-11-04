@@ -115,7 +115,9 @@ export function WeekBars({ date, today }: { date: string; today: string }) {
     'group flex flex-col items-center gap-1.5 rounded-md px-0.5 pt-1 pb-0.5 text-muted-foreground'
 
   return (
-    <nav aria-label={w.label}>
+    // Below 384 px the days reach into the card's padding, so each is
+    // 44 px wide to a finger on a 360 px phone too.
+    <nav aria-label={w.label} className="max-[24rem]:-mx-2">
       <ol className="grid grid-cols-7 gap-1.5 lg:gap-2">
         {dates.map((d) => {
           const day = byDate.get(d)
@@ -155,7 +157,7 @@ export function WeekBars({ date, today }: { date: string; today: string }) {
                   aria-label={w.day(name, said(day))}
                   className={cn(
                     cell,
-                    // 44 px wide to a finger at 390 px too: an ::after
+                    // 44 px wide to a finger on a phone too: an ::after
                     // over half the gap either side.
                     "relative outline-none after:absolute after:-inset-x-0.75 after:inset-y-0 after:content-[''] hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
                   )}

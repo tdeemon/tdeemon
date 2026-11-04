@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BellRing, Smartphone } from 'lucide-react'
+import { BellOff, BellRing, Smartphone } from 'lucide-react'
 import { useEffect } from 'react'
 
 import { $api, fetchClient } from '@/api/client'
 import { HttpError } from '@/api/errors'
 import { pushDeviceQuery } from '@/api/push'
 import { sessionQuery } from '@/api/session'
+import { EmptyState } from '@/components/empty-state'
 import { LoadError } from '@/components/load-error'
 import { Skeleton } from '@/components/skeleton'
 import { Badge } from '@/components/ui/badge'
@@ -105,7 +106,7 @@ export function Notifications() {
   } else if (list.data === undefined) {
     devices = <LoadError title={n.devices} error={list.error} onRetry={() => void list.refetch()} />
   } else if (list.data.subscriptions.length === 0) {
-    devices = <p className="text-small text-muted-foreground">{n.noDevices}</p>
+    devices = <EmptyState icon={BellOff}>{n.noDevices}</EmptyState>
   } else {
     devices = (
       <ul className="space-y-3">

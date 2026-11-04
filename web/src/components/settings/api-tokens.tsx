@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, Plus, Smartphone } from 'lucide-react'
+import { Bot, Plug, Plus, Smartphone } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 
@@ -8,6 +8,7 @@ import { statusOf } from '@/api/errors'
 import { sessionQuery } from '@/api/session'
 import { Ask } from '@/components/ask'
 import { SaveStatus } from '@/components/day/save-status'
+import { EmptyState } from '@/components/empty-state'
 import { LoadError } from '@/components/load-error'
 import { Connect } from '@/components/settings/connect'
 import type { ConnectKind } from '@/components/settings/connect-kinds'
@@ -120,11 +121,9 @@ export function ApiTokens({ connect }: { connect?: ConnectKind | 'choose' | unde
     )
   } else if (list.data.tokens.length === 0) {
     body = (
-      <div className="space-y-3 rounded-lg border border-dashed bg-card p-5">
-        <p className="font-medium">{t.settings.noTokens}</p>
-        <p className="text-small text-muted-foreground">{t.settings.noTokensHint}</p>
-        {add}
-      </div>
+      <EmptyState icon={Plug} title={t.settings.noTokens} action={add}>
+        {t.settings.noTokensHint}
+      </EmptyState>
     )
   } else {
     body = (

@@ -6,7 +6,7 @@ import { $api } from '@/api/client'
 import { HttpError, NoAnswerError, statusOf } from '@/api/errors'
 import { sessionQuery } from '@/api/session'
 import { acceptInvite } from '@/api/sign-in'
-import { BrandMark } from '@/components/brand-mark'
+import { AuthFrame, Or } from '@/components/auth-frame'
 import { LoadError } from '@/components/load-error'
 import { Skeleton } from '@/components/skeleton'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -16,7 +16,7 @@ import { useLocale } from '@/i18n/locale'
 import { useMessages } from '@/i18n/messages'
 import { problem } from '@/i18n/problem'
 import limits from '@/lib/limits.json'
-import { fieldLabel, inputClass, narrowPage } from '@/lib/styles'
+import { fieldLabel, inputClass } from '@/lib/styles'
 import { cn } from '@/lib/utils'
 
 // browserZone is the time zone the new account starts in: the browser's.
@@ -226,7 +226,7 @@ export function InvitePage() {
         </form>
         {oidc && (
           <>
-            <p className="text-center text-sm text-muted-foreground">{t.signIn.or}</p>
+            <Or />
             <Button
               variant="outline"
               className="w-full"
@@ -248,14 +248,5 @@ export function InvitePage() {
     )
   }
 
-  return (
-    <main className={cn(narrowPage, 'max-w-sm space-y-6 pt-10')}>
-      <p className="flex items-center gap-2.5 text-h2">
-        <BrandMark className="size-9" />
-        tdeemon
-      </p>
-      <h1 className="text-2xl font-semibold">{t.invite.title}</h1>
-      {body}
-    </main>
-  )
+  return <AuthFrame title={t.invite.title}>{body}</AuthFrame>
 }

@@ -49,8 +49,8 @@ the tool registry with
 that serves them at `/mcp`, with the coaching sessions as its prompts
 and the methodology as its resource, the API contract and the web app's frame
 (installed as an app, a PWA whose shell opens without a network and
-whose new version a toast offers; signing in, under the product's mark
-and what it is, and out, an account made by an invite's link (a password
+whose new version a toast offers; signing in, in a card under the
+product's mark and what it is, and out, an account made by an invite's link (a password
 or the provider), its
 sections in a bar at the bottom on a phone (none in a form, stepping
 down under a sheet, the settings an avatar in a page's header away),
@@ -64,13 +64,16 @@ sheet's buttons, a delete's for 10 s, and after it the recent changes
 Undo on the next, each number of
 calibration's an ⓘ away from what it is, a page that loads a skeleton
 of its shape under its header, one that did not load saying so there
-with a way to ask again, and what came kept, under a bar that says
+with a way to ask again, a place with nothing yet an icon, a sentence
+and the action that fills it, and what came kept, under a bar that says
 since when, when it cannot be asked again, in English and Croatian)
 with the day (shown at once, with what it shows above its meals, so
 nothing moves them after; under a header of one row, ‹ the title ›, a
 Today pill on another day and the user's mark; a new user's first
 steps to a plan in place of its hero,
-ticked one by one; what is left of the target in a ring, the one
+ticked one by one under a bar of them, the AI coach's step after them
+a card of what to write it, copied in a tap, and on a desktop how
+tdeemon works beside them; what is left of the target in a ring, the one
 number of what is left (the button that logs a meal repeats it), and
 the macros' bars,
 a day past it by more than 5 % in a warm colour and a word, not an error's,

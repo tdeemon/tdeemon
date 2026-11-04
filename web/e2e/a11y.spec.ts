@@ -4,7 +4,7 @@
 import { AxeBuilder } from '@axe-core/playwright'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
 
-import { invite, openMeal, signIn, user } from './user.ts'
+import { invite, newUser, openMeal, signIn, user } from './user.ts'
 
 // The checks of every screen of the app, on a phone and a desktop, in
 // the light and the dark theme, in English and Croatian, and between them
@@ -878,6 +878,77 @@ for (const size of sizes) {
   }
 }
 
+// The screens of a person not signed in, or just signed up: the sign-in
+// page, and a new user's first steps (the e2e server's second user, only
+// looked at here), on a phone and a desktop, in both themes and
+// languages, checked as every screen is, and photographed.
+for (const size of sizes.filter((s) => s.name === 'phone' || s.name === 'desktop')) {
+  for (const theme of themes) {
+    for (const locale of locales) {
+      test.describe(`${size.name}, ${theme}, ${locale}, signed out`, () => {
+        test.use({
+          viewport: size.viewport,
+          isMobile: size.isMobile,
+          hasTouch: size.hasTouch,
+          colorScheme: theme,
+          // The sign-in page speaks the browser's language.
+          locale: locale === 'hr' ? 'hr-HR' : 'en-US',
+        })
+
+        test.afterEach(async ({ page }) => {
+          // The new user's language back for the first steps' test.
+          await page.request.patch('/api/v1/me', { data: { locale: 'en' } })
+        })
+
+        test('the sign-in and the first steps pass axe, their targets and their focus', async ({
+          page,
+        }, testInfo) => {
+          test.setTimeout(60_000)
+          const check = async (name: string) => {
+            await settled(page)
+            const problems = [
+              ...(await serious(page)),
+              ...(size.hasTouch ? await smallTargets(page) : await unfocused(page)),
+            ]
+            await photograph(page, testInfo, name)
+            return problems
+          }
+          const found: Record<string, string[]> = {}
+          await page.goto('/login')
+          await expect(page.getByLabel(/^(Password|Lozinka)$/)).toBeVisible()
+          const login = await check('login')
+          if (login.length > 0) {
+            found.login = login
+          }
+
+          await page.getByLabel(/^(Email|E-mail)$/).fill(newUser.email)
+          await page.getByLabel(/^(Password|Lozinka)$/).fill(newUser.password)
+          await page.getByRole('button', { name: /^(Sign in|Prijavi se)$/ }).click()
+          await expect(
+            page.getByRole('region', { name: /^(First steps|Prvi koraci)$/ }),
+          ).toBeVisible()
+          // The new user's language is the test's, until the test ends.
+          expect((await page.request.patch('/api/v1/me', { data: { locale } })).ok()).toBe(true)
+          await page.reload()
+          await expect(
+            page.getByRole('region', { name: /^(First steps|Prvi koraci)$/ }),
+          ).toBeVisible()
+          if (size.name === 'desktop') {
+            await expect(
+              page.getByRole('region', { name: /^(How tdeemon works|Kako tdeemon radi)$/ }),
+            ).toBeVisible()
+          }
+          const steps = await check('first-steps')
+          if (steps.length > 0) {
+            found['first-steps'] = steps
+          }
+          expect(found).toEqual({})
+        })
+      })
+    }
+  }
+}
+
 // motions are what the page's elements would move, other than by
 // fading: the properties their transitions change, and those of the
 // animations that run.
@@ -920,6 +991,13 @@ test.describe('with less motion asked for', () => {
     expect(await motions(page)).toEqual([])
     await page.goto('/?log=true')
     await expect(page.getByRole('dialog')).toBeVisible()
+    expect(await motions(page)).toEqual([])
+  })
+
+  test("a new user's first steps only fade", async ({ page }) => {
+    await signIn(page, newUser)
+    await expect(page.getByRole('region', { name: 'First steps' })).toBeVisible()
+    await settled(page)
     expect(await motions(page)).toEqual([])
   })
 })

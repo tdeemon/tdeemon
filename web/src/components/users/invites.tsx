@@ -1,10 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query'
+import { MailOpen } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 
 import { $api } from '@/api/client'
 import { statusOf } from '@/api/errors'
 import { Ask } from '@/components/ask'
+import { EmptyState } from '@/components/empty-state'
 import { LoadError } from '@/components/load-error'
 import { Skeleton } from '@/components/skeleton'
 import { Badge } from '@/components/ui/badge'
@@ -59,7 +61,7 @@ export function Invites({ timeZone }: { timeZone: string }) {
       />
     )
   } else if (list.data.invites.length === 0) {
-    body = <p className="text-small text-muted-foreground">{t.users.noInvites}</p>
+    body = <EmptyState icon={MailOpen}>{t.users.noInvites}</EmptyState>
   } else {
     body = (
       <ul className="space-y-3">

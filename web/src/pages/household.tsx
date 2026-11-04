@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { UserPlus } from 'lucide-react'
+import { House, UserPlus } from 'lucide-react'
 import { useRef, useState } from 'react'
 
 import { householdQuery } from '@/api/household'
 import { sessionQuery } from '@/api/session'
+import { EmptyState } from '@/components/empty-state'
 import { InviteForm } from '@/components/household/invite-form'
 import { Invites } from '@/components/household/invites'
 import { Members } from '@/components/household/members'
@@ -46,7 +47,7 @@ export function HouseholdPage() {
         {members.length > 0 ? (
           <Members members={members} fallback={opener} />
         ) : (
-          <p className="rounded-lg border bg-card p-4">{t.household.none}</p>
+          <EmptyState icon={House}>{t.household.none}</EmptyState>
         )}
         <Button
           ref={opener}

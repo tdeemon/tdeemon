@@ -1560,14 +1560,40 @@ export const en = {
     toDo: 'To do:',
     profile: 'Complete your profile',
     profileDone: 'Your profile',
+    // Under a step to do, how it goes.
+    profileHint: 'Sex, birth date and height',
     weighIn: 'First weigh-in',
+    // Under a weigh-in done: today's, or the trend's of one before.
+    weighedToday: (kg: string) => `${kg} kg today`,
+    trend: (kg: string) => `trend ${kg} kg`,
     connect: 'Connect your AI coach or a phone',
     connectDone: 'Your AI coach or a phone',
+    connectHint: 'The MCP address and a key, in 3 steps',
     meal: 'Log your first meal',
     mealDone: 'Your first meal',
-    ask: 'Ask your AI coach for a plan',
-    write: 'Write this to your AI coach',
+    mealHint: 'Search, a barcode or an estimate',
+    // The step after them, the AI coach's: what to write it, to copy.
+    ask: 'Then: ask your AI coach for a plan',
+    prompt:
+      'Look at my profile and first weigh-ins in tdeemon and propose a phase and targets. Ask me what you need.',
+    copy: 'Copy',
+    copied: 'Copied',
+    // Said as the message is copied, to a screen reader too.
+    copiedSaid: 'Copied. Paste it to your AI coach.',
+    lands: 'The proposal lands in Plan; nothing changes until you accept it.',
     later: 'Later',
+    // Beside the steps on a desktop: the loop, in four rows.
+    how: {
+      title: 'How tdeemon works',
+      log: 'You log what you eat',
+      logText: 'In 2 taps: recent, a barcode, or an estimate.',
+      weigh: 'You weigh in most mornings',
+      weighText: 'The trend, not a day, counts.',
+      measure: 'tdeemon measures your TDEE',
+      measureText: 'From intake and the trend, with its ± interval.',
+      coach: 'Your AI coach proposes; you decide',
+      coachText: 'In your own assistant. Accept, reject or undo.',
+    },
     // The plan's way to show them again, once put off.
     show: 'Show the first steps',
   },
