@@ -14,7 +14,7 @@ import { useId, useRef, useState, type ReactNode } from 'react'
 
 import { $api } from '@/api/client'
 import { sessionQuery } from '@/api/session'
-import type { Day } from '@/api/types'
+import type { Day, RecentMeal } from '@/api/types'
 import { mealName } from '@/components/day/meal-slot'
 import { WeighIn } from '@/components/day/weigh-in'
 import { Button } from '@/components/ui/button'
@@ -40,6 +40,11 @@ function useFirstSteps(day: Day): string | undefined {
     return undefined
   }
   return user
+}
+
+// earliest is when a recent meal was first eaten.
+function earliest(meal: RecentMeal): string {
+  return meal.eaten.reduce((first, e) => (e.at < first ? e.at : first), meal.eaten_at)
 }
 
 // FirstSteps are a new user's way to a plan, the hero of today's page in
@@ -73,9 +78,10 @@ function Steps({ day, user }: { day: Day; user: string }) {
   const trend = summary.data?.trend
   const profile = me.data?.profile
   const caller = tokens.data?.tokens.find((k) => k.last_used_at !== undefined)
-  // The earliest meal known: today's first, else the oldest of the
-  // recent ones, which come newest first.
-  const firstMeal = day.meals[0] ?? meals.data?.meals.at(-1)
+  // The first meal the user ate: of the recent ones (each eaten at one
+  // time or more), the one eaten earliest; today's first until they come.
+  const firstMeal =
+    meals.data?.meals.toSorted((a, b) => (earliest(a) < earliest(b) ? -1 : 1))[0] ?? day.meals[0]
   const done = {
     profile: profile?.missing.length === 0,
     weighIn: weight !== undefined || trend !== undefined,

@@ -302,3 +302,40 @@ test('a first meal without a description is named by what was in it', async () =
   expect(await steps4.findByText('1 of 4')).toBeDefined()
   expect(steps()[3]).toBe('Done:Your first meal|Banana')
 })
+
+// at is a time a meal was eaten, on its day.
+function at(iso: string, day: string) {
+  return { at: iso, day }
+}
+
+test('the first meal is the one eaten earliest, not the one eaten again lately', async () => {
+  fakeServer({
+    ...newUser(),
+    'GET /api/v1/meals/recent': () =>
+      Response.json({
+        meals: [
+          {
+            ...meal,
+            description: 'Oats',
+            eaten_at: '2026-10-22T07:00:00Z',
+            eaten: [
+              at('2026-10-22T07:00:00Z', '2026-10-22'),
+              at('2026-10-20T07:00:00Z', '2026-10-20'),
+            ],
+          },
+          {
+            ...meal,
+            id: '0193c3a5-0000-7000-8000-0000000000a2',
+            description: 'Sandwich',
+            eaten_at: '2026-10-21T12:00:00Z',
+            eaten: [at('2026-10-21T12:00:00Z', '2026-10-21')],
+          },
+        ],
+      }),
+  })
+  renderAt('/')
+
+  const steps4 = await card()
+  expect(await steps4.findByText('1 of 4')).toBeDefined()
+  expect(steps()[3]).toBe('Done:Your first meal|Oats')
+})
