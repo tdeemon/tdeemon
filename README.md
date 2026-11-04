@@ -265,6 +265,20 @@ kubectl exec deploy/tdeemon -- /tdeemon user create --admin --email you@example.
   settings' Users, which shows the link once to copy; the link opens
   the app's `/invite` page, which makes the account. A user exports
   their data or deletes their account in the settings' Account.
+- `tdeemon user demo --email demo@example.com` adds a user with three
+  months of made-up data, to try tdeemon without your own or to take
+  screenshots: a profile, a cut with its targets and training days,
+  generic foods and two recipes, 3 to 5 meals on most days, a weigh-in
+  on most mornings, body fat weekly, steps, sleep, resting heart rate
+  and HRV, check-ins, a day out of calibration, and an AI coach's
+  proposal that waits. The weight follows what the user ate against a
+  hidden TDEE of 2540 to 2660 kcal, so calibration measures one near
+  it. `--days` sets how many days (30 to 365, by default 90) up to
+  today, and `--seed` picks the data: the same seed gives the same data
+  on the same day. It takes `--name`, `--timezone`, `--locale` (the
+  foods' names follow it) and `--password-stdin` as `user create` does,
+  and prints the password the same way. `user delete` removes the user
+  and their data again.
 - The commands read the same `TDEEMON_*` variables as the server, and
   they refuse a database the server has not migrated to their version.
 
