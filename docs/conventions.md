@@ -791,7 +791,7 @@ the API's `locale`); English is the base.
 Adding a language:
 
 1. Add it to `user.Locales()`, and refresh `api/openapi.json` and the
-   web's types (the README's commands).
+   web's types (CONTRIBUTING.md's commands).
 2. The web's type check then asks for the rest: the language in
    `known` and `locales` (`src/i18n/locale.ts`, named in itself), and a
    dictionary of every message (`src/i18n/<code>.ts`, typed `Messages`)

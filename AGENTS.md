@@ -258,7 +258,7 @@ make help          # the other targets
 
 Without mise activated in the shell, run the tools as
 `mise exec -- <tool>`. Run the server with `TDEEMON_BASE_URL`,
-`TDEEMON_SECRET_KEY` and `go run ./cmd/tdeemon`; the README has the
+`TDEEMON_SECRET_KEY` and `go run ./cmd/tdeemon`; CONTRIBUTING.md has the
 details.
 
 ## Rules

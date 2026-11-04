@@ -18,7 +18,7 @@ dir=$(mktemp -d)
 project=tdeemon-compose-test
 cp "$root/deploy/compose/compose.yaml" "$root/deploy/compose/compose.caddy.yaml" \
   "$root/deploy/compose/Caddyfile" "$dir/"
-# The recipe of README.md, "Docker Compose", with the base URL of this
+# The recipe of README.md, "Quick start", with the base URL of this
 # machine, its trailing slash allowed.
 (cd "$dir" && umask 077 && set -C &&
   sed -e "s|^TDEEMON_SECRET_KEY=\$|TDEEMON_SECRET_KEY=$(openssl rand -base64 32)|" \
@@ -55,6 +55,8 @@ compose up -d --wait --wait-timeout 180
 curl -fsS --retry 5 --retry-connrefused http://127.0.0.1:8080/healthz
 curl -fsS http://127.0.0.1:8080/api/v1/info
 echo
+# The quick start's first admin, in the read-only container.
+compose exec -T tdeemon /tdeemon user create --admin --email admin@example.com | grep '^Created admin admin@example.com'
 
 echo "== behind Caddy"
 # As .env.example says, with the test's file too.
