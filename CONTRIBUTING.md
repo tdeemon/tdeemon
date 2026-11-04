@@ -7,6 +7,9 @@ a small fix before you start on it.
 Report a security vulnerability privately, as [SECURITY.md](SECURITY.md)
 describes, never in a public issue.
 
+Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md),
+the Contributor Covenant.
+
 ## Licence of contributions
 
 tdeemon is under the [AGPL-3.0-only](LICENSE), and so is every

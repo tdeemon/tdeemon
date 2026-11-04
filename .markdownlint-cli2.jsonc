@@ -8,5 +8,7 @@
     "MD024": { "siblings_only": true }
   },
   "globs": ["**/*.md"],
-  "ignores": ["**/node_modules/**", "web/dist/**", "internal/webui/dist/**"]
+  // CODE_OF_CONDUCT.md is the Contributor Covenant as published, its
+  // lines unwrapped.
+  "ignores": ["**/node_modules/**", "web/dist/**", "internal/webui/dist/**", "CODE_OF_CONDUCT.md"]
 }
