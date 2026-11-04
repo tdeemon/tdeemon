@@ -1566,7 +1566,8 @@ the first spec.
     the history of changes is the settings' and an undo's toast's.
   - The day judges nothing it shows (§8: logging is never judged; the
     plan works on the week's average). Its hero has what is left of its
-    target in a ring, the one number of what is left on the screen, and
+    target in a ring, the one number of what is left on the screen (the
+    button that logs a meal repeats that same number), and
     beside it what was eaten, the target and its arithmetic ("Target
     2,150 = TDEE 2,679 − 529 deficit", or + a surplus), the TDEE a link
     to the progress; until there is a TDEE, in its place, calibration's
@@ -1574,8 +1575,9 @@ the first spec.
     day's type and the phase under it; and the macros' bars. Under the
     hero, by the time of day: the morning's weigh-in, a proposal that
     waits (at any hour, in the coach's colour: "Claude proposes 2 plan
-    changes", what they are and when it expires), or in the evening how
-    the week ends if today ends there. Within 5 % of the kcal target
+    changes", what they are and when it expires), or in the evening
+    (from 18:00 until the user's day starts) how the week ends if today
+    ends there. Within 5 % of the kcal target
     either way, and 100 kcal at least, a day is on it, in the brand's
     colour; past that, the ring, and the week's columns above the
     target's tick, run on in a warm neutral (`--over`), thinner, so it

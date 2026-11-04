@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import { setLocale } from '@/i18n/locale'
+import { toasts } from '@/lib/toast'
 import {
   day,
   fakeServer,
@@ -67,8 +68,27 @@ test('a change is taken back from its toast, and the toast says so', async () =>
 
   // The history of the changes is a tap from it, the day's header having
   // none.
-  fireEvent.click(screen.getByRole('button', { name: 'Recent changes' }))
-  expect(await screen.findByRole('dialog', { name: 'Recent changes' })).toBeDefined()
+  // Tapped, as a browser does it: the button takes the focus.
+  const open = screen.getByRole('button', { name: 'Recent changes' })
+  open.focus()
+  fireEvent.click(open)
+  const sheet = await screen.findByRole('dialog', { name: 'Recent changes' })
+  // The toast goes while the sheet is open.
+  act(() => {
+    toasts.close('change')
+  })
+  await waitFor(() => {
+    expect(screen.queryByText('Undone: a check-in.')).toBeNull()
+  })
+  // Closed, the focus goes to the page, its first control, as the toast
+  // that opened the sheet may be gone: never to the body.
+  fireEvent.keyDown(sheet, { key: 'Escape' })
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: 'Recent changes' })).toBeNull()
+  })
+  await waitFor(() => {
+    expect(document.getElementById('content')?.contains(document.activeElement)).toBe(true)
+  })
 })
 
 test.each([

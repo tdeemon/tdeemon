@@ -12,7 +12,8 @@ import { useFormat } from '@/i18n/format'
 import { useMessages } from '@/i18n/messages'
 import { hourAt } from '@/lib/zoned'
 
-// The evening starts at 18:00 on the user's clock.
+// The evening starts at 18:00 on the user's clock, and lasts until their
+// day starts.
 const evening = 18
 
 // DayNow is what today's hero has under it, by the time of day: in the
@@ -29,7 +30,11 @@ export function DayNow({ day }: { day: Day }) {
   if (me.data?.today !== day.date) {
     return null
   }
-  const late = user !== undefined && hourAt(now, user.timezone) >= evening
+  // The evening runs on past midnight until the user's day starts: the
+  // logical day is still today then.
+  const hour = user === undefined ? undefined : hourAt(now, user.timezone)
+  const late =
+    user !== undefined && hour !== undefined && (hour >= evening || hour < user.day_start_hour)
   const waits = plan.data?.pending !== undefined
 
   return (

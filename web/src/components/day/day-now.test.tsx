@@ -95,6 +95,19 @@ test('in the evening, the card under the hero says how the day ends the week', a
   ).toBeDefined()
 })
 
+// After midnight the day is still today until the user's day starts (at
+// 4): its evening goes on.
+test('after midnight, before the day starts, the evening card stays', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  // 01:30 in Los Angeles, the night after today.
+  vi.setSystemTime(new Date('2026-10-24T08:30:00Z'))
+  serve()
+  renderAt('/')
+
+  const card = await screen.findByRole('region', { name: 'How the day ends' })
+  expect(card.textContent).toContain('1,770 kcal a day')
+})
+
 test('the evening card speaks Croatian', async () => {
   at(20)
   serve(undefined, 'hr')
@@ -112,7 +125,12 @@ test('before the evening, or while a proposal waits, the day says no end', async
   at(14)
   serve()
   renderAt('/')
-  expect(await screen.findByRole('region', { name: 'Meals' })).toBeDefined()
+  // The week's days came, which the card would say.
+  expect(
+    await within(await screen.findByRole('navigation', { name: 'The week' })).findByRole('link', {
+      name: 'Tue 20: 1,960 of 2,000 kcal',
+    }),
+  ).toBeDefined()
   expect(screen.queryByRole('region', { name: 'How the day ends' })).toBeNull()
   cleanup()
 

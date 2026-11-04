@@ -135,6 +135,12 @@ test('the next change is taken back from the list, after its toast is gone, and 
   fireEvent.click(await sheet.findByRole('button', { name: 'Undo: Deleted: Skyr bowl' }))
 
   expect(await screen.findByText('Undone: a meal deleted.')).toBeDefined()
+  // Its toast leads to no second list of the changes: this one is open.
+  expect(
+    within(screen.getByRole('region', { name: 'Notifications' })).queryByRole('button', {
+      name: 'Recent changes',
+    }),
+  ).toBeNull()
   // Named, so taken back only while it is the latest.
   expect(undos).toEqual([
     { id: expect.any(String) as unknown, last: { action: 'meal.delete', entity: deleted } },

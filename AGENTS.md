@@ -71,7 +71,8 @@ nothing moves them after; under a header of one row, ‹ the title ›, a
 Today pill on another day and the user's mark; a new user's first
 steps to a plan in place of its hero,
 ticked one by one; what is left of the target in a ring, the one
-number of what is left, and the macros' bars,
+number of what is left (the button that logs a meal repeats it), and
+the macros' bars,
 a day past it by more than 5 % in a warm colour and a word, not an error's,
 with the target's arithmetic, the TDEE less the deficit (until there is
 a TDEE, calibration's counts toward it), the day's type in a small

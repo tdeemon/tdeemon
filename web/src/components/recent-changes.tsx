@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Undo2 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type RefObject } from 'react'
 
 import { $api } from '@/api/client'
 import type { components } from '@/api/schema'
@@ -87,14 +87,17 @@ function said(change: Change, t: Messages): string {
 export function RecentChanges({
   open,
   onOpenChange,
+  finalFocus,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  // Where the focus goes once it closes, when what opened it is gone.
+  finalFocus?: RefObject<HTMLElement | null> | undefined
 }) {
   const t = useMessages()
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title={t.changes.title}>
+    <Sheet open={open} onOpenChange={onOpenChange} title={t.changes.title} finalFocus={finalFocus}>
       <List />
     </Sheet>
   )
@@ -172,7 +175,8 @@ function UndoNext({ change, what }: { change: Change; what: string }) {
       aria-label={t.changes.undoOf(what)}
       disabled={latest.pending}
       onClick={() => {
-        latest.undo({ action: change.action, entity: change.entity })
+        // Its toast leads to no other list of the changes: this one.
+        latest.undo({ action: change.action, entity: change.entity }, { changes: false })
       }}
     >
       <Undo2 aria-hidden />

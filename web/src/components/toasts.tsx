@@ -1,7 +1,7 @@
 import { Toast, type ToastObject } from '@base-ui/react/toast'
 import { Link } from '@tanstack/react-router'
 import { X } from 'lucide-react'
-import { useState, type ComponentProps } from 'react'
+import { useRef, useState, type ComponentProps } from 'react'
 
 import { $api } from '@/api/client'
 import { statusOf } from '@/api/errors'
@@ -24,10 +24,12 @@ import { cn } from '@/lib/utils'
 // within it, and F6 takes the focus to them (Base UI), as a sheet leaves
 // them out of what it hides. Rendered within the router, so a toast
 // links a day. An undo's toast leads to the recent changes, in their
-// sheet.
+// sheet, which gives the focus to the page (its first control) once it
+// closes: the toast that opened it may be gone by then.
 export function Toasts() {
   const t = useMessages()
   const [changes, setChanges] = useState(false)
+  const back = useRef<HTMLElement | null>(null)
 
   return (
     <Toast.Provider toastManager={toasts}>
@@ -38,12 +40,13 @@ export function Toasts() {
         >
           <List
             onChanges={() => {
+              back.current = document.getElementById('content')
               setChanges(true)
             }}
           />
         </Toast.Viewport>
       </Toast.Portal>
-      <RecentChanges open={changes} onOpenChange={setChanges} />
+      <RecentChanges open={changes} onOpenChange={setChanges} finalFocus={back} />
     </Toast.Provider>
   )
 }
