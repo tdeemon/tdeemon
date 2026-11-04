@@ -246,8 +246,9 @@ test('the history shows a revision, which is taken back in a step', async () => 
   history.getByRole('heading', { name: 'Oct 20, by Claude (claude-opus-5-5)' })
   history.getByText('Train on Sundays too.')
   expect(rowsOf(region)).toEqual([
-    // Of the day it was applied, not today.
-    ['From Oct 20', 'Before', 'After', 'Δ'],
+    // Of the day it was applied, not today: 2 a.m. in Los Angeles, before
+    // the user's day starts at 4, is the 19th's.
+    ['From Oct 19', 'Before', 'After', 'Δ'],
     ['Training days', 'Mon', 'Sun, Mon', ''],
   ])
 
@@ -327,7 +328,7 @@ test("on a desktop the history's rows stay beside the revision open", async () =
   renderAt('/plan')
   const card = within(await screen.findByRole('region', { name: 'Plan history' }))
   expect(screen.queryByRole('link', { name: 'Plan history' })).toBeNull()
-  fireEvent.click(card.getByRole('link', { name: 'Latest 1' }))
+  fireEvent.click(card.getByRole('link', { name: '1 revision' }))
   const revision = await screen.findByRole('region', { name: /^Oct 20, by/ })
   within(revision).getByText('Train on Sundays too.')
   expect(screen.getByRole('link', { name: /^Oct 20, by/ }).getAttribute('aria-current')).toBe(

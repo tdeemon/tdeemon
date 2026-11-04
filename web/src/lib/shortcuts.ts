@@ -46,9 +46,6 @@ export function useShortcuts(actions: Readonly<Record<string, () => void>>) {
     latest.current = actions
   }, [actions])
   useEffect(() => {
-    // The first key of a sequence, while its second is waited for.
-    let first: string | undefined
-    let waiting: ReturnType<typeof setTimeout> | undefined
     function onKey(event: KeyboardEvent) {
       const now = latest.current
       if (event.defaultPrevented || event.isComposing) {
@@ -61,34 +58,52 @@ export function useShortcuts(actions: Readonly<Record<string, () => void>>) {
       if (key === undefined) {
         return
       }
-      const before = first
-      first = undefined
-      clearTimeout(waiting)
-      const action = (before === undefined ? undefined : now[`${before} ${key}`]) ?? now[key]
+      const before = sequenceBefore(event)
+      // The second key of a sequence begun, a letter, is the sequence's
+      // in every page's shortcuts, wherever it was begun: G, then A, is
+      // no A. Another key (Tab, Enter, an arrow) is its own.
+      const action =
+        (before === undefined ? undefined : now[`${before} ${key}`]) ??
+        (before !== undefined && key.length === 1 ? undefined : now[key])
       if (action) {
         event.preventDefault()
         action()
         return
       }
-      // The second key of a sequence begun is the sequence's, even one
-      // it does not know: no other page's shortcut takes it (G, then A
-      // is no A).
-      if (before !== undefined) {
+      if (before === undefined && Object.keys(now).some((name) => name.startsWith(`${key} `))) {
         event.preventDefault()
-        return
-      }
-      if (Object.keys(now).some((name) => name.startsWith(`${key} `))) {
-        event.preventDefault()
-        first = key
-        waiting = setTimeout(() => {
-          first = undefined
-        }, sequenceMs)
+        begun = { key, at: Date.now(), event }
       }
     }
     globalThis.addEventListener('keydown', onKey)
     return () => {
-      clearTimeout(waiting)
       globalThis.removeEventListener('keydown', onKey)
     }
   }, [])
+}
+
+// begun is the first key of a sequence, shared by every page's shortcuts:
+// its key, when, and its event, which is no second key of its own.
+let begun: { key: string; at: number; event: KeyboardEvent } | undefined
+
+// sequenceBefore is the first key of the sequence event is the second key
+// of, if one was begun within sequenceMs before it; the sequence ends
+// once every listener has seen it.
+
+function sequenceBefore(event: KeyboardEvent): string | undefined {
+  const b = begun
+  if (b === undefined || b.event === event) {
+    return undefined
+  }
+  if (Date.now() - b.at > sequenceMs) {
+    begun = undefined
+    return undefined
+  }
+  // A task, not a microtask: a browser runs those between two listeners.
+  setTimeout(() => {
+    if (begun === b) {
+      begun = undefined
+    }
+  })
+  return b.key
 }

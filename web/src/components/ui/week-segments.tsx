@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 
 // The control's and a day's classes: a segmented control of seven
 // columns, Monday first, one row at any width, no gap between them so
-// each is 44 px wide on a phone; a day chosen is the
+// each is 44 px wide on a phone of 360 px or more; a day chosen is the
 // brand's soft green, as a chosen segment and a chip are.
 const rowClass = 'grid grid-cols-7 rounded-md border border-control-border bg-surface-2 p-1'
 const dayClass =

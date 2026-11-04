@@ -114,6 +114,9 @@ export function RevisionDetail({ rev, plan }: { rev: Proposal; plan: Plan }) {
   const busy = revert.isPending || apply.isPending
   const session = useQuery(sessionQuery)
   const timeZone = session.data?.user.timezone ?? 'UTC'
+  // The user's day starts at this hour, so an hour before it is the day
+  // before's.
+  const startHour = session.data?.user.day_start_hour ?? 0
   const r = t.plan.revisions
 
   async function takeBack() {
@@ -172,7 +175,9 @@ export function RevisionDetail({ rev, plan }: { rev: Proposal; plan: Plan }) {
         changes={rev.changes}
         targets={plan.targets}
         today={
-          rev.decided_at === undefined ? plan.today : dateAt(Date.parse(rev.decided_at), timeZone)
+          rev.decided_at === undefined
+            ? plan.today
+            : dateAt(Date.parse(rev.decided_at) - startHour * 3_600_000, timeZone)
         }
         past
       />
@@ -237,7 +242,10 @@ export function HistoryCard({ plan }: { plan: Plan }) {
             "relative text-small font-semibold text-primary after:absolute after:-inset-3 after:content-['']",
           )}
         >
-          {r.all(plan.revisions.length)}
+          {/* The plan holds its latest ten. */}
+          {plan.revisions.length >= 10
+            ? r.all(plan.revisions.length)
+            : r.count(plan.revisions.length)}
         </Link>
       </div>
       <RevisionList revisions={latest} targets={plan.targets} />

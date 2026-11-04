@@ -41,9 +41,7 @@ export function PlanHistoryPage() {
     const missing = rev !== undefined && asked === undefined
     const open = asked ?? (desktop && rev === undefined ? revisions[0] : undefined)
     const detail = missing ? (
-      <p className="text-sm text-muted-foreground">
-        {r.missing}
-      </p>
+      <p className="text-sm text-muted-foreground">{r.missing}</p>
     ) : (
       open && <RevisionDetail key={open.id} rev={open} plan={plan.data} />
     )

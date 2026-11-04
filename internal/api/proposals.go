@@ -69,7 +69,7 @@ type changePlanInput struct {
 }
 
 // changePlanBody is the user's own change of the plan, in the app: the
-// phases and the targets as a proposal sets them.
+// phases, the targets and the training weekdays as a proposal sets them.
 type changePlanBody struct {
 	Phases           []phaseChangeIn  `json:"phases,omitempty"`
 	Targets          []targetChangeIn `json:"targets,omitempty"`
