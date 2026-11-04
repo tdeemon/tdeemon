@@ -10,9 +10,15 @@ import { invite, newUser, openMeal, signIn, user } from './user.ts'
 // the light and the dark theme, in English and Croatian, and between them
 // on a tablet and a laptop: axe finds nothing serious; on a phone or a
 // tablet, what a finger taps is 44 px or more; what the keyboard reaches
-// shows it has the focus. Each screen is
+// shows it has the focus; in Croatian, no English word shows. Each screen is
 // photographed too, to set beside the design: a phone's in Croatian and
 // a desktop's in English, as the design has them.
+
+// The rationale of the proposal the checks make, an AI coach's words.
+const rationale =
+  'The trend is flat after three weeks, made up for the checks: two lower targets, a week apart, with more carbs on training days for recovery.'
+// What the tests wrote in English that a Croatian screen shows as it is.
+const written = [rationale]
 
 const themes = ['light', 'dark'] as const
 const locales = ['en', 'hr'] as const
@@ -615,8 +621,7 @@ async function makePlan(page: Page) {
   expect(changed.ok()).toBe(true)
   const proposed = await api.post('/api/v1/proposals', {
     data: {
-      rationale:
-        'The trend is flat after three weeks, made up for the checks: two lower targets, a week apart, with more carbs on training days for recovery.',
+      rationale,
       model: 'claude-opus-5-5',
       targets: [
         {
@@ -683,6 +688,32 @@ async function serious(page: Page): Promise<string[]> {
     .flatMap((v) =>
       v.nodes.map((n) => `${v.id}: ${n.target.join(' ')} (${n.failureSummary ?? ''})`),
     )
+}
+
+// english are the English words a Croatian screen shows or names a
+// control by: a text left out of src/i18n, which the type check of hr
+// cannot see. The words are ones no Croatian message has, and no food or
+// meal of the tests has either; what an AI coach wrote (the proposal's
+// rationale) is the user's data, in its own language.
+async function english(page: Page): Promise<string[]> {
+  return page.evaluate((ours) => {
+    const words =
+      /\b(the|and|your|with|Save|Cancel|Delete|Undo|Settings|Today|Search|Close|Back|Loading)\b/
+    const texts = [document.body.innerText]
+    for (const el of document.querySelectorAll('[aria-label], [title], [placeholder], [alt]')) {
+      // Only what the screen shows: not what is inert, hidden or gone.
+      if (el.closest('[inert], [aria-hidden=true]') === null && el.getClientRects().length > 0) {
+        for (const name of ['aria-label', 'title', 'placeholder', 'alt']) {
+          texts.push(el.getAttribute(name) ?? '')
+        }
+      }
+    }
+    return texts
+      .flatMap((text) => text.split('\n'))
+      .map((line) => line.trim())
+      .filter((line) => words.test(line) && !ours.includes(line))
+      .map((line) => `english: ${line}`)
+  }, written)
 }
 
 // smallTargets are what a finger taps on the page, but a link in a
@@ -874,6 +905,7 @@ for (const size of sizes) {
             const problems = [
               ...(await serious(page)),
               ...(size.hasTouch ? await smallTargets(page) : await unfocused(page)),
+              ...(locale === 'hr' ? await english(page) : []),
             ]
             if (problems.length > 0) {
               found[screen.name] = problems
