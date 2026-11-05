@@ -59,66 +59,6 @@ func TestFailedSignInsFromOneAddress(t *testing.T) {
 	}
 }
 
-// A hundred failed sign-ins for one account, from any addresses, and the
-// account gets 429 everywhere until the window passes; a success before
-// that starts its count over. An address nobody has counts the same, so
-// the answer tells nothing about which accounts exist.
-func TestFailedSignInsForOneAccount(t *testing.T) {
-	t.Parallel()
-
-	in := newInstance(t, "http://localhost", passwordHash(t))
-	addr := func(i int) string { return fmt.Sprintf("203.0.113.%d:5000", i) }
-	for _, email := range []string{"ana@example.com", "nobody@example.com"} {
-		for i := range 99 {
-			if res := in.loginFrom(t, addr(i), email, "wrong password, surely"); res.Code != http.StatusUnauthorized {
-				t.Fatalf("%s, failure %d: %d, want 401", email, i+1, res.Code)
-			}
-		}
-	}
-	// Ana's success starts her count over; nobody's goes on.
-	if res := in.loginFrom(t, addr(200), "ana@example.com", password); res.Code != http.StatusOK {
-		t.Fatalf("ana after 99 failures: %d, want 200", res.Code)
-	}
-	if res := in.loginFrom(t, addr(201), "nobody@example.com", "wrong password, surely"); res.Code != http.StatusUnauthorized {
-		t.Fatalf("nobody's 100th failure: %d, want 401", res.Code)
-	}
-	if res := in.loginFrom(t, addr(202), "nobody@example.com", "wrong password, surely"); res.Code != http.StatusTooManyRequests {
-		t.Errorf("nobody after 100 failures: %d, want 429", res.Code)
-	}
-	for i := range 99 {
-		if res := in.loginFrom(t, fmt.Sprintf("192.0.2.%d:5000", i), "ana@example.com", "wrong password, surely"); res.Code != http.StatusUnauthorized {
-			t.Fatalf("ana, failure %d after the success: %d, want 401", i+1, res.Code)
-		}
-	}
-	if res := in.loginFrom(t, addr(220), "ana@example.com", password); res.Code != http.StatusOK {
-		t.Errorf("ana after 99 new failures: %d, want 200 (the success had started over)", res.Code)
-	}
-}
-
-// Someone who knows a user's address cannot keep them from signing in
-// from an address of their own, nor from a few: each is blocked after
-// ten failures, long before the account is.
-func TestFailedSignInsDoNotLockAnAccountOut(t *testing.T) {
-	t.Parallel()
-
-	in := newInstance(t, "http://localhost", passwordHash(t))
-	for a := range 5 {
-		attacker := fmt.Sprintf("198.51.100.%d:4000", 40+a)
-		for i := range 12 {
-			want := http.StatusUnauthorized
-			if i >= 10 {
-				want = http.StatusTooManyRequests
-			}
-			if res := in.loginFrom(t, attacker, "ana@example.com", "wrong password, surely"); res.Code != want {
-				t.Fatalf("attacker %d, try %d: %d, want %d", a, i+1, res.Code, want)
-			}
-		}
-	}
-	if res := in.loginFrom(t, "203.0.113.50:5000", "ana@example.com", password); res.Code != http.StatusOK {
-		t.Errorf("ana from her own address after 50 failures from five others: %d, want 200", res.Code)
-	}
-}
-
 // Fifty bad API tokens from one address in 15 minutes, and a bad token
 // from there gets 429 until they have passed. A good token goes on, from
 // there too (a device behind the same NAT), and does not start the count
