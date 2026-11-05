@@ -10,6 +10,3 @@ Where to start depends on what you came for.
 | Understand the numbers | [Methodology](methodology.md) and [Limits](limits.md) |
 | Know why it is built so | [Design](DESIGN.md) |
 | Contribute | [CONTRIBUTING.md](../CONTRIBUTING.md) and [Conventions](conventions.md) |
-
-`superpowers/` holds the plans and specs of a few larger changes, as
-they were written before the work; they are history, not a guide.
