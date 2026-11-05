@@ -1572,7 +1572,7 @@ var shareVersion = regexp.MustCompile(`^(food_shares .*) version=\d+`)
 // ownerRowsMayChange are the operations that may change an owner's row,
 // and what of it must stay the same. A join of a household adds its
 // members to the recipe the owner shared with the other, as the merge
-// does (docs/superpowers/specs/2026-11-02-household-design.md, rule 5),
+// does (docs/DESIGN.md, "A household"),
 // which counts a version of the owner's share of it.
 var ownerRowsMayChange = map[string]func(row string) string{
 	"accept-household-invite": func(row string) string { return shareVersion.ReplaceAllString(row, "$1") },

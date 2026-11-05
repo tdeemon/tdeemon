@@ -128,10 +128,14 @@ heart rate, HRV, steps and body fat come as small tiles against your
 usual range. Every number has an ⓘ that says what it is, and
 [the methodology](methodology.md) explains them all.
 
-![Progress on a desktop: the measured TDEE of 2,602 kcal ± 83, the
-verdict "too slow", the TDEE against the intake with a proposal
-marked, the weight's trend and the recovery
-tiles](screenshots/desktop-progress-dark.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="screenshots/desktop-progress-dark.png">
+  <img
+    alt="Progress on a desktop: the measured TDEE of 2,602 kcal ± 83, the
+      verdict &quot;too slow&quot;, the TDEE against the intake with a proposal
+      marked, the weight's trend and the recovery tiles"
+    src="screenshots/desktop-progress-light.png">
+</picture>
 
 <img
   width="300"
@@ -149,9 +153,13 @@ too. The plan's page shows the phase, the way to your goal, the
 timeline of phases and the deficit the targets plan. Every change is
 kept in its history, and a change can be reverted from there.
 
-![The plan on a desktop: the cut at -0.5 % a week, the way to the
-goal, a proposal of Claude's and the
-targets](screenshots/desktop-plan-light.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="screenshots/desktop-plan-dark.png">
+  <img
+    alt="The plan on a desktop: the cut at -0.5 % a week, the way to the
+      goal, a proposal of Claude's and the targets"
+    src="screenshots/desktop-plan-light.png">
+</picture>
 
 ## Proposals and limits
 
