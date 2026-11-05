@@ -35,7 +35,8 @@ jobs:
   go:
     name: Go
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # The tests may take go test's -timeout of 20 minutes (Makefile).
+    timeout-minutes: 25
     permissions:
       contents: read
     steps:

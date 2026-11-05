@@ -5,10 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"net/netip"
 	"testing"
 	"time"
+	"uuid"
+
+	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/tdeemon/tdeemon/internal/auth"
+	"github.com/tdeemon/tdeemon/internal/domain/user"
+	"github.com/tdeemon/tdeemon/internal/store/storetest"
 )
 
 func TestLimiter(t *testing.T) {
@@ -180,5 +187,111 @@ func TestLogLevel(t *testing.T) {
 				t.Errorf("logLevel = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// newLimitSessions is the sessions of an instance with Ana, whose
+// password is "correct horse battery staple", checked without a hash: a
+// test of the limits signs in hundreds of times, and argon2id under the
+// race detector takes a quarter of a second each.
+func newLimitSessions(t *testing.T) *sessions {
+	t.Helper()
+
+	db := storetest.Open(t)
+	now := time.Date(2026, 10, 21, 8, 0, 0, 0, time.UTC)
+	u := user.User{
+		ID: uuid.NewV7(), Email: "ana@example.com", Name: "Ana", Role: user.RoleUser,
+		Locale: "en", TimeZone: "UTC", DayStartHour: 4, CreatedAt: now, UpdatedAt: now,
+	}
+	hash, err := auth.HashPassword(t.Context(), "correct horse battery staple")
+	if err != nil {
+		t.Fatalf("HashPassword: %v", err)
+	}
+	if err := db.CreateUser(t.Context(), u, hash); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	s := newTestSessions(db, now)
+	s.verifyLogin = func(_ context.Context, password, encoded string) (bool, error) {
+		return encoded == hash && password == "correct horse battery staple", nil
+	}
+	return s
+}
+
+// loginFrom signs in as email with password from addr, and returns the
+// answer's status.
+func loginFrom(t *testing.T, s *sessions, addr, email, password string) int {
+	t.Helper()
+
+	ctx := context.WithValue(t.Context(), clientAddrKey{}, netip.MustParseAddr(addr))
+	in := &loginInput{}
+	in.Body.Email, in.Body.Password = email, password
+	if _, err := s.login(ctx, in); err != nil {
+		se, ok := errors.AsType[huma.StatusError](err)
+		if !ok {
+			t.Fatalf("login: %v", err)
+		}
+		return se.GetStatus()
+	}
+	return http.StatusOK
+}
+
+// A hundred failed sign-ins for one account, from any addresses, and the
+// account gets 429 everywhere until the window passes; a success before
+// that starts its count over. An address nobody has counts the same, so
+// the answer tells nothing about which accounts exist.
+func TestFailedSignInsForOneAccount(t *testing.T) {
+	t.Parallel()
+
+	const password, wrong = "correct horse battery staple", "wrong password, surely"
+	s := newLimitSessions(t)
+	addr := func(i int) string { return fmt.Sprintf("203.0.113.%d", i) }
+	for _, email := range []string{"ana@example.com", "nobody@example.com"} {
+		for i := range 99 {
+			if code := loginFrom(t, s, addr(i), email, wrong); code != http.StatusUnauthorized {
+				t.Fatalf("%s, failure %d: %d, want 401", email, i+1, code)
+			}
+		}
+	}
+	// Ana's success starts her count over; nobody's goes on.
+	if code := loginFrom(t, s, addr(200), "ana@example.com", password); code != http.StatusOK {
+		t.Fatalf("ana after 99 failures: %d, want 200", code)
+	}
+	if code := loginFrom(t, s, addr(201), "nobody@example.com", wrong); code != http.StatusUnauthorized {
+		t.Fatalf("nobody's 100th failure: %d, want 401", code)
+	}
+	if code := loginFrom(t, s, addr(202), "nobody@example.com", wrong); code != http.StatusTooManyRequests {
+		t.Errorf("nobody after 100 failures: %d, want 429", code)
+	}
+	for i := range 99 {
+		if code := loginFrom(t, s, fmt.Sprintf("192.0.2.%d", i), "ana@example.com", wrong); code != http.StatusUnauthorized {
+			t.Fatalf("ana, failure %d after the success: %d, want 401", i+1, code)
+		}
+	}
+	if code := loginFrom(t, s, addr(220), "ana@example.com", password); code != http.StatusOK {
+		t.Errorf("ana after 99 new failures: %d, want 200 (the success had started over)", code)
+	}
+}
+
+// Someone who knows a user's address cannot keep them from signing in
+// from an address of their own, nor from a few: each is blocked after
+// ten failures, long before the account is.
+func TestFailedSignInsDoNotLockAnAccountOut(t *testing.T) {
+	t.Parallel()
+
+	s := newLimitSessions(t)
+	for a := range 5 {
+		attacker := fmt.Sprintf("198.51.100.%d", 40+a)
+		for i := range 12 {
+			want := http.StatusUnauthorized
+			if i >= 10 {
+				want = http.StatusTooManyRequests
+			}
+			if code := loginFrom(t, s, attacker, "ana@example.com", "wrong password, surely"); code != want {
+				t.Fatalf("attacker %d, try %d: %d, want %d", a, i+1, code, want)
+			}
+		}
+	}
+	if code := loginFrom(t, s, "203.0.113.50", "ana@example.com", "correct horse battery staple"); code != http.StatusOK {
+		t.Errorf("ana from her own address after 50 failures from five others: %d, want 200", code)
 	}
 }

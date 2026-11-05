@@ -56,8 +56,10 @@ lint-other: ## EditorConfig, SQL, Dockerfile, shell scripts, workflows, YAML and
 
 test: test-go test-web test-scripts ## Go tests and Vitest, both with coverage thresholds, then the script tests
 
+# -timeout: internal/api takes 6 to 10 minutes on a CI runner under the
+# race detector, past go test's default of 10.
 test-go: ## Go tests with the race detector; coverage must meet .testcoverage.yml
-	$(MISE) go test -race -coverprofile=coverage.out ./...
+	$(MISE) go test -race -timeout 20m -coverprofile=coverage.out ./...
 	$(MISE) go-test-coverage --config .testcoverage.yml
 
 test-web: $(WEB_DEPS) ## Vitest; coverage must meet the thresholds in web/vite.config.ts
